@@ -227,17 +227,17 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     if skip_external_reactions:
         reactions = [reaction for reaction in reactions if '_EX_' not in reaction.id]
 
-    N = np.zeros(shape=(len(species), len(reactions)))
+    N = np.zeros(shape=(len(species), len(reactions)), dtype='object')
 
     for column, reaction in enumerate(reactions):
         network.reactions.append(Reaction(reaction.id, reaction.name, reaction.reversible))
 
         for metabolite in reaction.reactants:
             row = species_index[metabolite.species]
-            N[row, column] = Fraction(-metabolite.stoichiometry)
+            N[row, column] = Fraction(str(-metabolite.stoichiometry))
         for metabolite in reaction.products:
             row = species_index[metabolite.species]
-            N[row, column] = Fraction(metabolite.stoichiometry)
+            N[row, column] = Fraction(str(metabolite.stoichiometry))
 
         if add_objective and reaction.id == objective_name:
             objective_reaction_column = column
@@ -256,3 +256,13 @@ def add_debug_tags(network):
     for reaction in network.reactions:
         network.metabolites.append(Metabolite('virtual_tag_%s' % reaction.id, 'Virtual tag for %s' % reaction.id, compartment='e'))
     network.N = np.append(network.N, np.identity(len(network.reactions)), axis=0)
+
+
+def to_fractions(matrix):
+    fraction_matrix = matrix.astype('object')
+
+    for row in range(matrix.shape[0]):
+        for col in range(matrix.shape[1]):
+            fraction_matrix[row, col] = Fraction(str(matrix[row, col]))
+
+    return fraction_matrix

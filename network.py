@@ -30,6 +30,10 @@ class Network:
     objective_reaction = None
     right_nullspace = None
 
+    def __init__(self):
+        self.reactions = []
+        self.metabolites = []
+
     def reversible_reaction_indices(self):
         return [index for index, reaction in enumerate(self.reactions) if reaction.reversible]
 

@@ -14,9 +14,9 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], verbose=False)
     """
     G = np.transpose(N)
 
-    for metabolite_index in range(G.shape[0]):
-        if metabolite_index in reversible_columns:
-            G = np.append(G, [-G[metabolite_index, :]], axis=0)
+    for reaction_index in range(G.shape[0]):
+        if reaction_index in reversible_columns:
+            G = np.append(G, [-G[reaction_index, :]], axis=0)
 
     # We use sympy.Matrix so we can calculate the null space in an exact fashion.
     # Linealities are a biological synonym of the null space, and describe the degrees
@@ -24,7 +24,12 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], verbose=False)
     if verbose:
         print('Calculating nullspace of G')
     # G_linealities = np.transpose(nullspace(G))
-    G_linealities = np.asarray(Matrix(G).nullspace(), dtype='float')
+    nullspace_vectors = Matrix(G).nullspace()
+    nullspace = nullspace_vectors[0].T
+    for i in range(1, len(nullspace_vectors)):
+        nullspace = nullspace.row_insert(-1, nullspace_vectors[i].T)
+
+    G_linealities = to_fractions(np.asarray(nullspace.rref()[0], dtype='object'))
     G_linealities = np.append(G_linealities, -G_linealities, axis=0)
 
     if verbose:
@@ -38,10 +43,10 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], verbose=False)
     amount_metabolites = N.shape[0]
     row_tags = np.zeros(shape=(amount_metabolites * 2, amount_metabolites))
 
-    for metabolite_index in range(amount_metabolites):
-        if metabolite_index not in tagged_rows:
-            row_tags[metabolite_index, metabolite_index] = 1
-            row_tags[(metabolite_index + amount_metabolites), metabolite_index] = -1
+    for reaction_index in range(amount_metabolites):
+        if reaction_index not in tagged_rows:
+            row_tags[reaction_index, reaction_index] = 1
+            row_tags[(reaction_index + amount_metabolites), reaction_index] = -1
 
     H_mod = np.append(H, row_tags, axis=0)
     # H_mod = H
@@ -53,7 +58,7 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], verbose=False)
     if rays.shape[0] == 0:
         print('Warning: no feasible Elementary Conversion Modes found')
 
-    return rays
+    return rays, H_cone, H
 
 
 if __name__ == '__main__':
