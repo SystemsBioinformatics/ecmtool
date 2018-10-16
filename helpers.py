@@ -1,6 +1,6 @@
 from fractions import Fraction
-from subprocess import run, STDOUT, DEVNULL, PIPE
-from os import remove
+from subprocess import check_call, STDOUT, PIPE
+from os import remove, devnull as os_devnull
 
 import numpy as np
 import libsbml as sbml
@@ -111,9 +111,10 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, verbose=False
         for row in range(inequality_matrix.shape[0]):
             file.write(' '.join([str(val) for val in inequality_matrix[row, :]]) + '\r\n')
 
-    run(('java -Xms1g -Xmx7g -jar polco.jar -kind text %s -iq tmp/egm_iq_%d.txt -out text tmp/generators_%d.txt' % (
-        '-eq tmp/egm_eq_%d.txt' % rand if equality_matrix is not None else '', rand, rand)).split(' '),
-        stdout=(DEVNULL if not verbose else None), stderr=(DEVNULL if not verbose else None))
+    with open(os_devnull, 'w') as devnull:
+        check_call(('java -Xms1g -Xmx7g -jar polco.jar -kind text %s -iq tmp/egm_iq_%d.txt -out text tmp/generators_%d.txt' % (
+            '-eq tmp/egm_eq_%d.txt' % rand if equality_matrix is not None else '', rand, rand)).split(' '),
+            stdout=(devnull if not verbose else None), stderr=(devnull if not verbose else None))
 
     with open('tmp/generators_%d.txt' % rand, 'r') as file:
         lines = file.readlines()
@@ -121,7 +122,7 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, verbose=False
         for index, line in enumerate(lines):
             result = []
             for value in line.replace('\n', '').split('\t'):
-                result.append(Fraction(value))
+                result.append(Fraction(str(value)))
             yield result
 
     if equality_matrix is not None:

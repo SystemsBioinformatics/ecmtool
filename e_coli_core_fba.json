@@ -10,6 +10,17 @@
   "R_BIOMASS_Ecoli_core_w_GAM": 0.8739215069684909,
 
 
+  "norm_R_EX_co2_e": 26.100551512149988,
+  "norm_R_EX_glc__D_e": -11.442675252,
+  "norm_R_EX_h2o_e": 33.384951512150046,
+  "norm_R_EX_h_e": 20.05999999999154,
+  "norm_R_EX_nh4_e": -5.452799999999751,
+  "norm_R_EX_o2_e": -24.94445151215153,
+  "norm_R_EX_pi_e": -3.678700000004036,
+
+  "norm_R_BIOMASS_Ecoli_core_w_GAM": 1,
+
+
 
   "R_GLCpts": 9.999999999998302,
   "R_TKT1": 1.4969837572618871,

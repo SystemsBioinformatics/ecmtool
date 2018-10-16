@@ -40,7 +40,7 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], verbose=False)
     if verbose:
         print('Appending constraint B == 0')
     # Append B == 0 constraint
-    amount_metabolites = N.shape[0]
+    amount_metabolites, amount_reactions = N.shape[0], N.shape[1]
     row_tags = np.zeros(shape=(amount_metabolites * 2, amount_metabolites))
 
     for reaction_index in range(amount_metabolites):
@@ -51,12 +51,28 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], verbose=False)
     H_mod = np.append(H, row_tags, axis=0)
     # H_mod = H
 
+
+    if verbose:
+        print('Appending constraint biomass == 1')
+    H_bio = np.append(np.zeros(shape=(H_mod.shape[0], 1)), H_mod, axis=1)
+    H_bio = np.append(H_bio, np.zeros(shape=(2, H_bio.shape[1])), axis=0)
+    H_bio[-2, 0] = -1 # -1 * Target biomass concentration change
+    H_bio[-2, -1] = 1 # Biomass metabolite
+    H_bio[-1, 0] = 1 # Target biomass concentration change
+    H_bio[-1, -1] = -1 # -1 Biomass metabolite
+
     if verbose:
         print('Calculating extreme rays C of inequalities system H')
-    rays = np.asarray(list(get_extreme_rays(None, H_mod, verbose=verbose)))
+    rays = np.asarray(list(get_extreme_rays(None, H_bio, verbose=verbose)))
 
     if rays.shape[0] == 0:
         print('Warning: no feasible Elementary Conversion Modes found')
+        return rays, H_cone, H
+
+    # Normalise rays
+    for row in range(rays.shape[0]):
+        rays[row,:] /= rays[row, 0] if rays[row, 0] != 0 else 1
+    rays = rays[:, 1:] # Drop the added column
 
     return rays, H_cone, H
 

@@ -5311,7 +5311,7 @@ xmlns:fbc="http://www.sbml.org/sbml/level3/version1/fbc/version2" xmlns:groups="
       </species>
     </listOfSpecies>
     <listOfParameters>
-      <parameter constant="true" id="cobra_default_lb" name="cobra default - lb" sboTerm="SBO:0000626" units="mmol_per_gDW_per_hr" value="-1000" />
+      <parameter constant="true" id="cobra_default_lb" name="cobra default - lb" sboTerm="SBO:0000626" units="mmol_per_gDW_per_hr" ue="-1000" />
       <parameter constant="true" id="cobra_default_ub" name="cobra default - ub" sboTerm="SBO:0000626" units="mmol_per_gDW_per_hr" value="1000" />
       <parameter constant="true" id="cobra_0_bound" name="cobra 0 - bound" sboTerm="SBO:0000625" units="mmol_per_gDW_per_hr" value="0" />
       <parameter constant="true" id="R_ATPM_lower_bound" name="R ATPM lower - bound" sboTerm="SBO:0000625" units="mmol_per_gDW_per_hr" value="8.39" />
@@ -5818,31 +5818,31 @@ xmlns:fbc="http://www.sbml.org/sbml/level3/version1/fbc/version2" xmlns:groups="
           </rdf:RDF>
         </annotation>
         <listOfReactants>
-          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_3pg_c" stoichiometry="1.496" />
-          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_accoa_c" stoichiometry="3.7478" />
-          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_atp_c" stoichiometry="59.81" />
-          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_e4p_c" stoichiometry="0.361" />
-          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_f6p_c" stoichiometry="0.0709" />
-          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_g3p_c" stoichiometry="0.129" />
-          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_g6p_c" stoichiometry="0.205" />
-          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_gln__L_c" stoichiometry="0.2557" />
-          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_glu__L_c" stoichiometry="4.9414" />
-          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_h2o_c" stoichiometry="59.81" />
-          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_nad_c" stoichiometry="3.547" />
-          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_nadph_c" stoichiometry="13.0279" />
-          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_oaa_c" stoichiometry="1.7867" />
-          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_pep_c" stoichiometry="0.5191" />
-          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_pyr_c" stoichiometry="2.8328" />
-          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_r5p_c" stoichiometry="0.8977" />
+          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_3pg_c" stoichiometry="2" />
+          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_accoa_c" stoichiometry="4" />
+          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_atp_c" stoichiometry="60" />
+          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_e4p_c" stoichiometry="1" />
+          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_f6p_c" stoichiometry="1" />
+          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_g3p_c" stoichiometry="1" />
+          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_g6p_c" stoichiometry="1" />
+          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_gln__L_c" stoichiometry="1" />
+          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_glu__L_c" stoichiometry="5" />
+          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_h2o_c" stoichiometry="60" />
+          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_nad_c" stoichiometry="4" />
+          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_nadph_c" stoichiometry="13" />
+          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_oaa_c" stoichiometry="2" />
+          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_pep_c" stoichiometry="1" />
+          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_pyr_c" stoichiometry="3" />
+          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_r5p_c" stoichiometry="1" />
         </listOfReactants>
         <listOfProducts>
-          <speciesReference constant="true" sboTerm="SBO:0000011" species="M_adp_c" stoichiometry="59.81" />
-          <speciesReference constant="true" sboTerm="SBO:0000011" species="M_akg_c" stoichiometry="4.1182" />
-          <speciesReference constant="true" sboTerm="SBO:0000011" species="M_coa_c" stoichiometry="3.7478" />
-          <speciesReference constant="true" sboTerm="SBO:0000011" species="M_h_c" stoichiometry="59.81" />
-          <speciesReference constant="true" sboTerm="SBO:0000011" species="M_nadh_c" stoichiometry="3.547" />
-          <speciesReference constant="true" sboTerm="SBO:0000011" species="M_nadp_c" stoichiometry="13.0279" />
-          <speciesReference constant="true" sboTerm="SBO:0000011" species="M_pi_c" stoichiometry="59.81" />
+          <speciesReference constant="true" sboTerm="SBO:0000011" species="M_adp_c" stoichiometry="60" />
+          <speciesReference constant="true" sboTerm="SBO:0000011" species="M_akg_c" stoichiometry="4" />
+          <speciesReference constant="true" sboTerm="SBO:0000011" species="M_coa_c" stoichiometry="4" />
+          <speciesReference constant="true" sboTerm="SBO:0000011" species="M_h_c" stoichiometry="60" />
+          <speciesReference constant="true" sboTerm="SBO:0000011" species="M_nadh_c" stoichiometry="4" />
+          <speciesReference constant="true" sboTerm="SBO:0000011" species="M_nadp_c" stoichiometry="13" />
+          <speciesReference constant="true" sboTerm="SBO:0000011" species="M_pi_c" stoichiometry="60" />
         </listOfProducts>
       </reaction>
       <reaction fast="false" fbc:lowerFluxBound="cobra_default_lb" fbc:upperFluxBound="cobra_default_ub" id="R_CO2t" metaid="R_CO2t" name="CO2 transporter via diffusion" reversible="true"
@@ -5935,7 +5935,7 @@ xmlns:fbc="http://www.sbml.org/sbml/level3/version1/fbc/version2" xmlns:groups="
         </fbc:geneProductAssociation>
         <listOfReactants>
           <speciesReference constant="true" sboTerm="SBO:0000010" species="M_h_c" stoichiometry="2" />
-          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_o2_c" stoichiometry="0.5" />
+          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_o2_c" stoichiometry="1" />
           <speciesReference constant="true" sboTerm="SBO:0000010" species="M_q8h2_c" stoichiometry="1" />
         </listOfReactants>
         <listOfProducts>
