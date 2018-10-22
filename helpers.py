@@ -102,20 +102,24 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, verbose=False
         else:
             raise Exception('No equality or inequality argument given')
 
+    # Write equalities system to disk as space separated file
     if equality_matrix is not None:
         with open('tmp/egm_eq_%d.txt' % rand, 'w') as file:
             for row in range(equality_matrix.shape[0]):
                 file.write(' '.join([str(val) for val in equality_matrix[row, :]]) + '\r\n')
 
+    # Write inequalities system to disk as space separated file
     with open('tmp/egm_iq_%d.txt' % rand, 'w') as file:
         for row in range(inequality_matrix.shape[0]):
             file.write(' '.join([str(val) for val in inequality_matrix[row, :]]) + '\r\n')
 
+    # Run external extreme ray enumeration tool
     with open(os_devnull, 'w') as devnull:
         check_call(('java -Xms1g -Xmx7g -jar polco.jar -kind text %s -iq tmp/egm_iq_%d.txt -out text tmp/generators_%d.txt' % (
             '-eq tmp/egm_eq_%d.txt' % rand if equality_matrix is not None else '', rand, rand)).split(' '),
             stdout=(devnull if not verbose else None), stderr=(devnull if not verbose else None))
 
+    # Read resulting extreme rays
     with open('tmp/generators_%d.txt' % rand, 'r') as file:
         lines = file.readlines()
 
@@ -125,6 +129,7 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, verbose=False
                 result.append(Fraction(str(value)))
             yield result
 
+    # Clean up the files created above
     if equality_matrix is not None:
         remove('tmp/egm_eq_%d.txt' % rand)
 
