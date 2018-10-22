@@ -4,7 +4,7 @@ from sympy import *
 from time import time
 
 
-def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], verbose=False):
+def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metabolites=[], output_metabolites=[], verbose=False):
     """
     Calculates the conversion cone as described in (Urbanczik, 2005).
     :param N: stoichiometry matrix
@@ -25,17 +25,18 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], verbose=False)
         print('Calculating nullspace of G')
     # G_linealities = np.transpose(nullspace(G))
     nullspace_vectors = Matrix(G).nullspace()
-    nullspace = nullspace_vectors[0].T
+    nullspace_matrix = nullspace_vectors[0].T
     for i in range(1, len(nullspace_vectors)):
-        nullspace = nullspace.row_insert(-1, nullspace_vectors[i].T)
+        nullspace_matrix = nullspace_matrix.row_insert(-1, nullspace_vectors[i].T)
 
-    G_linealities = to_fractions(np.asarray(nullspace.rref()[0], dtype='object'))
+    G_linealities = to_fractions(np.asarray(nullspace_matrix.rref()[0], dtype='object'))
     G_linealities = np.append(G_linealities, -G_linealities, axis=0)
 
     if verbose:
         print('Calculating extreme rays H of inequalities system G')
     H_cone = np.asarray(list(get_extreme_rays(None, G, verbose=verbose)))
     H = np.append(G_linealities, H_cone, axis=0) if G_linealities.shape[0] else H_cone
+    # H = G_linealities
 
     if verbose:
         print('Appending constraint B == 0')
@@ -48,22 +49,35 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], verbose=False)
             row_tags[reaction_index, reaction_index] = 1
             row_tags[(reaction_index + amount_metabolites), reaction_index] = -1
 
+    if verbose:
+        print('Appending constraint inputs <= 0, outputs >= 0')
+    for index in input_metabolites:
+        row = np.zeros(shape=(1, amount_metabolites))
+        row[0, index] = -1
+        row_tags = np.append(row_tags, row, axis=0)
+    for index in output_metabolites:
+        row = np.zeros(shape=(1, amount_metabolites))
+        row[0, index] = 1
+        row_tags = np.append(row_tags, row, axis=0)
+
     H_mod = np.append(H, row_tags, axis=0)
     # H_mod = H
 
 
-    if verbose:
-        print('Appending constraint biomass == 1')
-    H_bio = np.append(np.zeros(shape=(H_mod.shape[0], 1)), H_mod, axis=1)
-    H_bio = np.append(H_bio, np.zeros(shape=(2, H_bio.shape[1])), axis=0)
-    H_bio[-2, 0] = -1 # -1 * Target biomass concentration change
-    H_bio[-2, -1] = 1 # Biomass metabolite
-    H_bio[-1, 0] = 1 # Target biomass concentration change
-    H_bio[-1, -1] = -1 # -1 Biomass metabolite
+    # if verbose:
+    #     print('Appending constraint biomass == 1')
+    # H_bio = np.append(np.zeros(shape=(H_mod.shape[0], 1)), H_mod, axis=1)
+    # H_bio = np.append(H_bio, np.zeros(shape=(2, H_bio.shape[1])), axis=0)
+    # H_bio[-2, 0] = -1 # -1 * Target biomass concentration change
+    # H_bio[-2, -1] = 1 # Biomass metabolite
+    # H_bio[-1, 0] = 1 # Target biomass concentration change
+    # H_bio[-1, -1] = -1 # -1 Biomass metabolite
+
+    # H_nullspace = np.transpose(nullspace(H_bio))
 
     if verbose:
         print('Calculating extreme rays C of inequalities system H')
-    rays = np.asarray(list(get_extreme_rays(None, H_bio, verbose=verbose)))
+    rays = np.asarray(list(get_extreme_rays(None, H_mod, verbose=verbose)))
 
     if rays.shape[0] == 0:
         print('Warning: no feasible Elementary Conversion Modes found')

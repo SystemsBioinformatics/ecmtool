@@ -211,6 +211,15 @@ def get_sbml_model(path):
 
 
 def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions=True):
+    """
+    Parses an SBML file containing a metabolic network, and returns a Network instance
+    with the metabolites, reactions, and stoichiometry initialised. By default will look
+    for an SBML v3 FBC objective function, and skip reactions that contain '_EX_' in their ID.
+    :param path: string absolute or relative path to the .sbml file
+    :param add_objective: Look for SBML v3 FBC objective definition
+    :param skip_external_reactions: Ignore external reactions, as identified by '_EX_' in their ID
+    :return: Network
+    """
     doc = sbml.readSBMLFromFile(path)
     model = doc.getModel()
     species = list(model.species)
