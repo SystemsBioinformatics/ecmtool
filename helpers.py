@@ -6,6 +6,7 @@ import numpy as np
 import libsbml as sbml
 from random import randint
 from numpy.linalg import svd
+from sympy import Matrix
 
 from network import Network, Reaction, Metabolite
 
@@ -93,7 +94,7 @@ def normalise_betas(result):
     return result
 
 
-def get_extreme_rays(equality_matrix=None, inequality_matrix=None, verbose=False):
+def get_extreme_rays(equality_matrix=None, inequality_matrix=None, fractional=True, verbose=False):
     rand = randint(1, 10 ** 6)
 
     if inequality_matrix is None:
@@ -115,8 +116,10 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, verbose=False
 
     # Run external extreme ray enumeration tool
     with open(os_devnull, 'w') as devnull:
-        check_call(('java -Xms1g -Xmx7g -jar polco.jar -kind text %s -iq tmp/egm_iq_%d.txt -out text tmp/generators_%d.txt' % (
-            '-eq tmp/egm_eq_%d.txt' % rand if equality_matrix is not None else '', rand, rand)).split(' '),
+        check_call(('java -Xms1g -Xmx7g -jar polco.jar -kind text ' +
+                    '-arithmetic %s ' % (' '.join(['fractional' if fractional else 'double'] * 3)) +
+                    ('' if equality_matrix is None else '-eq tmp/egm_eq_%d.txt ' % (rand)) +
+                    '-iq tmp/egm_iq_%d.txt -out text tmp/generators_%d.txt' % (rand, rand)).split(' '),
             stdout=(devnull if not verbose else None), stderr=(devnull if not verbose else None))
 
     # Read resulting extreme rays
@@ -182,7 +185,7 @@ def get_used_rows_columns(A_matrix, result):
     return active_columns, active_rows
 
 
-def nullspace(N, atol=1e-13, rtol=0):
+def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
     """
     Calculates the null space of given matrix N.
     Source: https://scipy-cookbook.readthedocs.io/items/RankNullspace.html
@@ -201,13 +204,25 @@ def nullspace(N, atol=1e-13, rtol=0):
             nullspace; each element in numpy.dot(A, ns) will be approximately
             zero.
     """
-    N = np.atleast_2d(N)
-    u, s, vh = svd(N)
-    tol = max(atol, rtol * s[0])
-    nnz = (s >= tol).sum()
-    ns = vh[nnz:].conj().T
-    return ns
+    if not symbolic:
+        N = np.asarray(N, dtype='float64')
+        u, s, vh = svd(N)
+        tol = max(atol, rtol * s[0])
+        nnz = (s >= tol).sum()
+        ns = vh[nnz:].conj()
+        return ns
+    else:
+        nullspace_vectors = Matrix(N).nullspace()
 
+        # Add nullspace vectors to a nullspace matrix as row vectors
+        # Must be a sympy Matrix so we can do rref()
+        nullspace_matrix = nullspace_vectors[0].T if len(nullspace_vectors) else None
+        for i in range(1, len(nullspace_vectors)):
+            nullspace_matrix = nullspace_matrix.row_insert(-1, nullspace_vectors[i].T)
+
+        return to_fractions(
+            np.asarray(nullspace_matrix.rref()[0], dtype='object')) if nullspace_matrix \
+            else np.ndarray(shape=(0, N.shape[0]))
 
 def get_sbml_model(path):
     doc = sbml.readSBMLFromFile(path)

@@ -9,24 +9,25 @@ metabolite_names <- c("3-Phospho-D-glyceroyl phosphate", "D-Glycerate 2-phosphat
 reaction_names <- c("Acetaldehyde dehydrogenase (acetylating)", "Acetaldehyde reversible transport", "Acetate kinase", "Aconitase (half-reaction A, Citrate hydro-lyase)", "Aconitase (half-reaction B, Isocitrate hydro-lyase)", "Acetate reversible transport via proton symport", "Adenylate kinase", "2-Oxogluterate dehydrogenase", "2 oxoglutarate reversible transport via symport", "Alcohol dehydrogenase (ethanol)", "ATP maintenance requirement", "ATP synthase (four protons for one ATP)", "Biomass Objective Function with GAM", "CO2 transporter via diffusion", "Citrate synthase", "Cytochrome oxidase bd (ubiquinol-8: 2 protons)", "D lactate transport via proton symport", "Enolase", "Ethanol reversible transport via proton symport", "Acetate exchange", "Acetaldehyde exchange", "2-Oxoglutarate exchange", "CO2 exchange", "Ethanol exchange", "Formate exchange", "D-Fructose exchange", "Fumarate exchange", "D-Glucose exchange", "L-Glutamine exchange", "L-Glutamate exchange", "H+ exchange", "H2O exchange", "D-lactate exchange", "L-Malate exchange", "Ammonia exchange", "O2 exchange", "Phosphate exchange", "Pyruvate exchange", "Succinate exchange", "Fructose-bisphosphate aldolase", "Fructose-bisphosphatase", "Formate transport in via proton symport", "Formate transport via diffusion", "Fumarate reductase", "Fructose transport via PEP:Pyr PTS (f6p generating)", "Fumarase", "Fumarate transport via proton symport (2 H)", "Glucose 6-phosphate dehydrogenase", "Glyceraldehyde-3-phosphate dehydrogenase", "D-glucose transport via PEP:Pyr PTS", "Glutamine synthetase", "L-glutamine transport via ABC system", "Glutamate dehydrogenase (NADP)", "Glutaminase", "Glutamate synthase (NADPH)", "L glutamate transport via proton symport  reversible", "Phosphogluconate dehydrogenase", "H2O transport via diffusion", "Isocitrate dehydrogenase (NADP)", "Isocitrate lyase", "D-lactate dehydrogenase", "Malate synthase", "Malate transport via proton symport (2 H)", "Malate dehydrogenase", "Malic enzyme (NAD)", "Malic enzyme (NADP)", "NADH dehydrogenase (ubiquinone-8 & 3 protons)", "NAD transhydrogenase", "Ammonia reversible transport", "O2 transport  diffusion ", "Pyruvate dehydrogenase", "Phosphofructokinase", "Pyruvate formate lyase", "Glucose-6-phosphate isomerase", "Phosphoglycerate kinase", "6-phosphogluconolactonase", "Phosphoglycerate mutase", "Phosphate reversible transport via symport", "Phosphoenolpyruvate carboxylase", "Phosphoenolpyruvate carboxykinase", "Phosphoenolpyruvate synthase", "Phosphotransacetylase", "Pyruvate kinase", "Pyruvate transport in via proton symport", "Ribulose 5-phosphate 3-epimerase", "Ribose-5-phosphate isomerase", "Succinate transport via proton symport (2 H)", "Succinate transport out via proton antiport", "Succinate dehydrogenase (irreversible)", "Succinyl-CoA synthetase (ADP-forming)", "Transaldolase", "NAD(P) transhydrogenase", "Transketolase", "Transketolase", "Triose-phosphate isomerase")
 
 # EFMs as calculated by efmtool
-efms <- read.csv('/Users/tom/Git/ecmtool/e_coli_core_efms.csv', header = FALSE, stringsAsFactors = FALSE)
+efms <- read.csv('/Users/tom/Git/ecmtool/data/e_coli_core_efms.csv', header = FALSE, stringsAsFactors = FALSE)
 colnames(efms) <- reaction_names
 efms_growth <- efms[efms$`Biomass Objective Function with GAM` > 10^-6,]
 efms_normalised <- efms_growth / efms_growth$`Biomass Objective Function with GAM`
 efms_compact <- efms_growth[, colSums(efms_growth) != 0]
 
 # Stoichiometry as dumped by ecmtool, FBA as calculated by CBMPy
-N <- read.csv('/Users/tom/Git/ecmtool/N_all.csv', header = FALSE, stringsAsFactors = FALSE)
-fba_fluxes_gluc <- read.csv('/Users/tom/Git/ecmtool/fba_fluxes_gluc.csv', header = FALSE, stringsAsFactors = FALSE)
+N <- read.csv('/Users/tom/Git/ecmtool/data/N_all.csv', header = FALSE, stringsAsFactors = FALSE)
+fba_fluxes_gluc <- read.csv('/Users/tom/Git/ecmtool/data/fba_fluxes_gluc.csv', header = FALSE, stringsAsFactors = FALSE)
 fba_normalised <- fba_fluxes_gluc / fba_fluxes_gluc[,13]
 internal_reactions = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95)
+colnames(fba_normalised) <- reaction_names
 
 # Determine EFM with lowest euclidean distance to FBA result
 fba_squared_dist_normalised <- as.matrix(pdist(efms_normalised, fba_normalised))
 closest_efm_index <- which.min(fba_squared_dist_normalised)
 
 # ECMs calculated from EFMs
-ecms_calculated <- as.data.frame(t(as.matrix(N[,internal_reactions]) %*% t(efms_growth[, internal_reactions])))
+ecms_calculated <- as.data.frame(t(as.matrix(N[,internal_reactions]) %*% t(efms_normalised[, internal_reactions])))
 colnames(ecms_calculated) <- metabolite_names
 ecms_calculated_unique <- ecms_calculated %>% round(1) %>% distinct()
 
@@ -39,7 +40,7 @@ colnames(closest_ecm_calc) <- metabolite_names
 closest_ecm_calc_normalised <- closest_ecm_calc / closest_ecm_calc$`Virtual objective metabolite`
 
 # ECMs as calculated by means of the conversion cone in ecmtool
-ecms <- read.csv('/Users/tom/Git/ecmtool/e_coli_core_ecms.csv', header = FALSE, stringsAsFactors = FALSE)
+ecms <- read.csv('/Users/tom/Git/ecmtool/data/e_coli_core_ecms_constr.csv', header = FALSE, stringsAsFactors = FALSE)
 colnames(ecms) <- metabolite_names
 ecms_growth <- ecms[ecms$`Virtual objective metabolite` > 10^-6,]
 ecms_normalised <- ecms_growth / ecms_growth$`Virtual objective metabolite`
@@ -118,3 +119,11 @@ for (row in c(1:nrow(ecms_normalised))) {
 for (row in c(1:nrow(ecms_calculated))) {
   result <- is_ecm_feasible(ecms_calculated[row,])
 }
+
+diffs <- apply(ecms_normalised, 1, function(row) { min(as.matrix(pdist(ecms_calculated, row))) })
+
+for (row in dim(ecms_normalised)[1]) {
+  print(min(as.matrix(pdist(ecms_calculated, ecms_normalised[row,]))))
+}
+
+heatmap.2(ecms_normalised, Rowv=FALSE, Colv=FALSE, dendrogram='none', trace='none', key=FALSE,lwid = c(.01,.99),lhei = c(.01,.99),margins = c(5,15 ))

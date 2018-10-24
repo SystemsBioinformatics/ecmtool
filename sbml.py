@@ -27,15 +27,16 @@ if __name__ == '__main__':
     for index, item in enumerate(network.metabolites):
         print(index, item.id, item.name)
 
+    symbolic = True
     inputs = [34, 54, 56, 60] # Glucose, ammonium, O2, phosphate
     c, H_cone, H = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
-                                       # verbose=True)
-                                       input_metabolites=inputs, output_metabolites=np.setdiff1d(network.external_metabolite_indices(), inputs), verbose=True)
+                                       # verbose=True, symbolic=symbolic)
+                                       input_metabolites=inputs, output_metabolites=np.setdiff1d(network.external_metabolite_indices(), inputs), verbose=True, symbolic=symbolic)
     np.savetxt('conversion_cone.csv', c, delimiter=',')
 
     for index, ecm in enumerate(c):
-        if not ecm[-1]:
-            continue
+        # if not ecm[-1]:
+        #     continue
         print('\nECM #%d:' % index)
         for metabolite_index, stoichiometry_val in enumerate(ecm):
             if stoichiometry_val != 0.0:
