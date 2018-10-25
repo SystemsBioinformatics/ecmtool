@@ -40,7 +40,7 @@ colnames(closest_ecm_calc) <- metabolite_names
 closest_ecm_calc_normalised <- closest_ecm_calc / closest_ecm_calc$`Virtual objective metabolite`
 
 # ECMs as calculated by means of the conversion cone in ecmtool
-ecms <- read.csv('/Users/tom/Git/ecmtool/data/e_coli_core_ecms_constr.csv', header = FALSE, stringsAsFactors = FALSE)
+ecms <- read.csv('/Users/tom/Git/ecmtool/conversion_cone.csv', header = FALSE, stringsAsFactors = FALSE)
 colnames(ecms) <- metabolite_names
 ecms_growth <- ecms[ecms$`Virtual objective metabolite` > 10^-6,]
 ecms_normalised <- ecms_growth / ecms_growth$`Virtual objective metabolite`
@@ -49,6 +49,7 @@ ecms_diff <- sweep(as.matrix(ecms_normalised), 1, as.matrix(closest_ecm_calc_nor
 
 # Difference between conversion cone and ECMs calculated from efmtool's EFM matching with FBA result
 heatmap.2(ecms_diff, Rowv=FALSE, Colv=FALSE, dendrogram='none', trace='none', key=FALSE,lwid = c(.01,.99),lhei = c(.01,.99),margins = c(5,15 ))
+heatmap.2(as.matrix(ecms_normalised), Rowv=FALSE, Colv=FALSE, dendrogram='none', trace='none', key=FALSE,lwid = c(.01,.99),lhei = c(.01,.99),margins = c(5,15 ))
 ggcorrplot(round(cor(ecms_normalised), 1))
 
 
@@ -80,6 +81,8 @@ ggcorrplot(round(cor(ecms_normalised), 1))
 # get.solutioncount(mod)
 # get.primal.solution(mod)
 # View(solution)
+
+N_int <- N[,internal_reactions]
 
 is_ecm_feasible <- function(target) {
   # We make an irreversible stoichiometry N_irrev to use the normal lpsolve (which supports only variables >= 0)

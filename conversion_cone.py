@@ -1,6 +1,6 @@
 import numpy as np
 from helpers import *
-from sympy import *
+from sympy import Matrix
 from time import time
 
 
@@ -130,19 +130,21 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
     G = np.transpose(N)
 
     # Add reversible reactions (columns) of N to G in the negative direction as well
-    for reaction_index in range(G.shape[0]):
-        if reaction_index in reversible_columns:
-            G = np.append(G, [-G[reaction_index, :]], axis=0)
+    for metabolite_index in range(G.shape[0]):
+        if metabolite_index in reversible_columns:
+            G = np.append(G, [-G[metabolite_index, :]], axis=0)
+
+    # Add exchange metabolites in both directions
+    for metabolite_index in tagged_rows:
+        G = np.append(G, np.transpose([-G[:, metabolite_index]]), axis=1)
 
     if verbose:
         print('Calculating nullspace of G')
     # Add (reduced row echelon form of) the nullspace matrix to our linealities in positive and negative direction
     # Linealities are a biological synonym of the null space, and describe the degrees
     # of freedom that our generator G has.
-    G_deflated = deflate_matrix(G, tagged_rows)
-    G_linealities_deflated = nullspace(G_deflated, symbolic=symbolic)
-    G_linealities_deflated = np.append(G_linealities_deflated, -G_linealities_deflated, axis=0)
-    G_linealities = inflate_matrix(G_linealities_deflated, tagged_rows, G.shape[1])
+    G_linealities = nullspace(G, symbolic=symbolic)
+    G_linealities = np.append(G_linealities, -G_linealities, axis=0)
 
     # Calculate H as the union of our linealities and the extreme rays of matrix G (all as row vectors)
     if verbose:
@@ -157,34 +159,36 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
     # Create constraints that internal metabolites shouldn't change over time
     if verbose:
         print('Appending constraint B == 0')
-    row_tags = np.zeros(shape=(amount_metabolites * 2, amount_metabolites))
+    row_tags = np.zeros(shape=(amount_metabolites * 2, G.shape[1]))
 
-    for reaction_index in range(amount_metabolites):
-        if reaction_index not in tagged_rows:
-            row_tags[reaction_index, reaction_index] = 1
-            row_tags[(reaction_index + amount_metabolites), reaction_index] = -1
+    for metabolite_index in range(amount_metabolites):
+        if metabolite_index not in tagged_rows:
+            row_tags[metabolite_index, metabolite_index] = 1
+            row_tags[(metabolite_index + amount_metabolites), metabolite_index] = -1
 
     # Create constraints that input metabolites should have seminegative change over time,
     # and outputs semipositive.
     if verbose:
         print('Appending constraint inputs <= 0, outputs >= 0')
     for index in input_metabolites:
-        row = np.zeros(shape=(1, amount_metabolites))
+        row = np.zeros(shape=(1, G.shape[1]))
         row[0, index] = -1
         row_tags = np.append(row_tags, row, axis=0)
     for index in output_metabolites:
-        row = np.zeros(shape=(1, amount_metabolites))
+        row = np.zeros(shape=(1, G.shape[1]))
         row[0, index] = 1
         row_tags = np.append(row_tags, row, axis=0)
 
     # Append above additional constraints to the final version of H
     H_mod = np.append(H, row_tags, axis=0)
+    H_mod_deflated = deflate_matrix(H_mod, tagged_rows + range(amount_metabolites, amount_metabolites+len(tagged_rows)))
 
     if verbose:
         print('Calculating nullspace of H')
         # Add (reduced row echelon form of) the nullspace matrix to our linealities in positive and negative direction
-    H_linealities = nullspace(H_mod, symbolic=symbolic)
-    H_linealities = np.append(H_linealities, -H_linealities, axis=0)
+    H_linealities_deflated = nullspace(H_mod_deflated, symbolic=symbolic)
+    H_linealities_deflated = np.append(H_linealities_deflated, -H_linealities_deflated, axis=0)
+    H_linealities = inflate_matrix(H_linealities_deflated, tagged_rows + range(amount_metabolites, amount_metabolites+len(tagged_rows)), H_mod.shape[1])
 
     # Calculate the extreme rays of this cone H, resulting in the elementary
     # conversion modes of the input system.
@@ -195,6 +199,11 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
     if rays.shape[0] == 0:
         print('Warning: no feasible Elementary Conversion Modes found')
         return rays, H_cone, H
+
+    # Merge the negative exchange metabolite directions with their original again
+    for index, metabolite_index in enumerate(tagged_rows):
+        rays[:, metabolite_index] -= rays[:, amount_metabolites + index]
+    rays = rays[:, 0:amount_metabolites]
 
     return rays, H_cone, H
 
