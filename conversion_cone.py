@@ -142,22 +142,17 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
         for col in range(G.shape[1]):
             G[row, col] = max(0, G[row, col])
 
-    if verbose:
-        print('Calculating nullspace of G')
-    # Add (reduced row echelon form of) the nullspace matrix to our linealities in positive and negative direction
-    # Linealities are a biological synonym of the null space, and describe the degrees
-    # of freedom that our generator G has.
-    G_linealities = np.ndarray(shape=(0,0))
-    # G_linealities = to_fractions(nullspace(G, symbolic=False))
-    # G_linealities = np.append(G_linealities, -G_linealities, axis=0)
-
     # Calculate H as the union of our linealities and the extreme rays of matrix G (all as row vectors)
     if verbose:
         print('Calculating extreme rays H of inequalities system G')
-    # H_cone = np.asarray(list(get_extreme_rays(None, np.append(G, G_linealities, axis=0) if G_linealities.shape[0] else G, fractional=symbolic, verbose=verbose)))
     H_cone = np.asarray(list(get_extreme_rays_cdd(G)))
+    H = H_cone
 
-    H = np.append(G_linealities, H_cone, axis=0) if G_linealities.shape[0] else H_cone
+    for row in range(H_cone.shape[0]):
+        if np.all(np.dot(G, H_cone[row, :]) == 0):
+            # This is a lineality
+            H = np.append(H, [-H_cone[row, :]], axis=0)
+
 
     constraints = np.ndarray(shape=(0, H.shape[1]))
 
@@ -185,8 +180,8 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
     # conversion modes of the input system.
     if verbose:
         print('Calculating extreme rays C of inequalities system H')
-    # rays_full = np.asarray(list(get_extreme_rays(None, H_constrained, fractional=symbolic, verbose=verbose)))
-    rays_full = np.asarray(list(get_extreme_rays_cdd(H_constrained)))
+    rays_full = np.asarray(list(get_extreme_rays(None, H_constrained, fractional=symbolic, verbose=verbose)))
+    # rays_full = np.asarray(list(get_extreme_rays_cdd(H_constrained)))
 
     if rays_full.shape[0] == 0:
         print('Warning: no feasible Elementary Conversion Modes found')
