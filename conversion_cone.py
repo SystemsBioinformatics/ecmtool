@@ -134,20 +134,13 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
         if metabolite_index in reversible_columns:
             G = np.append(G, [-G[metabolite_index, :]], axis=0)
 
-    # Add metabolites in both directions
-    G = np.append(G, -G, axis=1)
-
-    # Remove negative entries
-    for row in range(G.shape[0]):
-        for col in range(G.shape[1]):
-            G[row, col] = max(0, G[row, col])
-
     # Calculate H as the union of our linealities and the extreme rays of matrix G (all as row vectors)
     if verbose:
         print('Calculating extreme rays H of inequalities system G')
     H_cone = np.asarray(list(get_extreme_rays_cdd(G)))
     H = H_cone
 
+    # Add linealities in negative direction too
     for row in range(H_cone.shape[0]):
         if np.all(np.dot(G, H_cone[row, :]) == 0):
             # This is a lineality
@@ -159,19 +152,19 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
     # Create constraints that internal metabolites shouldn't change over time
     if verbose:
         print('Appending constraint B == 0')
-    metabolite_identity = np.identity(H.shape[1] / 2)
+    metabolite_identity = np.identity(H.shape[1])
 
     for external_metabolite in tagged_rows:
         metabolite_identity[external_metabolite] = 0
 
-    internal_constraint = np.append(metabolite_identity, -metabolite_identity, axis=1)
+    internal_constraint = metabolite_identity
     internal_constraint = np.append(internal_constraint, -internal_constraint, axis=0)
     constraints = np.append(constraints, internal_constraint, axis=0)
 
-    if verbose:
-        print('Appending constraint c >= 0')
-    semipositivity = np.identity(H.shape[1])
-    constraints = np.append(constraints, semipositivity, axis=0)
+    # if verbose:
+    #     print('Appending constraint c >= 0')
+    # semipositivity = np.identity(H.shape[1])
+    # constraints = np.append(constraints, semipositivity, axis=0)
 
     # Append above additional constraints to the final version of H
     H_constrained = np.append(H, constraints, axis=0)
@@ -188,7 +181,8 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
         return rays_full, H_cone, H
 
     # Merge the negative exchange metabolite directions with their original again
-    rays_compact = np.subtract(rays_full[:, 0:amount_metabolites], rays_full[:, amount_metabolites:])
+    # rays_compact = np.subtract(rays_full[:, 0:amount_metabolites], rays_full[:, amount_metabolites:])
+    rays_compact = rays_full
 
     return rays_compact, H_cone, H
 

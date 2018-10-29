@@ -8,12 +8,12 @@ if __name__ == '__main__':
     # model_path = 'models/iAF1260.xml'
     # model_path = 'models/iND750.xml'
     # model_path = 'models/microbesflux_toy.xml'
-    # model_path = 'models/e_coli_core.xml'
+    model_path = 'models/e_coli_core.xml'
     # model_path = 'models/e_coli_core_constr.xml'
     # model_path = 'models/e_coli_core_red.xml'
     # model_path = 'models/e_coli_core_nolac.xml'
     # model_path = 'models/daan_toy.xml'
-    model_path = 'models/sxp_toy.xml'
+    # model_path = 'models/sxp_toy.xml'
 
     network = extract_sbml_stoichiometry(model_path)
     for index, item in enumerate(network.metabolites):
