@@ -180,8 +180,8 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
     # conversion modes of the input system.
     if verbose:
         print('Calculating extreme rays C of inequalities system H')
-    rays_full = np.asarray(list(get_extreme_rays(None, H_constrained, fractional=symbolic, verbose=verbose)))
-    # rays_full = np.asarray(list(get_extreme_rays_cdd(H_constrained)))
+    # rays_full = np.asarray(list(get_extreme_rays(None, H_constrained, fractional=symbolic, verbose=verbose)))
+    rays_full = np.asarray(list(get_extreme_rays_cdd(H_constrained)))
 
     if rays_full.shape[0] == 0:
         print('Warning: no feasible Elementary Conversion Modes found')
