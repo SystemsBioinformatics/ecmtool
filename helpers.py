@@ -2,6 +2,7 @@ from fractions import Fraction
 from subprocess import check_call, STDOUT, PIPE
 from os import remove, devnull as os_devnull
 
+import cdd
 import numpy as np
 import libsbml as sbml
 from random import randint
@@ -92,6 +93,15 @@ def normalise_betas(result):
         # Multiply normalised Beta_r+1 (ribosome synthesis rate) by the growth rate (sets Beta_r+1 = mu)
         result[-1] *= result[0]
     return result
+
+
+def get_extreme_rays_cdd(inequality_matrix):
+    mat = cdd.Matrix(np.append(np.zeros(shape=(inequality_matrix.shape[0], 1)), inequality_matrix, axis=1))
+    mat.rep_type = cdd.RepType.INEQUALITY
+    poly = cdd.Polyhedron(mat)
+    gen = poly.get_generators()
+    return np.asarray(gen)[:, 1:]
+
 
 
 def get_extreme_rays(equality_matrix=None, inequality_matrix=None, fractional=True, verbose=False):

@@ -26,7 +26,7 @@ if __name__ == '__main__':
     # output_exceptions = [6, 8, 14, 19, 24, 28, 29, 31, 36, 38, 41, 43, 46, 48, 62, 69]
     output_exceptions = [24]
     outputs = np.setdiff1d(np.setdiff1d(network.external_metabolite_indices(), inputs), output_exceptions)
-    c, H = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
+    c, H_cone, H = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
                                        verbose=True, symbolic=symbolic)
                                        # input_metabolites=inputs, output_metabolites=outputs, verbose=True, symbolic=symbolic)
     np.savetxt('conversion_cone.csv', c, delimiter=',')
