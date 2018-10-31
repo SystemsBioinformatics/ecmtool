@@ -43,13 +43,65 @@ class Network:
     def compress(self, verbose=False):
         if verbose:
             print('Compressing network')
+
+        metabolite_count, reaction_count = self.N.shape
+
+        self.cancel_compounds(verbose=verbose)
+
         if not self.right_nullspace:
             if verbose:
                 print('Calculating null space')
-            self.right_nullspace = helpers.nullspace(np.transpose(self.N))
+            self.right_nullspace = np.transpose(helpers.nullspace(np.transpose(self.N), symbolic=False))
 
         self.remove_infeasible_irreversible_reactions(verbose=verbose)
+
+        if verbose:
+            print('Removed %d reactions and %d metabolites' %
+                  (reaction_count - self.N.shape[1], metabolite_count - self.N.shape[0]))
         pass
+
+    def cancel_compounds(self, verbose=False):
+        if verbose:
+            print('Trying to cancel compounds by reversible reactions')
+
+        reversible_reactions = self.reversible_reaction_indices()
+        total_reactions = len(reversible_reactions)
+
+        for iteration, reaction_index in enumerate(reversible_reactions):
+            print('%.2f%%' % (iteration / float(total_reactions) * 100))
+            reaction = self.N[:, reaction_index]
+            metabolite_indices = [index for index in range(len(self.metabolites)) if reaction[index] != 0 and
+                                  index not in self.external_metabolite_indices()]
+            involved_in_reactions = [np.count_nonzero(self.N[index, :]) for index in metabolite_indices]
+
+            if len(involved_in_reactions) == 0:
+                # This reaction doesn't use any internal metabolites
+                continue
+
+            busiest_metabolite = np.argmax(involved_in_reactions)  # Involved in most reactions
+            if not isinstance(busiest_metabolite, int):
+                busiest_metabolite = busiest_metabolite[0]
+
+            target = metabolite_indices[busiest_metabolite]
+
+            for other_reaction_index in range(self.N.shape[1]):
+                if other_reaction_index != reaction_index and self.N[target, other_reaction_index] != 0:
+                    self.N[:, other_reaction_index] = np.subtract(self.N[:, other_reaction_index],
+                                                                  self.N[:, reaction_index] * \
+                                                                  (self.N[target, other_reaction_index] /
+                                                                   self.N[target, reaction_index]))
+
+        removable_metabolites, removable_reactions = [], []
+        for metabolite_index in range(len(self.metabolites)):
+            if metabolite_index not in self.external_metabolite_indices() and \
+                            np.count_nonzero(self.N[metabolite_index, :]) == 1:
+                # This metabolite is used in only one reaction
+                reaction_index = [index for index in range(len(self.reactions)) if self.N[metabolite_index, index] != 0][0]
+                removable_metabolites.append(metabolite_index)
+                removable_reactions.append(reaction_index)
+
+        self.drop_reactions(removable_reactions)
+        self.drop_metabolites(removable_metabolites)
 
     def remove_infeasible_irreversible_reactions(self, verbose=False):
         reversible = self.reversible_reaction_indices()
@@ -86,8 +138,8 @@ class Network:
         self.N = self.N[:, reactions_to_keep]
 
         if len(self.reactions):
-            self.reactions = self.reactions[reactions_to_keep]
-        if self.right_nullspace:
+            self.reactions = [self.reactions[index] for index in reactions_to_keep]
+        if self.right_nullspace is not None:
             # Since the right null space has as many rows as N has columns, we remove rows here
             self.right_nullspace = self.right_nullspace[reactions_to_keep, :]
 
@@ -96,4 +148,4 @@ class Network:
         self.N = self.N[metabolites_to_keep, :]
 
         if len(self.metabolites):
-            self.metabolites = self.metabolites[metabolites_to_keep]
+            self.metabolites = [self.metabolites[index] for index in metabolites_to_keep]

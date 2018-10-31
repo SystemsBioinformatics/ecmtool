@@ -145,13 +145,12 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
     # Calculate H as the union of our linealities and the extreme rays of matrix G (all as row vectors)
     if verbose:
         print('Calculating extreme rays H of inequalities system G')
-    H_cone = np.asarray(list(get_extreme_rays_cdd(G)))
-    H = H_cone
+    H = get_extreme_rays_cdd(G)
 
-    for row in range(H_cone.shape[0]):
-        if np.all(np.dot(G, H_cone[row, :]) == 0):
+    for row in range(H.shape[0]):
+        if np.all(np.dot(G, H[row, :]) == 0):
             # This is a lineality
-            H = np.append(H, [-H_cone[row, :]], axis=0)
+            H = np.append(H, [-H[row, :]], axis=0)
 
 
     constraints = np.ndarray(shape=(0, H.shape[1]))
@@ -181,16 +180,16 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
     if verbose:
         print('Calculating extreme rays C of inequalities system H')
     # rays_full = np.asarray(list(get_extreme_rays(None, H_constrained, fractional=symbolic, verbose=verbose)))
-    rays_full = np.asarray(list(get_extreme_rays_cdd(H_constrained)))
+    rays_full = get_extreme_rays_cdd(H_constrained)
 
     if rays_full.shape[0] == 0:
         print('Warning: no feasible Elementary Conversion Modes found')
-        return rays_full, H_cone, H
+        return rays_full, H
 
     # Merge the negative exchange metabolite directions with their original again
     rays_compact = np.subtract(rays_full[:, 0:amount_metabolites], rays_full[:, amount_metabolites:])
 
-    return rays_compact, H_cone, H
+    return rays_compact, H
 
 
 if __name__ == '__main__':

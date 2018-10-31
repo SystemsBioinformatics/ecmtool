@@ -96,7 +96,7 @@ def normalise_betas(result):
 
 
 def get_extreme_rays_cdd(inequality_matrix):
-    mat = cdd.Matrix(np.append(np.zeros(shape=(inequality_matrix.shape[0], 1)), inequality_matrix, axis=1))
+    mat = cdd.Matrix(np.append(np.zeros(shape=(inequality_matrix.shape[0], 1)), inequality_matrix, axis=1), number_type='fraction')
     mat.rep_type = cdd.RepType.INEQUALITY
     poly = cdd.Polyhedron(mat)
     gen = poly.get_generators()
@@ -234,6 +234,7 @@ def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
             np.asarray(nullspace_matrix.rref()[0], dtype='object')) if nullspace_matrix \
             else np.ndarray(shape=(0, N.shape[0]))
 
+
 def get_sbml_model(path):
     doc = sbml.readSBMLFromFile(path)
     model = doc.getModel()
@@ -298,7 +299,11 @@ def add_debug_tags(network):
     network.N = np.append(network.N, np.identity(len(network.reactions)), axis=0)
 
 
-def to_fractions(matrix):
+def to_fractions(matrix, quasi_zero_correction=True, quasi_zero_tolerance=1e-13):
+    if quasi_zero_correction:
+        # Make almost zero values equal to zero
+        matrix[(matrix < quasi_zero_tolerance) & (matrix > -quasi_zero_correction)] = 0
+
     fraction_matrix = matrix.astype('object')
 
     for row in range(matrix.shape[0]):

@@ -8,16 +8,19 @@ if __name__ == '__main__':
     # model_path = 'models/iAF1260.xml'
     # model_path = 'models/iND750.xml'
     # model_path = 'models/microbesflux_toy.xml'
-    # model_path = 'models/e_coli_core.xml'
+    model_path = 'models/e_coli_core.xml'
     # model_path = 'models/e_coli_core_constr.xml'
     # model_path = 'models/e_coli_core_red.xml'
     # model_path = 'models/e_coli_core_nolac.xml'
     # model_path = 'models/daan_toy.xml'
-    model_path = 'models/sxp_toy.xml'
+    # model_path = 'models/sxp_toy.xml'
+    # model_path = 'models/sabp_compression.xml'
 
     network = extract_sbml_stoichiometry(model_path)
     for index, item in enumerate(network.metabolites):
         print(index, item.id, item.name)
+
+    network.compress(verbose=True)
 
     symbolic = True
     inputs = [34, 54, 56, 60] # Glucose, ammonium, O2, phosphate
@@ -26,7 +29,7 @@ if __name__ == '__main__':
     # output_exceptions = [6, 8, 14, 19, 24, 28, 29, 31, 36, 38, 41, 43, 46, 48, 62, 69]
     output_exceptions = [24]
     outputs = np.setdiff1d(np.setdiff1d(network.external_metabolite_indices(), inputs), output_exceptions)
-    c, H_cone, H = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
+    c, H = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
                                        verbose=True, symbolic=symbolic)
                                        # input_metabolites=inputs, output_metabolites=outputs, verbose=True, symbolic=symbolic)
     np.savetxt('conversion_cone.csv', c, delimiter=',')

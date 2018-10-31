@@ -26,7 +26,7 @@
       <species id="c_icit" name="c_icit" compartment="cell" hasOnlySubstanceUnits="false" boundaryCondition="false" constant="false"/>
     </listOfSpecies>
     <listOfReactions>
-      <reaction id="Inflow1" name="Inflow1" reversible="false" fast="false" compartment="cell">
+      <reaction id="Inflow1" name="Inflow1" reversible="true" fast="false" compartment="cell">
         <annotation>
           <microbesflux:user-reaction xmlns:microbesflux="http://tanglab.engineering.wustl.edu/dtd.xml">Inflow</microbesflux:user-reaction>
         </annotation>
@@ -69,7 +69,7 @@
           <speciesReference species="c_accoa" stoichiometry="1" constant="false"/>
         </listOfProducts>
       </reaction>
-      <reaction id="Outflow2" name="Outflow2" reversible="false" fast="false" compartment="cell">
+      <reaction id="Outflow2" name="Outflow2" reversible="true" fast="false" compartment="cell">
         <annotation>
           <microbesflux:user-reaction xmlns:microbesflux="http://tanglab.engineering.wustl.edu/dtd.xml">Outflow</microbesflux:user-reaction>
         </annotation>
