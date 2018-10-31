@@ -7,8 +7,8 @@ if __name__ == '__main__':
 
     # model_path = 'models/iAF1260.xml'
     # model_path = 'models/iND750.xml'
-    # model_path = 'models/microbesflux_toy.xml'
-    model_path = 'models/e_coli_core.xml'
+    model_path = 'models/microbesflux_toy.xml'
+    # model_path = 'models/e_coli_core.xml'
     # model_path = 'models/e_coli_core_constr.xml'
     # model_path = 'models/e_coli_core_red.xml'
     # model_path = 'models/e_coli_core_nolac.xml'
@@ -21,6 +21,7 @@ if __name__ == '__main__':
         print(index, item.id, item.name)
 
     network.compress(verbose=True)
+    add_debug_tags(network)
 
     symbolic = True
     inputs = [34, 54, 56, 60] # Glucose, ammonium, O2, phosphate
