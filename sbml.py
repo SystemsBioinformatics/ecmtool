@@ -40,7 +40,7 @@ if __name__ == '__main__':
         print('\nECM #%d:' % index)
         for metabolite_index, stoichiometry_val in enumerate(ecm):
             if stoichiometry_val != 0.0:
-                print('%d %s\t\t->\t%f' % (metabolite_index, network.metabolites[metabolite_index].name, stoichiometry_val))
+                print('%d %s\t\t->\t%.4f' % (metabolite_index, network.metabolites[metabolite_index].name, stoichiometry_val))
 
     end = time()
     print('Ran in %f seconds' % (end - start))

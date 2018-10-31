@@ -134,12 +134,13 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
         if metabolite_index in reversible_columns:
             G = np.append(G, [-G[metabolite_index, :]], axis=0)
 
-    # Add metabolites in both directions
-    G = np.append(G, -G, axis=1)
+    # Add external metabolites in both directions
+    G = np.append(G, -G[:, tagged_rows], axis=1)
+    extra_metabolites = [index + amount_metabolites for index in range(len(tagged_rows))]
 
     # Remove negative entries
     for row in range(G.shape[0]):
-        for col in range(G.shape[1]):
+        for col in (tagged_rows + extra_metabolites):
             G[row, col] = max(0, G[row, col])
 
     # Calculate H as the union of our linealities and the extreme rays of matrix G (all as row vectors)
@@ -158,14 +159,10 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
     # Create constraints that internal metabolites shouldn't change over time
     if verbose:
         print('Appending constraint B == 0')
-    metabolite_identity = np.identity(H.shape[1] / 2)
-
-    for external_metabolite in tagged_rows:
-        metabolite_identity[external_metabolite] = 0
-
-    internal_constraint = np.append(metabolite_identity, -metabolite_identity, axis=1)
-    internal_constraint = np.append(internal_constraint, -internal_constraint, axis=0)
-    constraints = np.append(constraints, internal_constraint, axis=0)
+    constraints = np.ndarray(shape=(0, H.shape[1]))
+    for internal_metabolite in np.setdiff1d(range(amount_metabolites), tagged_rows):
+        equality = np.asarray([[0] * internal_metabolite + [1] + [0] * (amount_metabolites + len(tagged_rows) - (internal_metabolite + 1))])
+        constraints = np.append(constraints, np.append(equality, -equality, axis=0), axis=0)
 
     if verbose:
         print('Appending constraint c >= 0')
@@ -187,7 +184,11 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
         return rays_full, H
 
     # Merge the negative exchange metabolite directions with their original again
-    rays_compact = np.subtract(rays_full[:, 0:amount_metabolites], rays_full[:, amount_metabolites:])
+    rays_full[:, tagged_rows] = np.subtract(rays_full[:, tagged_rows], rays_full[:, amount_metabolites:])
+    rays_compact = rays_full[:, :amount_metabolites]
+
+    # TODO: find out how to prevent null vectors caused by S - S_neg = 0 ray
+    rays_compact = rays_compact[np.unique(np.nonzero(rays_compact)[0]), :]
 
     return rays_compact, H
 
