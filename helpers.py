@@ -95,6 +95,20 @@ def normalise_betas(result):
     return result
 
 
+def get_extreme_rays_efmtool(inequality_matrix):
+    H = inequality_matrix
+    r, m = H.shape
+    N = np.append(-np.identity(r), H, axis=1)
+
+    # TODO: Call efmtool through matlab integration
+    eng = matlab.engine.start_matlab()
+    v = None # efmtool result goes in here
+
+    x = v[:, r:]
+    return x
+
+
+
 def get_extreme_rays_cdd(inequality_matrix):
     mat = cdd.Matrix(np.append(np.zeros(shape=(inequality_matrix.shape[0], 1)), inequality_matrix, axis=1), number_type='fraction')
     mat.rep_type = cdd.RepType.INEQUALITY
@@ -126,7 +140,7 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, fractional=Tr
 
     # Run external extreme ray enumeration tool
     with open(os_devnull, 'w') as devnull:
-        check_call(('java -Xms1g -Xmx7g -jar polco.jar -kind text ' +
+        check_call(('java -Xms1g -Xmx7g -jar polco.jar -sortinput LexMin -kind text ' +
                     '-arithmetic %s ' % (' '.join(['fractional' if fractional else 'double'] * 3)) +
                     ('' if equality_matrix is None else '-eq tmp/egm_eq_%d.txt ' % (rand)) +
                     '-iq tmp/egm_iq_%d.txt -out text tmp/generators_%d.txt' % (rand, rand)).split(' '),

@@ -164,15 +164,15 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
     # Create constraints that internal metabolites shouldn't change over time
     if verbose:
         print('Appending constraint B == 0')
-    constraints = np.ndarray(shape=(0, H.shape[1]))
+    constraints = np.ndarray(shape=(0, rays.shape[1]))
     for internal_metabolite in np.setdiff1d(range(amount_metabolites), tagged_rows):
-        equality = np.asarray([[0] * internal_metabolite + [1] + [0] * (amount_metabolites + len(tagged_rows) - (internal_metabolite + 1))])
-        H_eq = np.append(H_eq, np.append(equality, -equality, axis=0), axis=0)
+        equality = to_fractions(np.asarray([[0] * internal_metabolite + [1] + [0] * (amount_metabolites + len(tagged_rows) - (internal_metabolite + 1))]))
+        H_eq = np.append(H_eq, equality, axis=0)
 
     if verbose:
         print('Appending constraint c >= 0')
     semipositivity = np.identity(H_ineq.shape[1])
-    H_ineq = np.append(H_ineq, semipositivity, axis=0)
+    H_ineq = np.append(H_ineq, to_fractions(semipositivity), axis=0)
 
     if verbose:
         print('Calculating nullspace A of H_eq')
@@ -185,8 +185,8 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
     # conversion modes of the input system.
     if verbose:
         print('Calculating extreme rays C of inequalities system H_total')
-    # rays_full = np.transpose(np.dot(A, np.transpose(np.asarray(list(get_extreme_rays(None, H_total, fractional=symbolic, verbose=verbose))))))
-    rays_full = np.transpose(np.dot(A, np.transpose(get_extreme_rays_cdd(H_total))))
+    rays_full = np.transpose(np.dot(A, np.transpose(np.asarray(list(get_extreme_rays(None, H_total, fractional=symbolic, verbose=verbose))))))
+    # rays_full = np.transpose(np.dot(A, np.transpose(get_extreme_rays_cdd(H_total))))
 
     if rays_full.shape[0] == 0:
         print('Warning: no feasible Elementary Conversion Modes found')
