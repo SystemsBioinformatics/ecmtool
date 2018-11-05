@@ -10,6 +10,7 @@ from numpy.linalg import svd
 from sympy import Matrix
 
 from network import Network, Reaction, Metabolite
+from matlab_wrapper import MatlabSession
 
 
 def get_P_M(metabolites, metabolic_reactions, enzyme_reactions):
@@ -95,16 +96,43 @@ def normalise_betas(result):
     return result
 
 
-def get_extreme_rays_efmtool(inequality_matrix):
+def get_extreme_rays_metatool(inequality_matrix, matlab_root='/Applications/MATLAB_R2018b.app/'):
     H = inequality_matrix
     r, m = H.shape
     N = np.append(-np.identity(r), H, axis=1)
 
     # TODO: Call efmtool through matlab integration
-    eng = matlab.engine.start_matlab()
-    v = None # efmtool result goes in here
+    matlab = MatlabSession(matlab_root=matlab_root)
+    matlab.workspace.cd('metatool')
+    matlab.put('N', np.asarray(N, dtype='float'))
+    matlab.put('rev', [False] * r + [True] * m)
+    matlab.eval('res = calculate_flux_modes(N, rev)')
+    matlab.eval('efms = res.efms')
+    v = np.asarray(matlab.get('efms'))
 
-    x = v[:, r:]
+    y = v.shape
+
+    x = np.transpose(v[r:, :])
+    return x
+
+
+def get_extreme_rays_efmtool(inequality_matrix, matlab_root='/Applications/MATLAB_R2018b.app/'):
+    H = inequality_matrix
+    r, m = H.shape
+    N = np.append(-np.identity(r), H, axis=1)
+
+    # TODO: Call efmtool through matlab integration
+    matlab = MatlabSession(matlab_root=matlab_root)
+    matlab.workspace.cd('efmtool')
+    matlab.put('N', np.asarray(N, dtype='float64'))
+    matlab.put('rev', [False] * r + [True] * m)
+    matlab.eval('res = CalculateFluxModes(N, rev)')
+    matlab.eval('efms = res.efms')
+    v = np.asarray(matlab.get('efms'))
+
+    y = v.shape
+
+    x = np.transpose(v[r:, :])
     return x
 
 

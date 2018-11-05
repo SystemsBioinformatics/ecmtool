@@ -146,7 +146,7 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
     # Calculate H as the union of our linearities and the extreme rays of matrix G (all as row vectors)
     if verbose:
         print('Calculating extreme rays H of inequalities system G')
-    rays = get_extreme_rays_cdd(G)
+    rays = get_extreme_rays_metatool(G)
     H_ineq = np.ndarray(shape=(0, rays.shape[1]))
     linearities = np.ndarray(shape=(0, rays.shape[1]))
 
@@ -185,7 +185,7 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
     # conversion modes of the input system.
     if verbose:
         print('Calculating extreme rays C of inequalities system H_total')
-    rays_full = np.transpose(np.dot(A, np.transpose(np.asarray(list(get_extreme_rays(None, H_total, fractional=symbolic, verbose=verbose))))))
+    rays_full = np.transpose(np.dot(A, np.transpose(np.asarray(list(get_extreme_rays_metatool(H_total))))))
     # rays_full = np.transpose(np.dot(A, np.transpose(get_extreme_rays_cdd(H_total))))
 
     if rays_full.shape[0] == 0:
