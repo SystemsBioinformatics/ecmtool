@@ -130,23 +130,14 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
     G = np.transpose(N)
 
     # Add reversible reactions (columns) of N to G in the negative direction as well
-    for metabolite_index in range(G.shape[0]):
-        if metabolite_index in reversible_columns:
-            G = np.append(G, [-G[metabolite_index, :]], axis=0)
-
-    # Add external metabolites in both directions
-    G = np.append(G, -G[:, tagged_rows], axis=1)
-    extra_metabolites = [index + amount_metabolites for index in range(len(tagged_rows))]
-
-    # Remove negative entries
-    for row in range(G.shape[0]):
-        for col in (tagged_rows + extra_metabolites):
-            G[row, col] = max(0, G[row, col])
+    for reaction_index in range(G.shape[0]):
+        if reaction_index in reversible_columns:
+            G = np.append(G, [-G[reaction_index, :]], axis=0)
 
     # Calculate H as the union of our linearities and the extreme rays of matrix G (all as row vectors)
     if verbose:
         print('Calculating extreme rays H of inequalities system G')
-    rays = get_extreme_rays_metatool(G)
+    rays = get_extreme_rays_efmtool(G)
     H_ineq = np.ndarray(shape=(0, rays.shape[1]))
     linearities = np.ndarray(shape=(0, rays.shape[1]))
 
@@ -164,42 +155,33 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
     # Create constraints that internal metabolites shouldn't change over time
     if verbose:
         print('Appending constraint B == 0')
-    constraints = np.ndarray(shape=(0, rays.shape[1]))
-    for internal_metabolite in np.setdiff1d(range(amount_metabolites), tagged_rows):
-        equality = to_fractions(np.asarray([[0] * internal_metabolite + [1] + [0] * (amount_metabolites + len(tagged_rows) - (internal_metabolite + 1))]))
-        H_eq = np.append(H_eq, equality, axis=0)
 
-    if verbose:
-        print('Appending constraint c >= 0')
-    semipositivity = np.identity(H_ineq.shape[1])
-    H_ineq = np.append(H_ineq, to_fractions(semipositivity), axis=0)
+    identity = np.identity(amount_metabolites)
+    for internal_metabolite in np.setdiff1d(range(amount_metabolites), tagged_rows):
+        equality = [identity[internal_metabolite, :]]
+        H_eq = np.append(H_eq, equality, axis=0)
 
     if verbose:
         print('Calculating nullspace A of H_eq')
     A = np.transpose(nullspace(H_eq))
 
     # Append above additional constraints to the final version of H
-    H_total = np.dot(H_ineq, A)
+    H_total = np.dot(H_ineq, A) if H_ineq.shape[0] else np.append(H_eq, -H_eq, axis=0)
 
     # Calculate the extreme rays of this cone H, resulting in the elementary
     # conversion modes of the input system.
     if verbose:
         print('Calculating extreme rays C of inequalities system H_total')
-    rays_full = np.transpose(np.dot(A, np.transpose(np.asarray(list(get_extreme_rays_metatool(H_total))))))
-    # rays_full = np.transpose(np.dot(A, np.transpose(get_extreme_rays_cdd(H_total))))
+    rays = np.asarray(list(get_extreme_rays_efmtool(H_total)))
+    rays = np.transpose(np.dot(A, np.transpose(rays))) if H_ineq.shape[0] else rays
+    # rays = np.transpose(np.dot(A, np.transpose(get_extreme_rays_cdd(H_total))))
 
-    if rays_full.shape[0] == 0:
+    if rays.shape[0] == 0:
         print('Warning: no feasible Elementary Conversion Modes found')
-        return rays_full, H_ineq
+        return rays, H_ineq
 
-    # Merge the negative exchange metabolite directions with their original again
-    rays_full[:, tagged_rows] = np.subtract(rays_full[:, tagged_rows], rays_full[:, amount_metabolites:])
-    rays_compact = rays_full[:, :amount_metabolites]
 
-    # TODO: find out how to prevent null vectors caused by S - S_neg = 0 ray
-    rays_compact = rays_compact[np.unique(np.nonzero(rays_compact)[0]), :]
-
-    return rays_compact, H_ineq
+    return rays, H_ineq
 
 
 if __name__ == '__main__':

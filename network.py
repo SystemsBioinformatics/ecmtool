@@ -48,12 +48,13 @@ class Network:
 
         self.cancel_compounds(verbose=verbose)
 
-        if not self.right_nullspace:
-            if verbose:
-                print('Calculating null space')
-            self.right_nullspace = np.transpose(helpers.nullspace(np.transpose(self.N), symbolic=False))
-
-        self.remove_infeasible_irreversible_reactions(verbose=verbose)
+        ## This does not seem to do anything on the tested metabolic networks
+        # if not self.right_nullspace:
+        #     if verbose:
+        #         print('Calculating null space')
+        #     self.right_nullspace = np.transpose(helpers.nullspace(np.transpose(self.N), symbolic=False))
+        #
+        # self.remove_infeasible_irreversible_reactions(verbose=verbose)
 
         if verbose:
             print('Removed %d reactions and %d metabolites' %

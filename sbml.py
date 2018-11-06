@@ -11,12 +11,12 @@ if __name__ == '__main__':
     # model_path = 'models/iAF1260.xml'
     # model_path = 'models/iND750.xml'
     # model_path = 'models/microbesflux_toy.xml'
-    # model_path = 'models/e_coli_core.xml'
+    model_path = 'models/e_coli_core.xml'
     # model_path = 'models/e_coli_core_constr.xml'
     # model_path = 'models/e_coli_core_red.xml'
     # model_path = 'models/e_coli_core_nolac.xml'
     # model_path = 'models/daan_toy.xml'
-    model_path = 'models/sxp_toy.xml'
+    # model_path = 'models/sxp_toy.xml'
     # model_path = 'models/sabp_compression.xml'
 
     network = extract_sbml_stoichiometry(model_path)
@@ -60,6 +60,7 @@ if __name__ == '__main__':
 
     np.savetxt('conversion_cone.csv', expanded_c, delimiter=',')
 
+    end = time()
     for index, ecm in enumerate(c):
         # if not ecm[-1]:
         #     continue
@@ -67,9 +68,8 @@ if __name__ == '__main__':
         for metabolite_index, stoichiometry_val in enumerate(ecm):
             if stoichiometry_val != 0.0:
                 print('%d %s\t\t->\t%.4f' % (metabolite_index, network.metabolites[metabolite_index].name, stoichiometry_val))
-        # solution = linprog(c=[0] * orig_N.shape[1], A_eq=orig_N, b_eq=expanded_c[index,:], bounds=[(-1000, 1000)] * orig_N.shape[1])
-        # print('ECM satisfies stoichiometry' if solution.status == 0 else 'ECM does not satisfy stoichiometry')
+        solution = linprog(c=[0] * orig_N.shape[1], A_eq=orig_N, b_eq=expanded_c[index,:], bounds=[(-1000, 1000)] * orig_N.shape[1])
+        print('ECM satisfies stoichiometry' if solution.status == 0 else 'ECM does not satisfy stoichiometry')
 
-    end = time()
     print('Ran in %s' % format_timespan(end - start))
     pass
