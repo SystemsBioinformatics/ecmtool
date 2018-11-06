@@ -20,8 +20,8 @@ if __name__ == '__main__':
     for index, item in enumerate(network.metabolites):
         print(index, item.id, item.name)
 
-    network.compress(verbose=True)
-    add_debug_tags(network)
+    # network.compress(verbose=True)
+    # add_debug_tags(network)
 
     symbolic = True
     inputs = [34, 54, 56, 60] # Glucose, ammonium, O2, phosphate
