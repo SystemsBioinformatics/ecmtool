@@ -138,27 +138,29 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
     if verbose:
         print('Calculating extreme rays H of inequalities system G')
     rays_full = get_extreme_rays_cdd(G)
-    rays = rays_full[:, tagged_rows]
-    H_ineq = np.ndarray(shape=(0, rays.shape[1]))
-    linearities = np.ndarray(shape=(0, rays.shape[1]))
+    rays_deflated = rays_full[:, tagged_rows]
+    H_ineq = np.ndarray(shape=(0, rays_deflated.shape[1]))
+    linearities = np.ndarray(shape=(0, rays_deflated.shape[1]))
 
-    for row in range(rays.shape[0]):
+    for row in range(rays_deflated.shape[0]):
         if np.all(np.dot(G, rays_full[row, :]) == 0):
-            # This is a lineality
-            linearities = np.append(linearities, [rays[row, :]], axis=0)
+            # This is a linearity
+            linearities = np.append(linearities, [rays_deflated[row, :]], axis=0)
         else:
             # This is a normal extreme ray
-            H_ineq = np.append(H_ineq, [rays[row, :]], axis=0)
+            H_ineq = np.append(H_ineq, [rays_deflated[row, :]], axis=0)
 
 
     H_eq = linearities
 
-    if verbose:
+    make_homogeneous = H_ineq.shape[0] > 0
+
+    if verbose and make_homogeneous:
         print('Calculating nullspace A of H_eq')
-    A = np.transpose(nullspace(H_eq))
+    A = nullspace(H_eq) if make_homogeneous else None
 
     # Append above additional constraints to the final version of H
-    H_total = np.dot(H_ineq, A) if H_ineq.shape[0] else np.append(H_eq, -H_eq, axis=0)
+    H_total = np.dot(H_ineq, A) if make_homogeneous else np.append(H_eq, -H_eq, axis=0)
 
     # Calculate the extreme rays of this cone H, resulting in the elementary
     # conversion modes of the input system.
@@ -168,18 +170,19 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
         H_eq = np.zeros(shape=(1, H_eq.shape[1]))
     if not H_ineq.shape[0]:
         H_ineq = np.zeros(shape=(1, H_ineq.shape[1]))
-    # rays_full = np.transpose(np.asarray(list(get_extreme_rays(H_eq, H_ineq, fractional=symbolic, verbose=verbose))))
-    rays_full = np.transpose(np.asarray(list(get_extreme_rays(None, H_total, fractional=symbolic, verbose=verbose))))
-    # rays_full = get_extreme_rays_cdd(H_total)
-    rays = np.transpose(np.dot(A, rays_full))
+    # rays = np.transpose(np.asarray(list(get_extreme_rays(H_eq, H_ineq, fractional=symbolic, verbose=verbose))))
+    # rays = np.transpose(np.asarray(list(get_extreme_rays(None, H_total, fractional=symbolic, verbose=verbose))))
+    rays = np.asarray(list(get_extreme_rays_efmtool(H_total)))
+    # rays = get_extreme_rays_cdd(H_total)
+    rays_deflated = np.transpose(np.dot(A, np.transpose(rays))) if make_homogeneous else rays
 
-    if rays.shape[0] == 0:
+    if rays_deflated.shape[0] == 0:
         print('Warning: no feasible Elementary Conversion Modes found')
-        return rays, H_ineq
+        return rays_deflated, H_ineq
 
-    rays_inflated = np.zeros(shape=(rays.shape[0], amount_metabolites))
+    rays_inflated = np.zeros(shape=(rays_deflated.shape[0], amount_metabolites))
     for index, metabolite_index in enumerate(tagged_rows):
-        rays_inflated[:, metabolite_index] = rays[:, index]
+        rays_inflated[:, metabolite_index] = rays_deflated[:, index]
 
     return rays_inflated, H_ineq
 
