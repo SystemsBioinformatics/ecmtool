@@ -1,16 +1,18 @@
 from fractions import Fraction
 from subprocess import check_call, STDOUT, PIPE
 from os import remove, devnull as os_devnull
+import matlab.engine
 
 import cdd
 import numpy as np
 import libsbml as sbml
 from random import randint
+
+from matlab_wrapper import MatlabSession
 from numpy.linalg import svd
 from sympy import Matrix
 
 from network import Network, Reaction, Metabolite
-from matlab_wrapper import MatlabSession
 
 
 def get_P_M(metabolites, metabolic_reactions, enzyme_reactions):
@@ -96,45 +98,19 @@ def normalise_betas(result):
     return result
 
 
-def get_extreme_rays_metatool(inequality_matrix, matlab_root='/Applications/MATLAB_R2018b.app/'):
-    H = inequality_matrix
-    r, m = H.shape
-    N = np.append(-np.identity(r), H, axis=1)
-
-    # TODO: Call efmtool through matlab integration
-    matlab = MatlabSession(matlab_root=matlab_root)
-    matlab.workspace.cd('metatool')
-    matlab.put('N', np.asarray(N, dtype='float'))
-    matlab.put('rev', [False] * r + [True] * m)
-    matlab.eval('res = calculate_flux_modes(N, rev)')
-    matlab.eval('efms = res.efms')
-    v = np.asarray(matlab.get('efms'))
-
-    y = v.shape
-
-    x = np.transpose(v[r:, :])
-    return x
-
-
 def get_extreme_rays_efmtool(inequality_matrix, matlab_root='/Applications/MATLAB_R2018b.app/'):
     H = inequality_matrix
     r, m = H.shape
     N = np.append(-np.identity(r), H, axis=1)
 
-    # TODO: Call efmtool through matlab integration
-    matlab = MatlabSession(matlab_root=matlab_root)
-    matlab.workspace.cd('efmtool')
-    matlab.put('N', np.asarray(N, dtype='float64'))
-    matlab.put('rev', [False] * r + [True] * m)
-    matlab.eval('res = CalculateFluxModes(N, rev)')
-    matlab.eval('efms = res.efms')
-    v = np.asarray(matlab.get('efms'))
-
-    y = v.shape
-
-    x = np.transpose(v[r:, :])
+    engine = matlab.engine.start_matlab()
+    engine.cd('efmtool')
+    engine.workspace['N'] = matlab.double([list(row) for row in N])
+    engine.workspace['rev'] = ([False] * r) + ([True] * m)
+    result = engine.CalculateFluxModes(matlab.double([list(row) for row in N]), matlab.logical(([False] * r) + ([True] * m)))
+    v = result['efms']
+    x = np.transpose(np.asarray(v)[r:, :])
     return x
-
 
 
 def get_extreme_rays_cdd(inequality_matrix):
@@ -168,7 +144,7 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, fractional=Tr
 
     # Run external extreme ray enumeration tool
     with open(os_devnull, 'w') as devnull:
-        check_call(('java -Xms1g -Xmx7g -jar polco.jar -sortinput LexMin -kind text ' +
+        check_call(('java -Xms1g -Xmx7g -jar polco.jar -kind text ' +
                     '-arithmetic %s ' % (' '.join(['fractional' if fractional else 'double'] * 3)) +
                     ('' if equality_matrix is None else '-eq tmp/egm_eq_%d.txt ' % (rand)) +
                     '-iq tmp/egm_iq_%d.txt -out text tmp/generators_%d.txt' % (rand, rand)).split(' '),
@@ -182,7 +158,7 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, fractional=Tr
             result = []
             for value in line.replace('\n', '').split('\t'):
                 result.append(Fraction(str(value)))
-            yield result
+            yield np.transpose(result)
 
     # Clean up the files created above
     if equality_matrix is not None:
@@ -262,7 +238,7 @@ def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
         tol = max(atol, rtol * s[0])
         nnz = (s >= tol).sum()
         ns = vh[nnz:].conj()
-        return ns
+        return np.transpose(ns)
     else:
         nullspace_vectors = Matrix(N).nullspace()
 
@@ -273,8 +249,8 @@ def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
             nullspace_matrix = nullspace_matrix.row_insert(-1, nullspace_vectors[i].T)
 
         return to_fractions(
-            np.asarray(nullspace_matrix.rref()[0], dtype='object')) if nullspace_matrix \
-            else np.ndarray(shape=(0, N.shape[0]))
+            np.transpose(np.asarray(nullspace_matrix.rref()[0], dtype='object'))) if nullspace_matrix \
+            else np.ndarray(shape=(N.shape[0], 0))
 
 
 def get_sbml_model(path):

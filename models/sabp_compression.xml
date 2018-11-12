@@ -25,8 +25,9 @@
           <speciesReference species="s" stoichiometry="1" constant="false"/>
         </listOfReactants>
         <listOfProducts>
-          <speciesReference species="a" stoichiometry="1" constant="false"/>
-          <speciesReference species="b" stoichiometry="0.5" constant="false"/>
+          <!--<speciesReference species="a" stoichiometry="1" constant="false"/>-->
+          <!--<speciesReference species="b" stoichiometry="0.5" constant="false"/>-->
+          <speciesReference species="b" stoichiometry="1" constant="false"/>
         </listOfProducts>
       </reaction>
       <reaction id="v2" name="v2" reversible="true" fast="false" compartment="cell">
@@ -34,7 +35,8 @@
           <speciesReference species="s" stoichiometry="1" constant="false"/>
         </listOfReactants>
         <listOfProducts>
-          <speciesReference species="a" stoichiometry="2" constant="false"/>
+          <!--<speciesReference species="a" stoichiometry="2" constant="false"/>-->
+          <speciesReference species="a" stoichiometry="1" constant="false"/>
         </listOfProducts>
       </reaction>
       <reaction id="v3" name="v3" reversible="true" fast="false" compartment="cell">
