@@ -106,9 +106,9 @@ class Network:
 
     def remove_infeasible_irreversible_reactions(self, verbose=False):
         reversible = self.reversible_reaction_indices()
-        irreversible_rows = [i for i in range(self.N.shape[0]) if i not in reversible]
-        number_irreversible = len(irreversible_rows)
-        reduced_nullspace = self.right_nullspace[irreversible_rows, :]
+        irreversible_columns = [i for i in range(self.N.shape[1]) if i not in reversible]
+        number_irreversible = len(irreversible_columns)
+        reduced_nullspace = self.right_nullspace[:, irreversible_columns]
 
         if verbose:
             print('Removing infeasible irreversible reactions')
@@ -123,7 +123,7 @@ class Network:
                 print('Linear programming optimisation failed with error: "%s"' % result.message)
             return
 
-        removable_reactions = [irreversible_rows[index] for index, value in enumerate(result.x) if value > 0.001]
+        removable_reactions = [irreversible_columns[index] for index, value in enumerate(result.x) if value > 0.001]
         if verbose:
             if len(removable_reactions):
                 print('Removed the following infeasible irreversible reactions:')

@@ -105,3 +105,5 @@ venv.bak/
 tmp
 .idea
 *.csv
+.RData
+.Rhistory

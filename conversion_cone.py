@@ -21,10 +21,11 @@ def deflate_matrix(A, columns_to_keep):
     # Return rows that are nonzero after removing unwanted columns
     for row_index in range(A.shape[0]):
         row = A[row_index, columns_to_keep]
-        if np.sum(row) > 0:
+        if np.sum(row) != 0:
             B = np.append(B, [row], axis=0)
 
     return B
+
 
 def inflate_matrix(A, kept_columns, original_width):
     B = np.zeros(shape=(A.shape[0], original_width), dtype=A.dtype)
@@ -33,86 +34,6 @@ def inflate_matrix(A, kept_columns, original_width):
         B[:, col] = A[:, index]
 
     return B
-
-
-def de_groot_nullbase(A):
-    """
-    Calculates De Groot base(TM)(R) of a nullspace matrix.
-    :param A: nullspace matrix
-    :return:
-    """
-    A = to_fractions(A)
-    k_rows, n_cols = A.shape
-    rownames = get_rownames(A)
-    steps = ['%d' % i for i in range(k_rows)]
-
-
-    # for m in range(1, n_cols - k_rows + 1):
-    #     cur_iteration_rows = A.shape[0]
-    #     for row_index in range(A.shape[0]):
-    #
-    #         if A[row_index, k_rows + m-1] == 0 or \
-    #            rownames[row_index][m-1] > k_rows + m -1:
-    #             continue
-    #
-    #         # Normalise row
-    #         # TODO: add support for columns with zero value
-    #         A[row_index, :] /= A[row_index, k_rows + m - 1]
-    #         cur_row = A[row_index, :]
-    #
-    #         # All rows except the current row
-    #         other_rows = np.setdiff1d(range(cur_iteration_rows), [row_index])
-    #         for other_row_index in other_rows:
-    #             cur_rownames = rownames[row_index]
-    #             other_rownames = rownames[other_row_index]
-    #
-    #             # j > im && j <= k + m - 1
-    #             if len(np.union1d([row for row in cur_rownames if row <= k_rows + m - 2], [row for row in other_rownames if row <= k_rows + m - 2])) <= (m + 1) and \
-    #                             other_rownames[m-1] > cur_rownames[m-1] and other_rownames[m-1] <= k_rows + m - 2:
-    #                 # TODO: add support for columns with zero value
-    #                 other_row = A[other_row_index, :]
-    #                 # Normalise other row
-    #                 other_row /= other_row[k_rows + m - 1]
-    #                 A = np.append(A, np.asarray(np.asmatrix(np.subtract(cur_row, other_row), dtype='object'), dtype='object'), axis=0)
-    #                 steps.append('%d => %d - %d' % (k_rows + m - 1, row_index, other_row_index))
-    #
-    #             # Has to be recalculated after every new row has been added
-    #             # TODO: can of course be made tremendously more efficient
-    #             rownames = get_rownames(A)
-    #
-    # return A
-
-    for m in range(1, n_cols - k_rows + 1):
-        cur_iteration_rows = A.shape[0]
-        for row_index in range(cur_iteration_rows):
-
-            if A[row_index, k_rows + m - 1] == 0:
-                continue
-
-            # Normalise row
-            # TODO: add support for columns with zero value
-            A[row_index, :] /= A[row_index, k_rows + m - 1]
-            cur_row = A[row_index, :]
-
-            for other_row_index in range(row_index+1, cur_iteration_rows):
-                cur_rownames = [row for row in rownames[row_index] if row <= k_rows + m - 2]
-                other_rownames = [row for row in rownames[other_row_index] if row <= k_rows + m - 2]
-
-                if len(np.union1d(cur_rownames, other_rownames) <= (m + 1)):
-                    #TODO: add support for columns with zero value
-                    other_row = A[other_row_index, :]
-
-                    if other_row[k_rows + m - 1] == 0:
-                        continue
-
-                    # Normalise other row
-                    other_row /= other_row[k_rows + m - 1]
-                    A = np.append(A, np.asarray(np.asmatrix(np.subtract(cur_row, other_row), dtype='object'), dtype='object'), axis=0)
-                    steps.append('%d => %d - %d' % (k_rows + m - 1, row_index, other_row_index))
-
-            rownames = get_rownames(A)
-
-    return A
 
 
 def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metabolites=[], output_metabolites=[],
@@ -137,11 +58,18 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
     # Calculate H as the union of our linearities and the extreme rays of matrix G (all as row vectors)
     if verbose:
         print('Calculating extreme rays H of inequalities system G')
+
+    # Calculate generating set of the dual of our initial conversion cone C0, C0*
     rays_full = get_extreme_rays_cdd(G)
-    rays_deflated = rays_full[:, tagged_rows]
+
+    # Remove internal metabolites from the rays, since they are all equal to 0 in the conversion cone
+    rays_deflated = deflate_matrix(rays_full, tagged_rows)
+
     H_ineq = np.ndarray(shape=(0, rays_deflated.shape[1]))
     linearities = np.ndarray(shape=(0, rays_deflated.shape[1]))
 
+    # Fill H_ineq with all generating rays that are not part of the nullspace (aka lineality space) of the dual cone C0*.
+    # These represent the system of inequalities of our initial conversion cone C0.
     for row in range(rays_deflated.shape[0]):
         if np.all(np.dot(G, rays_full[row, :]) == 0):
             # This is a linearity
@@ -153,48 +81,37 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
 
     H_eq = linearities
 
+    # If there are inequalities, apply trick A3 from (Urbanczik, 2005, appendix)
     make_homogeneous = H_ineq.shape[0] > 0
 
     if verbose and make_homogeneous:
         print('Calculating nullspace A of H_eq')
-    A = nullspace(H_eq) if make_homogeneous else None
 
-    # Append above additional constraints to the final version of H
+    A = nullspace(H_eq) if make_homogeneous else None
     H_total = np.dot(H_ineq, A) if make_homogeneous else np.append(H_eq, -H_eq, axis=0)
 
-    # Calculate the extreme rays of this cone H, resulting in the elementary
-    # conversion modes of the input system.
+    # Calculate the extreme rays of the cone C represented by inequalities H_total, resulting in
+    # the elementary conversion modes of the input system.
     if verbose:
         print('Calculating extreme rays C of inequalities system H_total')
-    if not H_eq.shape[0]:
-        H_eq = np.zeros(shape=(1, H_eq.shape[1]))
+
     if not H_ineq.shape[0]:
         H_ineq = np.zeros(shape=(1, H_ineq.shape[1]))
-    # rays = np.transpose(np.asarray(list(get_extreme_rays(H_eq, H_ineq, fractional=symbolic, verbose=verbose))))
-    # rays = np.transpose(np.asarray(list(get_extreme_rays(None, H_total, fractional=symbolic, verbose=verbose))))
+
     rays = np.asarray(list(get_extreme_rays_efmtool(H_total)))
-    # rays = get_extreme_rays_cdd(H_total)
     rays_deflated = np.transpose(np.dot(A, np.transpose(rays))) if make_homogeneous else rays
 
     if rays_deflated.shape[0] == 0:
         print('Warning: no feasible Elementary Conversion Modes found')
         return rays_deflated, H_ineq
 
-    rays_inflated = np.zeros(shape=(rays_deflated.shape[0], amount_metabolites))
-    for index, metabolite_index in enumerate(tagged_rows):
-        rays_inflated[:, metabolite_index] = rays_deflated[:, index]
+    rays_inflated = inflate_matrix(rays_deflated, tagged_rows, amount_metabolites)
 
     return rays_inflated, H_ineq
 
 
 if __name__ == '__main__':
     start = time()
-
-    de_groot_nullbase(np.asarray([
-        [1, 0, 0, 0, 1],
-        [0, 1, 0, 3, 2],
-        [0, 0, 1, 5, 3],
-    ]))
 
     S = np.asarray([
         [-1, 0, 0],

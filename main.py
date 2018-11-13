@@ -1,9 +1,17 @@
 from helpers import *
 from time import time
 from conversion_cone import get_conversion_cone
+from argparse import ArgumentParser
 
 if __name__ == '__main__':
     start = time()
+
+    parser = ArgumentParser(description='Calculate Elementary Conversion Modes from an SBML model.')
+    parser.add_argument('--model_path', default='models/e_coli_core.xml', help='Relative or absolute path to an SBML model .xml file')
+    parser.add_argument('--compress', type=bool, default=True, help='Perform compression to which the conversions are invariant, and reduce the network size considerably (default: True)')
+    parser.add_argument('--out_path', default='conversion_cone.csv', help='Relative or absolute path to the .csv file you want to save the calculated conversions to')
+    parser.add_argument('--add_objective_metabolite', type=bool, default=True, help='Add a virtual metabolite containing the stoichiometry of the objective function of the model')
+    args = parser.parse_args()
 
     # model_path = 'models/iAF1260.xml'
     # model_path = 'models/iND750.xml'
@@ -13,14 +21,16 @@ if __name__ == '__main__':
     # model_path = 'models/e_coli_core_red.xml'
     # model_path = 'models/e_coli_core_nolac.xml'
     # model_path = 'models/daan_toy.xml'
-    model_path = 'models/sxp_toy.xml'
+    # model_path = 'models/sxp_toy.xml'
     # model_path = 'models/sabp_compression.xml'
+    model_path = args.model_path
 
-    network = extract_sbml_stoichiometry(model_path)
+    network = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite)
     for index, item in enumerate(network.metabolites):
         print(index, item.id, item.name)
 
-    # network.compress(verbose=True)
+    if args.compress:
+        network.compress(verbose=True)
     # add_debug_tags(network)
 
     symbolic = True
@@ -33,7 +43,7 @@ if __name__ == '__main__':
     c, H = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
                                        verbose=True, symbolic=symbolic)
                                        # input_metabolites=inputs, output_metabolites=outputs, verbose=True, symbolic=symbolic)
-    np.savetxt('conversion_cone.csv', c, delimiter=',')
+    np.savetxt(args.out_path, c, delimiter=',')
 
     for index, ecm in enumerate(c):
         # if not ecm[-1]:
