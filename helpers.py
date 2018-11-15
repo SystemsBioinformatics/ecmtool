@@ -144,7 +144,7 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, fractional=Tr
 
     # Run external extreme ray enumeration tool
     with open(os_devnull, 'w') as devnull:
-        check_call(('java -Xms1g -Xmx7g -jar polco.jar -kind text ' +
+        check_call(('java -Xms1g -Xmx7g -jar polco/polco.jar -kind text ' +
                     '-arithmetic %s ' % (' '.join(['fractional' if fractional else 'double'] * 3)) +
                     ('' if equality_matrix is None else '-eq tmp/egm_eq_%d.txt ' % (rand)) +
                     '-iq tmp/egm_iq_%d.txt -out text tmp/generators_%d.txt' % (rand, rand)).split(' '),

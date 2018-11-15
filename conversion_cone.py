@@ -1,3 +1,5 @@
+from os import system
+
 import numpy as np
 from helpers import *
 from sympy import Matrix
@@ -36,6 +38,42 @@ def inflate_matrix(A, kept_columns, original_width):
     return B
 
 
+def redund(matrix, verbose=False):
+    matrix = to_fractions(matrix)
+
+    with open('tmp/matrix.ine', 'w') as file:
+        file.write('H-representation\n')
+        file.write('begin\n')
+        file.write('%d %d rational\n' % (matrix.shape[0], matrix.shape[1] + 1))
+        for row in range(matrix.shape[0]):
+            file.write(' 0')
+            for col in range(matrix.shape[1]):
+                file.write(' %s' % str(matrix[row, col]))
+            file.write('\n')
+        file.write('end\n')
+
+    system('scripts/redund tmp/matrix.ine > tmp/matrix_nored.ine')
+
+    matrix_nored = np.ndarray(shape=(0, matrix.shape[1] + 1), dtype='object')
+
+    with open('tmp/matrix_nored.ine') as file:
+        lines = file.readlines()
+        for line in [line for line in lines if line not in ['\n', '']]:
+            # Skip comment and INE format lines
+            if np.any([target in line for target in ['*', 'H-representation', 'begin', 'end', 'rational']]):
+                continue
+            row = [Fraction(x) for x in line.replace('\n', '').split(' ') if x != '']
+            matrix_nored = np.append(matrix_nored, [row], axis=0)
+
+    remove('tmp/matrix.ine')
+    remove('tmp/matrix_nored.ine')
+
+    if verbose:
+        print('Removed %d redundant rows' % (matrix.shape[0] - matrix_nored.shape[0]))
+
+    return matrix_nored[:, 1:]
+
+
 def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metabolites=[], output_metabolites=[],
                         symbolic=True, verbose=False):
     """
@@ -55,6 +93,9 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
         if metabolite_index in reversible_columns:
             G = np.append(G, [-G[metabolite_index, :]], axis=0)
 
+    # TODO: remove debug block
+    # G = redund(G)
+
     # Calculate H as the union of our linearities and the extreme rays of matrix G (all as row vectors)
     if verbose:
         print('Calculating extreme rays H of inequalities system G')
@@ -64,6 +105,10 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
 
     # Remove internal metabolites from the rays, since they are all equal to 0 in the conversion cone
     rays_deflated = deflate_matrix(rays_full, tagged_rows)
+
+    # if verbose:
+    #     print('Removing redundant rows from H')
+    # rays_deflated = redund(rays_deflated)
 
     H_ineq = np.ndarray(shape=(0, rays_deflated.shape[1]))
     linearities = np.ndarray(shape=(0, rays_deflated.shape[1]))
@@ -81,6 +126,20 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
 
     H_eq = linearities
 
+    # Add input/output constraints to H_ineq
+    if not H_ineq.shape[0]:
+        H_ineq = np.zeros(shape=(1, H_ineq.shape[1]))
+
+    identity = np.identity(H_ineq.shape[1])
+
+    for input_metabolite in input_metabolites:
+        index = tagged_rows.index(input_metabolite)
+        H_ineq = np.append(H_ineq, [-identity[index, :]], axis=0)
+
+    for output_metabolite in output_metabolites:
+        index = tagged_rows.index(output_metabolite)
+        H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
+
     # If there are inequalities, apply trick A3 from (Urbanczik, 2005, appendix)
     make_homogeneous = H_ineq.shape[0] > 0
 
@@ -88,6 +147,9 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
         print('Calculating nullspace A of H_eq')
 
     A = nullspace(H_eq) if make_homogeneous else None
+
+    # Combine equality and inequality equations into homogenous inequality system
+    # using Urbanczik A3.
     H_total = np.dot(H_ineq, A) if make_homogeneous else np.append(H_eq, -H_eq, axis=0)
 
     # Calculate the extreme rays of the cone C represented by inequalities H_total, resulting in
@@ -95,19 +157,20 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
     if verbose:
         print('Calculating extreme rays C of inequalities system H_total')
 
-    if not H_ineq.shape[0]:
-        H_ineq = np.zeros(shape=(1, H_ineq.shape[1]))
+    # rays = np.asarray(list(get_extreme_rays_efmtool(H_total)))
+    rays = np.asarray(list(get_extreme_rays(None, H_total, verbose=True)))
+    # rays = np.asarray(list(get_extreme_rays_cdd(H_total)))
 
-    rays = np.asarray(list(get_extreme_rays_efmtool(H_total)))
+    if rays.shape[0] == 0:
+        print('Warning: no feasible Elementary Conversion Modes found')
+        return rays
+
     rays_deflated = np.transpose(np.dot(A, np.transpose(rays))) if make_homogeneous else rays
 
-    if rays_deflated.shape[0] == 0:
-        print('Warning: no feasible Elementary Conversion Modes found')
-        return rays_deflated, H_ineq
 
     rays_inflated = inflate_matrix(rays_deflated, tagged_rows, amount_metabolites)
 
-    return rays_inflated, H_ineq
+    return rays_inflated
 
 
 if __name__ == '__main__':

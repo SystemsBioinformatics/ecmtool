@@ -4554,32 +4554,32 @@ xmlns:fbc="http://www.sbml.org/sbml/level3/version1/fbc/version2" xmlns:groups="
           </rdf:RDF>
         </annotation>
       </species>
-      <!--<species boundaryCondition="false" compartment="e" constant="false" fbc:chemicalFormula="C3H5O3" hasOnlySubstanceUnits="false" id="M_lac__D_e" metaid="M_lac__D_e" name="D-Lactate">-->
-        <!--<annotation>-->
-          <!--<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/">-->
-            <!--<rdf:Description rdf:about="#M_lac__D_e">-->
-              <!--<bqbiol:is>-->
-                <!--<rdf:Bag>-->
-                  <!--<rdf:li rdf:resource="http://identifiers.org/bigg.metabolite/lac__D" />-->
-                  <!--<rdf:li rdf:resource="http://identifiers.org/biocyc/META:D-LACTATE" />-->
-                  <!--<rdf:li rdf:resource="http://identifiers.org/chebi/CHEBI:11001" />-->
-                  <!--<rdf:li rdf:resource="http://identifiers.org/chebi/CHEBI:16004" />-->
-                  <!--<rdf:li rdf:resource="http://identifiers.org/chebi/CHEBI:18684" />-->
-                  <!--<rdf:li rdf:resource="http://identifiers.org/chebi/CHEBI:341" />-->
-                  <!--<rdf:li rdf:resource="http://identifiers.org/chebi/CHEBI:42105" />-->
-                  <!--<rdf:li rdf:resource="http://identifiers.org/chebi/CHEBI:42111" />-->
-                  <!--<rdf:li rdf:resource="http://identifiers.org/chebi/CHEBI:43701" />-->
-                  <!--<rdf:li rdf:resource="http://identifiers.org/hmdb/HMDB00171" />-->
-                  <!--<rdf:li rdf:resource="http://identifiers.org/hmdb/HMDB01311" />-->
-                  <!--<rdf:li rdf:resource="http://identifiers.org/kegg.compound/C00256" />-->
-                  <!--<rdf:li rdf:resource="http://identifiers.org/metanetx.chemical/MNXM285" />-->
-                  <!--<rdf:li rdf:resource="http://identifiers.org/seed.compound/cpd00221" />-->
-                <!--</rdf:Bag>-->
-              <!--</bqbiol:is>-->
-            <!--</rdf:Description>-->
-          <!--</rdf:RDF>-->
-        <!--</annotation>-->
-      <!--</species>-->
+      <species boundaryCondition="false" compartment="e" constant="false" fbc:chemicalFormula="C3H5O3" hasOnlySubstanceUnits="false" id="M_lac__D_e" metaid="M_lac__D_e" name="D-Lactate">
+        <annotation>
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/">
+            <rdf:Description rdf:about="#M_lac__D_e">
+              <bqbiol:is>
+                <rdf:Bag>
+                  <rdf:li rdf:resource="http://identifiers.org/bigg.metabolite/lac__D" />
+                  <rdf:li rdf:resource="http://identifiers.org/biocyc/META:D-LACTATE" />
+                  <rdf:li rdf:resource="http://identifiers.org/chebi/CHEBI:11001" />
+                  <rdf:li rdf:resource="http://identifiers.org/chebi/CHEBI:16004" />
+                  <rdf:li rdf:resource="http://identifiers.org/chebi/CHEBI:18684" />
+                  <rdf:li rdf:resource="http://identifiers.org/chebi/CHEBI:341" />
+                  <rdf:li rdf:resource="http://identifiers.org/chebi/CHEBI:42105" />
+                  <rdf:li rdf:resource="http://identifiers.org/chebi/CHEBI:42111" />
+                  <rdf:li rdf:resource="http://identifiers.org/chebi/CHEBI:43701" />
+                  <rdf:li rdf:resource="http://identifiers.org/hmdb/HMDB00171" />
+                  <rdf:li rdf:resource="http://identifiers.org/hmdb/HMDB01311" />
+                  <rdf:li rdf:resource="http://identifiers.org/kegg.compound/C00256" />
+                  <rdf:li rdf:resource="http://identifiers.org/metanetx.chemical/MNXM285" />
+                  <rdf:li rdf:resource="http://identifiers.org/seed.compound/cpd00221" />
+                </rdf:Bag>
+              </bqbiol:is>
+            </rdf:Description>
+          </rdf:RDF>
+        </annotation>
+      </species>
       <species boundaryCondition="false" compartment="c" constant="false" fbc:chemicalFormula="C4H4O5" hasOnlySubstanceUnits="false" id="M_mal__L_c" metaid="M_mal__L_c" name="L-Malate">
         <annotation>
           <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/">
@@ -5311,7 +5311,7 @@ xmlns:fbc="http://www.sbml.org/sbml/level3/version1/fbc/version2" xmlns:groups="
       </species>
     </listOfSpecies>
     <listOfParameters>
-      <parameter constant="true" id="cobra_default_lb" name="cobra default - lb" sboTerm="SBO:0000626" units="mmol_per_gDW_per_hr" ue="-1000" />
+      <parameter constant="true" id="cobra_default_lb" name="cobra default - lb" sboTerm="SBO:0000626" units="mmol_per_gDW_per_hr" value="-1000" />
       <parameter constant="true" id="cobra_default_ub" name="cobra default - ub" sboTerm="SBO:0000626" units="mmol_per_gDW_per_hr" value="1000" />
       <parameter constant="true" id="cobra_0_bound" name="cobra 0 - bound" sboTerm="SBO:0000625" units="mmol_per_gDW_per_hr" value="0" />
       <parameter constant="true" id="R_ATPM_lower_bound" name="R ATPM lower - bound" sboTerm="SBO:0000625" units="mmol_per_gDW_per_hr" value="8.39" />
@@ -5944,36 +5944,36 @@ xmlns:fbc="http://www.sbml.org/sbml/level3/version1/fbc/version2" xmlns:groups="
           <speciesReference constant="true" sboTerm="SBO:0000011" species="M_q8_c" stoichiometry="1" />
         </listOfProducts>
       </reaction>
-      <!--<reaction fast="false" fbc:lowerFluxBound="cobra_default_lb" fbc:upperFluxBound="cobra_default_ub" id="R_D_LACt2" metaid="R_D_LACt2" name="D lactate transport via proton symport"-->
-      <!--reversible="true" sboTerm="SBO:0000375">-->
-        <!--<annotation>-->
-          <!--<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/">-->
-            <!--<rdf:Description rdf:about="#R_D_LACt2">-->
-              <!--<bqbiol:is>-->
-                <!--<rdf:Bag>-->
-                  <!--<rdf:li rdf:resource="http://identifiers.org/bigg.reaction/D_LACt2" />-->
-                  <!--<rdf:li rdf:resource="http://identifiers.org/biocyc/META:TRANS-RXN0-515" />-->
-                  <!--<rdf:li rdf:resource="http://identifiers.org/metanetx.reaction/MNXR97838" />-->
-                <!--</rdf:Bag>-->
-              <!--</bqbiol:is>-->
-            <!--</rdf:Description>-->
-          <!--</rdf:RDF>-->
-        <!--</annotation>-->
-        <!--<fbc:geneProductAssociation xmlns:fbc="http://www.sbml.org/sbml/level3/version1/fbc/version2">-->
-          <!--<fbc:or sboTerm="SBO:0000174">-->
-            <!--<fbc:geneProductRef fbc:geneProduct="G_b2975" />-->
-            <!--<fbc:geneProductRef fbc:geneProduct="G_b3603" />-->
-          <!--</fbc:or>-->
-        <!--</fbc:geneProductAssociation>-->
-        <!--<listOfReactants>-->
-          <!--<speciesReference constant="true" sboTerm="SBO:0000010" species="M_h_e" stoichiometry="1" />-->
-          <!--<speciesReference constant="true" sboTerm="SBO:0000010" species="M_lac__D_e" stoichiometry="1" />-->
-        <!--</listOfReactants>-->
-        <!--<listOfProducts>-->
-          <!--<speciesReference constant="true" sboTerm="SBO:0000011" species="M_h_c" stoichiometry="1" />-->
-          <!--<speciesReference constant="true" sboTerm="SBO:0000011" species="M_lac__D_c" stoichiometry="1" />-->
-        <!--</listOfProducts>-->
-      <!--</reaction>-->
+      <reaction fast="false" fbc:lowerFluxBound="cobra_default_lb" fbc:upperFluxBound="cobra_default_ub" id="R_D_LACt2" metaid="R_D_LACt2" name="D lactate transport via proton symport"
+      reversible="true" sboTerm="SBO:0000375">
+        <annotation>
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/">
+            <rdf:Description rdf:about="#R_D_LACt2">
+              <bqbiol:is>
+                <rdf:Bag>
+                  <rdf:li rdf:resource="http://identifiers.org/bigg.reaction/D_LACt2" />
+                  <rdf:li rdf:resource="http://identifiers.org/biocyc/META:TRANS-RXN0-515" />
+                  <rdf:li rdf:resource="http://identifiers.org/metanetx.reaction/MNXR97838" />
+                </rdf:Bag>
+              </bqbiol:is>
+            </rdf:Description>
+          </rdf:RDF>
+        </annotation>
+        <fbc:geneProductAssociation xmlns:fbc="http://www.sbml.org/sbml/level3/version1/fbc/version2">
+          <fbc:or sboTerm="SBO:0000174">
+            <fbc:geneProductRef fbc:geneProduct="G_b2975" />
+            <fbc:geneProductRef fbc:geneProduct="G_b3603" />
+          </fbc:or>
+        </fbc:geneProductAssociation>
+        <listOfReactants>
+          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_h_e" stoichiometry="1" />
+          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_lac__D_e" stoichiometry="1" />
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference constant="true" sboTerm="SBO:0000011" species="M_h_c" stoichiometry="1" />
+          <speciesReference constant="true" sboTerm="SBO:0000011" species="M_lac__D_c" stoichiometry="1" />
+        </listOfProducts>
+      </reaction>
       <reaction fast="false" fbc:lowerFluxBound="cobra_default_lb" fbc:upperFluxBound="cobra_default_ub" id="R_ENO" metaid="R_ENO" name="Enolase" reversible="true" sboTerm="SBO:0000375">
         <annotation>
           <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/">
@@ -6248,23 +6248,23 @@ xmlns:fbc="http://www.sbml.org/sbml/level3/version1/fbc/version2" xmlns:groups="
           <speciesReference constant="true" sboTerm="SBO:0000010" species="M_h2o_e" stoichiometry="1" />
         </listOfReactants>
       </reaction>
-      <!--<reaction fast="false" fbc:lowerFluxBound="cobra_0_bound" fbc:upperFluxBound="cobra_default_ub" id="R_EX_lac__D_e" metaid="R_EX_lac__D_e" name="D-lactate exchange" reversible="false"-->
-      <!--sboTerm="SBO:0000627">-->
-        <!--<annotation xmlns:sbml="http://www.sbml.org/sbml/level3/version1/core">-->
-          <!--<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/">-->
-            <!--<rdf:Description rdf:about="#R_EX_lac__D_e">-->
-              <!--<bqbiol:is>-->
-                <!--<rdf:Bag>-->
-                  <!--<rdf:li rdf:resource="http://identifiers.org/bigg.reaction/lac__D" />-->
-                <!--</rdf:Bag>-->
-              <!--</bqbiol:is>-->
-            <!--</rdf:Description>-->
-          <!--</rdf:RDF>-->
-        <!--</annotation>-->
-        <!--<listOfReactants>-->
-          <!--<speciesReference constant="true" sboTerm="SBO:0000010" species="M_lac__D_e" stoichiometry="1" />-->
-        <!--</listOfReactants>-->
-      <!--</reaction>-->
+      <reaction fast="false" fbc:lowerFluxBound="cobra_0_bound" fbc:upperFluxBound="cobra_default_ub" id="R_EX_lac__D_e" metaid="R_EX_lac__D_e" name="D-lactate exchange" reversible="false"
+      sboTerm="SBO:0000627">
+        <annotation xmlns:sbml="http://www.sbml.org/sbml/level3/version1/core">
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/">
+            <rdf:Description rdf:about="#R_EX_lac__D_e">
+              <bqbiol:is>
+                <rdf:Bag>
+                  <rdf:li rdf:resource="http://identifiers.org/bigg.reaction/lac__D" />
+                </rdf:Bag>
+              </bqbiol:is>
+            </rdf:Description>
+          </rdf:RDF>
+        </annotation>
+        <listOfReactants>
+          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_lac__D_e" stoichiometry="1" />
+        </listOfReactants>
+      </reaction>
       <reaction fast="false" fbc:lowerFluxBound="cobra_0_bound" fbc:upperFluxBound="cobra_default_ub" id="R_EX_mal__L_e" metaid="R_EX_mal__L_e" name="L-Malate exchange" reversible="false"
       sboTerm="SBO:0000627">
         <annotation xmlns:sbml="http://www.sbml.org/sbml/level3/version1/core">
@@ -6464,7 +6464,7 @@ xmlns:fbc="http://www.sbml.org/sbml/level3/version1/fbc/version2" xmlns:groups="
           <speciesReference constant="true" sboTerm="SBO:0000011" species="M_h_c" stoichiometry="1" />
         </listOfProducts>
       </reaction>
-      <reaction fast="false" fbc:lowerFluxBound="cobra_default_lb" fbc:upperFluxBound="cobra_0_bound" id="R_FORt" metaid="R_FORt" name="Formate transport via diffusion" reversible="true"
+      <reaction fast="false" fbc:upperFluxBound="cobra_default_ub" fbc:lowerFluxBound="cobra_0_bound" id="R_FORt" metaid="R_FORt" name="Formate transport via diffusion" reversible="false"
       sboTerm="SBO:0000375">
         <annotation>
           <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/">
@@ -6490,10 +6490,10 @@ xmlns:fbc="http://www.sbml.org/sbml/level3/version1/fbc/version2" xmlns:groups="
           </fbc:or>
         </fbc:geneProductAssociation>
         <listOfReactants>
-          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_for_e" stoichiometry="1" />
+          <speciesReference constant="true" sboTerm="SBO:0000011" species="M_for_c" stoichiometry="1" />
         </listOfReactants>
         <listOfProducts>
-          <speciesReference constant="true" sboTerm="SBO:0000011" species="M_for_c" stoichiometry="1" />
+          <speciesReference constant="true" sboTerm="SBO:0000010" species="M_for_e" stoichiometry="1" />
         </listOfProducts>
       </reaction>
       <reaction fast="false" fbc:lowerFluxBound="cobra_0_bound" fbc:upperFluxBound="cobra_default_ub" id="R_FRD7" metaid="R_FRD7" name="Fumarate reductase" reversible="false" sboTerm="SBO:0000375">
