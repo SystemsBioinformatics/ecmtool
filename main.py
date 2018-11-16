@@ -2,19 +2,29 @@ from scipy.optimize import linprog
 
 from helpers import *
 from time import time
-from conversion_cone import get_conversion_cone
-from argparse import ArgumentParser
+from conversion_cone import get_conversion_cone, get_clementine_conversion_cone
+from argparse import ArgumentParser, ArgumentTypeError
+
+
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise ArgumentTypeError('Boolean value expected.')
+
 
 if __name__ == '__main__':
     start = time()
 
     parser = ArgumentParser(description='Calculate Elementary Conversion Modes from an SBML model. For medium-to large networks, be sure to define --inputs and --outputs. This reduces the enumeration problem complexity considerably.')
     parser.add_argument('--model_path', default='models/e_coli_core.xml', help='Relative or absolute path to an SBML model .xml file')
-    parser.add_argument('--compress', type=bool, default=True, help='Perform compression to which the conversions are invariant, and reduce the network size considerably (default: True)')
+    parser.add_argument('--compress', type=str2bool, default=True, help='Perform compression to which the conversions are invariant, and reduce the network size considerably (default: True)')
     parser.add_argument('--out_path', default='conversion_cone.csv', help='Relative or absolute path to the .csv file you want to save the calculated conversions to')
-    parser.add_argument('--add_objective_metabolite', type=bool, default=True, help='Add a virtual metabolite containing the stoichiometry of the objective function of the model')
-    parser.add_argument('--check_feasibility', type=bool, default=False, help='For each found ECM, verify that a feasible flux exists that produces it')
-    parser.add_argument('--print_metabolites', type=bool, default=True, help='Print the names and IDs of metabolites in the (compressed) metabolic network')
+    parser.add_argument('--add_objective_metabolite', type=str2bool, default=True, help='Add a virtual metabolite containing the stoichiometry of the objective function of the model')
+    parser.add_argument('--check_feasibility', type=str2bool, default=False, help='For each found ECM, verify that a feasible flux exists that produces it')
+    parser.add_argument('--print_metabolites', type=str2bool, default=True, help='Print the names and IDs of metabolites in the (compressed) metabolic network')
     parser.add_argument('--inputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true, that can only be consumed')
     parser.add_argument('--outputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true, that can only be produced')
     args = parser.parse_args()
@@ -43,9 +53,11 @@ if __name__ == '__main__':
     if len(outputs) < 1:
         # If no outputs are given, define all external metabolites that are not inputs as outputs
         outputs = np.setdiff1d(network.external_metabolite_indices(), inputs)
-    cone = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
-                               # verbose=True, symbolic=symbolic)
-                               input_metabolites=inputs, output_metabolites=outputs, verbose=True, symbolic=symbolic)
+    # cone = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
+    #                            # verbose=True, symbolic=symbolic)
+    #                            input_metabolites=inputs, output_metabolites=outputs, verbose=True, symbolic=symbolic)
+    cone = get_clementine_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
+                               input_metabolites=inputs, output_metabolites=outputs, verbose=True)
 
     # Undo compression so we have results in the same dimensionality as original data
     expanded_c = np.zeros(shape=(cone.shape[0], len(orig_ids)))

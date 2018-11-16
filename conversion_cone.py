@@ -23,7 +23,7 @@ def deflate_matrix(A, columns_to_keep):
     # Return rows that are nonzero after removing unwanted columns
     for row_index in range(A.shape[0]):
         row = A[row_index, columns_to_keep]
-        if np.sum(row) != 0:
+        if np.count_nonzero(row) > 0:
             B = np.append(B, [row], axis=0)
 
     return B
@@ -74,6 +74,71 @@ def redund(matrix, verbose=False):
     return matrix_nored[:, 1:]
 
 
+def get_clementine_conversion_cone(N, external_metabolites=[], reversible_reactions=[], input_metabolites=[], output_metabolites=[],
+                                   verbose=True):
+    """
+    Calculates the conversion cone using Superior Clementine Equality Intersection (all rights reserved).
+    Follows the general Double Description method by Motzkin, using G as initial basis and intersecting
+    hyperplanes of internal metabolites = 0.
+    :param N:
+    :param external_metabolites:
+    :param reversible_reactions:
+    :param input_metabolites:
+    :param output_metabolites:
+    :return:
+    """
+    amount_metabolites, amount_reactions = N.shape[0], N.shape[1]
+    internal_metabolites = np.setdiff1d(range(amount_metabolites), external_metabolites)
+
+    identity = np.identity(amount_metabolites)
+
+    # Compose G of the columns of N
+    G = np.transpose(N)
+
+    # Add reversible reactions (columns) of N to G in the negative direction as well
+    for reaction_index in range(G.shape[0]):
+        if reaction_index in reversible_reactions:
+            G = np.append(G, [-G[reaction_index, :]], axis=0)
+
+    for index, internal_metabolite in enumerate(internal_metabolites):
+        if verbose:
+            print('Iteration %d/%d' % (index, len(internal_metabolites)))
+
+        # Find conversions that use this metabolite
+        active_conversions = np.asarray([conversion_index for conversion_index in range(G.shape[0])
+                              if G[conversion_index, internal_metabolite] != 0])
+
+        # Skip internal metabolites that aren't used anywhere
+        if len(active_conversions) == 0:
+            if verbose:
+                print('Skipping internal metabolite #%d\n' % internal_metabolite)
+            continue
+
+        # Project conversions that use this metabolite onto the hyperplane internal_metabolite = 0
+        projections = np.dot(G[active_conversions, :], identity[:, internal_metabolite])
+        positive = active_conversions[np.argwhere(projections > 0)[:, 0]]
+        negative = active_conversions[np.argwhere(projections < 0)[:, 0]]
+        candidates = np.ndarray(shape=(0, amount_metabolites))
+
+        if verbose:
+            print('Adding %d candidates' % (len(positive) * len(negative)))
+
+        # Make convex combinations of all pairs (positive, negative) such that their internal_metabolite = 0
+        for pos in positive:
+            for neg in negative:
+                candidate = np.add(G[pos, :], G[neg, :] * (G[pos, internal_metabolite] / -G[neg, internal_metabolite]))
+                candidates = np.append(candidates, [candidate], axis=0)
+
+        # Keep only rays that satisfy internal_metabolite = 0
+        keep = np.setdiff1d(range(G.shape[0]), np.append(positive, negative, axis=0))
+        if verbose:
+            print('Removing %d rays\n' % (G.shape[0] - len(keep)))
+        G = G[keep, :]
+        G = np.append(G, candidates, axis=0)
+
+    return G
+
+
 def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metabolites=[], output_metabolites=[],
                         symbolic=True, verbose=False):
     """
@@ -89,9 +154,9 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
     G = np.transpose(N)
 
     # Add reversible reactions (columns) of N to G in the negative direction as well
-    for metabolite_index in range(G.shape[0]):
-        if metabolite_index in reversible_columns:
-            G = np.append(G, [-G[metabolite_index, :]], axis=0)
+    for reaction_index in range(G.shape[0]):
+        if reaction_index in reversible_columns:
+            G = np.append(G, [-G[reaction_index, :]], axis=0)
 
     # TODO: remove debug block
     # G = redund(G)

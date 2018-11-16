@@ -1,8 +1,6 @@
-import numpy as np
+from scipy.optimize import linprog
 
 from helpers import *
-import helpers
-from scipy.optimize import linprog
 
 
 class Reaction:
@@ -66,10 +64,10 @@ class Network:
             print('Trying to cancel compounds by reversible reactions')
 
         reversible_reactions = self.reversible_reaction_indices()
-        total_reactions = len(reversible_reactions)
+        total_reversible_reactions = len(reversible_reactions)
 
         for iteration, reaction_index in enumerate(reversible_reactions):
-            print('%.2f%%' % (iteration / float(total_reactions) * 100))
+            print('%.2f%%' % (iteration / float(total_reversible_reactions) * 100))
             reaction = self.N[:, reaction_index]
             metabolite_indices = [index for index in range(len(self.metabolites)) if reaction[index] != 0 and
                                   index not in self.external_metabolite_indices()]
@@ -80,12 +78,13 @@ class Network:
                 continue
 
             busiest_metabolite = np.argmax(involved_in_reactions)  # Involved in most reactions
-            if not isinstance(busiest_metabolite, int):
+            if not isinstance(busiest_metabolite, int) and not isinstance(busiest_metabolite, np.int64):
                 busiest_metabolite = busiest_metabolite[0]
 
             target = metabolite_indices[busiest_metabolite]
 
             for other_reaction_index in range(self.N.shape[1]):
+                # Make all other reactions that consume or produce target metabolite 0 for that metabolite
                 if other_reaction_index != reaction_index and self.N[target, other_reaction_index] != 0:
                     self.N[:, other_reaction_index] = np.subtract(self.N[:, other_reaction_index],
                                                                   self.N[:, reaction_index] * \
