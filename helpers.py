@@ -10,7 +10,7 @@ from random import randint
 
 from matlab_wrapper import MatlabSession
 from numpy.linalg import svd
-from sympy import Matrix
+from sympy import Matrix, matrix2numpy
 
 from network import Network, Reaction, Metabolite
 
@@ -127,7 +127,7 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, fractional=Tr
 
     if inequality_matrix is None:
         if equality_matrix is not None:
-            inequality_matrix = np.identity(equality_matrix.shape[1])
+            inequality_matrix = np.zeros(equality_matrix.shape[1])
         else:
             raise Exception('No equality or inequality argument given')
 
@@ -135,16 +135,16 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, fractional=Tr
     if equality_matrix is not None:
         with open('tmp/egm_eq_%d.txt' % rand, 'w') as file:
             for row in range(equality_matrix.shape[0]):
-                file.write(' '.join([str(val) for val in equality_matrix[row, :]]) + '\r\n')
+                file.write(' '.join([str(val) for val in equality_matrix[row, :]]) + '\n')
 
     # Write inequalities system to disk as space separated file
     with open('tmp/egm_iq_%d.txt' % rand, 'w') as file:
         for row in range(inequality_matrix.shape[0]):
-            file.write(' '.join([str(val) for val in inequality_matrix[row, :]]) + '\r\n')
+            file.write(' '.join([str(val) for val in inequality_matrix[row, :]]) + '\n')
 
     # Run external extreme ray enumeration tool
     with open(os_devnull, 'w') as devnull:
-        check_call(('java -Xms1g -Xmx7g -jar polco/polco.jar -kind text ' +
+        check_call(('java -Xms1g -Xmx1g -jar polco/polco.jar -kind text ' +
                     '-arithmetic %s ' % (' '.join(['fractional' if fractional else 'double'] * 3)) +
                     ('' if equality_matrix is None else '-eq tmp/egm_eq_%d.txt ' % (rand)) +
                     '-iq tmp/egm_iq_%d.txt -out text tmp/generators_%d.txt' % (rand, rand)).split(' '),
@@ -249,7 +249,7 @@ def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
             nullspace_matrix = nullspace_matrix.row_insert(-1, nullspace_vectors[i].T)
 
         return to_fractions(
-            np.transpose(np.asarray(nullspace_matrix.rref()[0], dtype='object'))) if nullspace_matrix \
+            np.transpose(matrix2numpy(nullspace_matrix.rref()[0]))) if nullspace_matrix \
             else np.ndarray(shape=(N.shape[0], 0))
 
 

@@ -1,8 +1,6 @@
-import numpy as np
+from scipy.optimize import linprog
 
 from helpers import *
-import helpers
-from scipy.optimize import linprog
 
 
 class Reaction:
@@ -80,7 +78,7 @@ class Network:
                 continue
 
             busiest_metabolite = np.argmax(involved_in_reactions)  # Involved in most reactions
-            if not isinstance(busiest_metabolite, int):
+            if not isinstance(busiest_metabolite, int) and not isinstance(busiest_metabolite, np.int64):
                 busiest_metabolite = busiest_metabolite[0]
 
             target = metabolite_indices[busiest_metabolite]

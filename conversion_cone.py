@@ -23,7 +23,7 @@ def deflate_matrix(A, columns_to_keep):
     # Return rows that are nonzero after removing unwanted columns
     for row_index in range(A.shape[0]):
         row = A[row_index, columns_to_keep]
-        if np.sum(row) != 0:
+        if np.count_nonzero(row) > 0:
             B = np.append(B, [row], axis=0)
 
     return B
@@ -89,9 +89,9 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
     G = np.transpose(N)
 
     # Add reversible reactions (columns) of N to G in the negative direction as well
-    for metabolite_index in range(G.shape[0]):
-        if metabolite_index in reversible_columns:
-            G = np.append(G, [-G[metabolite_index, :]], axis=0)
+    for reaction_index in range(G.shape[0]):
+        if reaction_index in reversible_columns:
+            G = np.append(G, [-G[reaction_index, :]], axis=0)
 
     # TODO: remove debug block
     # G = redund(G)
@@ -116,7 +116,7 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
     # Fill H_ineq with all generating rays that are not part of the nullspace (aka lineality space) of the dual cone C0*.
     # These represent the system of inequalities of our initial conversion cone C0.
     for row in range(rays_deflated.shape[0]):
-        if np.all(np.dot(G, rays_full[row, :]) == 0):
+        if np.all(np.dot(G[:,tagged_rows], rays_deflated[row, :]) == 0):
             # This is a linearity
             linearities = np.append(linearities, [rays_deflated[row, :]], axis=0)
         else:
