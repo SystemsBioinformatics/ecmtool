@@ -67,7 +67,7 @@ class Network:
         total_reversible_reactions = len(reversible_reactions)
 
         for iteration, reaction_index in enumerate(reversible_reactions):
-            print('%.2f%%' % (iteration / float(total_reversible_reactions) * 100))
+            print('Cancelling compounds - %.2f%%' % (iteration / float(total_reversible_reactions) * 100))
             reaction = self.N[:, reaction_index]
             metabolite_indices = [index for index in range(len(self.metabolites)) if reaction[index] != 0 and
                                   index not in self.external_metabolite_indices()]
@@ -81,15 +81,18 @@ class Network:
             if not isinstance(busiest_metabolite, int) and not isinstance(busiest_metabolite, np.int64):
                 busiest_metabolite = busiest_metabolite[0]
 
+            # We want to cancel the metabolite that is used in the largest amount of other reactions
             target = metabolite_indices[busiest_metabolite]
 
             for other_reaction_index in range(self.N.shape[1]):
-                # Make all other reactions that consume or produce target metabolite 0 for that metabolite
+                # Make all other reactions that consume or produce target metabolite zero for that metabolite
                 if other_reaction_index != reaction_index and self.N[target, other_reaction_index] != 0:
                     self.N[:, other_reaction_index] = np.subtract(self.N[:, other_reaction_index],
                                                                   self.N[:, reaction_index] * \
                                                                   (self.N[target, other_reaction_index] /
                                                                    self.N[target, reaction_index]))
+                    self.reactions[other_reaction_index].name = '(%s - %s)' % (self.reactions[other_reaction_index].name,
+                                                                      reaction_index)
 
         removable_metabolites, removable_reactions = [], []
         for metabolite_index in range(len(self.metabolites)):

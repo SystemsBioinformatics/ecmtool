@@ -111,7 +111,7 @@ def get_clementine_conversion_cone(N, external_metabolites=[], reversible_reacti
         # Skip internal metabolites that aren't used anywhere
         if len(active_conversions) == 0:
             if verbose:
-                print('Skipping internal metabolite #%d\n' % internal_metabolite)
+                print('Skipping internal metabolite #%d, since it is not used by any reaction\n' % internal_metabolite)
             continue
 
         # Project conversions that use this metabolite onto the hyperplane internal_metabolite = 0
@@ -206,12 +206,13 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
         H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
 
     # If there are inequalities, apply trick A3 from (Urbanczik, 2005, appendix)
-    make_homogeneous = H_ineq.shape[0] > 0
+    # make_homogeneous = H_ineq.shape[0] > 0
+    make_homogeneous = False
 
     if verbose and make_homogeneous:
         print('Calculating nullspace A of H_eq')
 
-    A = nullspace(H_eq) if make_homogeneous else None
+    A = nullspace(H_eq, symbolic=symbolic) if make_homogeneous else None
 
     # Combine equality and inequality equations into homogenous inequality system
     # using Urbanczik A3.
@@ -223,16 +224,20 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
         print('Calculating extreme rays C of inequalities system H_total')
 
     # rays = np.asarray(list(get_extreme_rays_efmtool(H_total)))
-    rays = np.asarray(list(get_extreme_rays(None, H_total, verbose=True)))
+    # rays = np.asarray(list(get_extreme_rays(None, H_total, verbose=True)))
+    rays = np.asarray(list(get_extreme_rays(H_eq, H_ineq, verbose=True)))
     # rays = np.asarray(list(get_extreme_rays_cdd(H_total)))
 
     if rays.shape[0] == 0:
         print('Warning: no feasible Elementary Conversion Modes found')
         return rays
 
+    if verbose:
+        print('Extracting deflated rays')
     rays_deflated = np.transpose(np.dot(A, np.transpose(rays))) if make_homogeneous else rays
 
-
+    if verbose:
+        print('Inflating rays')
     rays_inflated = inflate_matrix(rays_deflated, tagged_rows, amount_metabolites)
 
     return rays_inflated

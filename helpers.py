@@ -311,10 +311,14 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     return network
 
 
-def add_debug_tags(network):
-    for reaction in network.reactions:
-        network.metabolites.append(Metabolite('virtual_tag_%s' % reaction.id, 'Virtual tag for %s' % reaction.id, compartment='e'))
-    network.N = np.append(network.N, np.identity(len(network.reactions)), axis=0)
+def add_debug_tags(network, reactions=[]):
+    if len(reactions) == 0:
+        reactions = range(len(network.reactions))
+
+    for reaction in reactions:
+        network.metabolites.append(Metabolite('virtual_tag_%s' % network.reactions[reaction].id,
+                                              'Virtual tag for %s' % network.reactions[reaction].id, compartment='e'))
+    network.N = np.append(network.N, np.identity(len(network.reactions))[reactions, :], axis=0)
 
 
 def to_fractions(matrix, quasi_zero_correction=True, quasi_zero_tolerance=1e-13):
