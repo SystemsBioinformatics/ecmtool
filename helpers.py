@@ -305,7 +305,7 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
             stoichiometries = reaction.getStoichiometry()
 
             if len(stoichiometries) != 1:
-                print('Warning, exchange reaction %s has more than one substrate or product. Skipping marking its metabolite as input or output.')
+                print('Warning, exchange reaction %s has more than one substrate or product. Skipping marking its metabolite as input or output.' % reaction.id)
                 continue
 
             metabolite.direction = 'input' if stoichiometries[0][0] >= 0 else 'output'
