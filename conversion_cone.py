@@ -150,6 +150,9 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
     """
     amount_metabolites, amount_reactions = N.shape[0], N.shape[1]
 
+    # External metabolites that have no direction specified
+    in_out_metabolites = np.setdiff1d(tagged_rows, np.append(input_metabolites, output_metabolites, axis=0))
+
     # Compose G of the columns of N
     G = np.transpose(N)
 

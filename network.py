@@ -16,9 +16,12 @@ class Metabolite:
     id = ''
     name = ''
     compartment = ''
+    is_external = False
+    direction = 'both'  # input, output, or both
 
-    def __init__(self, id, name, compartment):
-        self.id, self.name, self.compartment = id, name, compartment
+    def __init__(self, id, name, compartment, is_external=False, direction='both'):
+        self.id, self.name, self.compartment, self.is_external, self.direction = \
+            id, name, compartment, is_external, direction
 
 
 class Network:
@@ -36,7 +39,13 @@ class Network:
         return [index for index, reaction in enumerate(self.reactions) if reaction.reversible]
 
     def external_metabolite_indices(self):
-        return [index for index, metabolite in enumerate(self.metabolites) if metabolite.compartment == 'e']
+        return [index for index, metabolite in enumerate(self.metabolites) if metabolite.is_external]
+
+    def input_metabolite_indices(self):
+        return [index for index, metabolite in enumerate(self.metabolites) if metabolite.direction == 'input']
+
+    def output_metabolite_indices(self):
+        return [index for index, metabolite in enumerate(self.metabolites) if metabolite.direction == 'output']
 
     def compress(self, verbose=False):
         if verbose:

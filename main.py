@@ -26,13 +26,14 @@ if __name__ == '__main__':
     parser.add_argument('--check_feasibility', type=str2bool, default=False, help='For each found ECM, verify that a feasible flux exists that produces it')
     parser.add_argument('--print_metabolites', type=str2bool, default=True, help='Print the names and IDs of metabolites in the (compressed) metabolic network')
     parser.add_argument('--print_reactions', type=str2bool, default=True, help='Print the names and IDs of reactions in the (compressed) metabolic network')
+    parser.add_argument('--auto_direction', type=str2bool, default=True, help='Automatically determine external metabolites that can only be consumed or produced')
     parser.add_argument('--inputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true, that can only be consumed')
     parser.add_argument('--outputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true, that can only be produced')
     args = parser.parse_args()
 
     model_path = args.model_path
 
-    network = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite)
+    network = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite, determine_inputs_outputs=args.auto_direction)
 
     debug_tags = []  # CS, ME1, ME2, PYK
     # debug_tags = [14, 44, 45, 62]  # CS, ME1, ME2, PYK
@@ -55,17 +56,11 @@ if __name__ == '__main__':
             print(index, item.id, item.name)
 
     symbolic = True
-    # inputs = [1] # Glucose
-    # inputs = [13, 22, 23, 25, 1] # Glucose, ammonium, O2, phosphate, acetate
-    inputs = [int(index) for index in args.inputs.split(',') if len(index)]
-    # Acetate, acetaldehyde, 2-oxoglutarate, CO2, ethanol, formate, D-fructose, fumarate, L-glutamine, L-glutamate,
-    # H2O, H+, lactate, L-malate, pyruvate, succinate
-    # output_exceptions = [6, 8, 14, 19, 24, 28, 29, 31, 36, 38, 41, 43, 46, 48, 62, 69]
-    # outputs = []
-    outputs = [int(index) for index in args.outputs.split(',') if len(index)]
+    inputs = network.input_metabolite_indices() if args.auto_direction else [int(index) for index in args.inputs.split(',') if len(index)]
+    outputs = network.output_metabolite_indices() if args.auto_direction else [int(index) for index in args.outputs.split(',') if len(index)]
     if len(outputs) < 1:
         # If no outputs are given, define all external metabolites that are not inputs as outputs
-        print('No output metabolites given. All non-input metabolites will be defined as outputs.')
+        print('No output metabolites given or determined from model. All non-input metabolites will be defined as outputs.')
         outputs = np.setdiff1d(network.external_metabolite_indices(), inputs)
 
     cone = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),

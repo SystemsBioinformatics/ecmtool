@@ -1,6 +1,8 @@
 from fractions import Fraction
 from subprocess import check_call, STDOUT, PIPE
 from os import remove, devnull as os_devnull
+
+import cbmpy
 import matlab.engine
 
 import cdd
@@ -8,7 +10,6 @@ import numpy as np
 import libsbml as sbml
 from random import randint
 
-from matlab_wrapper import MatlabSession
 from numpy.linalg import svd
 from sympy import Matrix
 
@@ -119,7 +120,6 @@ def get_extreme_rays_cdd(inequality_matrix):
     poly = cdd.Polyhedron(mat)
     gen = poly.get_generators()
     return np.asarray(gen)[:, 1:]
-
 
 
 def get_extreme_rays(equality_matrix=None, inequality_matrix=None, fractional=True, verbose=False):
@@ -256,10 +256,11 @@ def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
 def get_sbml_model(path):
     doc = sbml.readSBMLFromFile(path)
     model = doc.getModel()
+    model.__keep_doc_alive__ = doc
     return model
 
 
-def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions=True):
+def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions=True, determine_inputs_outputs=False):
     """
     Parses an SBML file containing a metabolic network, and returns a Network instance
     with the metabolites, reactions, and stoichiometry initialised. By default will look
@@ -269,22 +270,45 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     :param skip_external_reactions: Ignore external reactions, as identified by '_EX_' in their ID
     :return: Network
     """
-    doc = sbml.readSBMLFromFile(path)
-    model = doc.getModel()
+    model = get_sbml_model(path)
     species = list(model.species)
     species_index = {item.id: index for index, item in enumerate(species)}
     reactions = model.reactions
     objective_reaction_column = None
 
+    # TODO: parse stoichiometry, reactions, and metabolites using CBMPy too
+    cbmpy_model = cbmpy.readSBML3FBC(path)
+    pairs = cbmpy.CBTools.findDeadEndReactions(cbmpy_model)
+    external_metabolites, external_reactions = zip(*pairs)
+
     network = Network()
-    network.metabolites = [Metabolite(item.id, item.name, item.compartment) for item in species]
+    network.metabolites = [Metabolite(item.id, item.name, item.compartment, item.id in external_metabolites) for item in species]
 
     if add_objective:
         plugin = model.getPlugin('fbc')
         objective_name = plugin.getObjective(0).flux_objectives[0].reaction
 
     if skip_external_reactions:
-        reactions = [reaction for reaction in reactions if '_EX_' not in reaction.id]
+        reactions = [reaction for reaction in reactions if reaction.id not in external_reactions]
+
+    if determine_inputs_outputs:
+        for metabolite in [network.metabolites[index] for index in network.external_metabolite_indices()]:
+            index = external_metabolites.index(metabolite.id)
+            reaction_id = external_reactions[index]
+            reaction = cbmpy_model.getReaction(reaction_id)
+
+            if reaction.reversible:
+                # Reversible reactions are both inputs and outputs
+                # TODO: check SBML flux boundaries here to see if the reaction is truly bidirectional
+                continue
+
+            stoichiometries = reaction.getStoichiometry()
+
+            if len(stoichiometries) != 1:
+                print('Warning, exchange reaction %s has more than one substrate or product. Skipping marking its metabolite as input or output.')
+                continue
+
+            metabolite.direction = 'input' if stoichiometries[0][0] >= 0 else 'output'
 
     N = np.zeros(shape=(len(species), len(reactions)), dtype='object')
 
@@ -302,7 +326,7 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
             objective_reaction_column = column
 
     if add_objective and objective_reaction_column:
-        network.metabolites.append(Metabolite('objective', 'Virtual objective metabolite', 'e'))
+        network.metabolites.append(Metabolite('objective', 'Virtual objective metabolite', 'e', is_external=True, direction='output'))
         N = np.append(N, np.zeros(shape=(1, N.shape[1])), axis=0)
         N[-1, objective_reaction_column] = 1
 
