@@ -139,40 +139,42 @@ def get_clementine_conversion_cone(N, external_metabolites=[], reversible_reacti
     return G
 
 
-def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metabolites=[], output_metabolites=[],
+def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], input_metabolites=[], output_metabolites=[],
                         symbolic=True, verbose=False):
     """
     Calculates the conversion cone as described in (Urbanczik, 2005).
     :param N: stoichiometry matrix
-    :param tagged_rows: list of row numbers (0-based) of metabolites that are tagged as in/outputs ("conversions")
-    :param reversible_columns: list of booleans stating whether the reaction at this column is reversible
+    :param external_metabolites: list of row numbers (0-based) of metabolites that are tagged as in/outputs ("conversions")
+    :param reversible_reactions: list of booleans stating whether the reaction at this column is reversible
     :return: matrix with conversion cone "c" as row vectors
     """
     amount_metabolites, amount_reactions = N.shape[0], N.shape[1]
 
     # External metabolites that have no direction specified
-    in_out_metabolites = np.setdiff1d(tagged_rows, np.append(input_metabolites, output_metabolites, axis=0))
+    in_out_metabolites = np.setdiff1d(external_metabolites, np.append(input_metabolites, output_metabolites, axis=0))
+    added_virtual_metabolites = np.asarray(np.add(range(len(in_out_metabolites)), amount_metabolites), dtype='int')
+    extended_external_metabolites = np.append(external_metabolites, added_virtual_metabolites, axis=0)
 
     # Compose G of the columns of N
     G = np.transpose(N)
 
     # Add reversible reactions (columns) of N to G in the negative direction as well
     for reaction_index in range(G.shape[0]):
-        if reaction_index in reversible_columns:
+        if reaction_index in reversible_reactions:
             G = np.append(G, [-G[reaction_index, :]], axis=0)
-
-    # TODO: remove debug block
-    # G = redund(G)
 
     # Calculate H as the union of our linearities and the extreme rays of matrix G (all as row vectors)
     if verbose:
-        print('Calculating extreme rays H of inequalities system G')
+         print('Calculating extreme rays H of inequalities system G')
 
     # Calculate generating set of the dual of our initial conversion cone C0, C0*
-    rays_full = get_extreme_rays_cdd(G)
+    rays_full = np.asarray(list(get_extreme_rays_cdd(G)))
+
+    # Add bidirectional (in- and output) metabolites in reverse direction
+    rays_full = np.append(rays_full, -rays_full[:, in_out_metabolites], axis=1)
 
     # Remove internal metabolites from the rays, since they are all equal to 0 in the conversion cone
-    rays_deflated = deflate_matrix(rays_full, tagged_rows)
+    rays_deflated = deflate_matrix(rays_full, extended_external_metabolites)
 
     # if verbose:
     #     print('Removing redundant rows from H')
@@ -184,7 +186,7 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
     # Fill H_ineq with all generating rays that are not part of the nullspace (aka lineality space) of the dual cone C0*.
     # These represent the system of inequalities of our initial conversion cone C0.
     for row in range(rays_deflated.shape[0]):
-        if np.all(np.dot(G, rays_full[row, :]) == 0):
+        if np.all(np.dot(G, rays_full[row, :G.shape[1]]) == 0):
             # This is a linearity
             linearities = np.append(linearities, [rays_deflated[row, :]], axis=0)
         else:
@@ -200,12 +202,21 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
 
     identity = np.identity(H_ineq.shape[1])
 
+    # Bidirectional (in- and output) metabolites
+    for list_index, inout_metabolite in enumerate(in_out_metabolites):
+        index = external_metabolites.index(inout_metabolite)
+        H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
+        index = len(external_metabolites) + list_index
+        H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
+
+    # Inputs
     for input_metabolite in input_metabolites:
-        index = tagged_rows.index(input_metabolite)
+        index = external_metabolites.index(input_metabolite)
         H_ineq = np.append(H_ineq, [-identity[index, :]], axis=0)
 
+    # Outputs
     for output_metabolite in output_metabolites:
-        index = tagged_rows.index(output_metabolite)
+        index = external_metabolites.index(output_metabolite)
         H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
 
     # If there are inequalities, apply trick A3 from (Urbanczik, 2005, appendix)
@@ -227,9 +238,9 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
         print('Calculating extreme rays C of inequalities system H_total')
 
     # rays = np.asarray(list(get_extreme_rays_efmtool(H_total)))
-    # rays = np.asarray(list(get_extreme_rays(None, H_total, verbose=True)))
-    rays = np.asarray(list(get_extreme_rays(H_eq, H_ineq, verbose=True)))
-    # rays = np.asarray(list(get_extreme_rays_cdd(H_total)))
+    # rays = np.asarray(list(get_extreme_rays(None, H_total, verbose=verbose)))
+    rays = np.asarray(list(get_extreme_rays(H_eq if len(H_eq) else None, H_ineq, verbose=verbose)))
+    # rays = get_extreme_rays_cdd(H_total)
 
     if rays.shape[0] == 0:
         print('Warning: no feasible Elementary Conversion Modes found')
@@ -241,9 +252,13 @@ def get_conversion_cone(N, tagged_rows=[], reversible_columns=[], input_metaboli
 
     if verbose:
         print('Inflating rays')
-    rays_inflated = inflate_matrix(rays_deflated, tagged_rows, amount_metabolites)
+    rays_inflated = inflate_matrix(rays_deflated, extended_external_metabolites, amount_metabolites + len(in_out_metabolites))
 
-    return rays_inflated
+    # Merge bidirectional metabolites again, and drop duplicate rows
+    # np.unique() requires non-object matrices, so here we cast our results into float64.
+    rays_inflated[:, in_out_metabolites] = np.subtract(rays_inflated[:, in_out_metabolites], rays_inflated[:, G.shape[1]:])
+    rays_merged = np.asarray(rays_inflated[:, :G.shape[1]], dtype='float64')
+    return np.unique(rays_merged, axis=0)
 
 
 if __name__ == '__main__':

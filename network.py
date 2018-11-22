@@ -53,7 +53,17 @@ class Network:
 
         metabolite_count, reaction_count = self.N.shape
 
+        metabolite_count_intermediate, reaction_count_intermediate = self.N.shape
+        self.cancel_singly(verbose=verbose)
+        if verbose:
+            print('Removed %d reactions and %d metabolites' %
+                  (reaction_count_intermediate - self.N.shape[1], metabolite_count_intermediate - self.N.shape[0]))
+
+        metabolite_count_intermediate, reaction_count_intermediate = self.N.shape
         self.cancel_compounds(verbose=verbose)
+        if verbose:
+            print('Removed %d reactions and %d metabolites' %
+                  (reaction_count_intermediate - self.N.shape[1], metabolite_count_intermediate - self.N.shape[0]))
 
         ## This does not seem to do anything on the tested metabolic networks
         # if not self.right_nullspace:
@@ -64,11 +74,68 @@ class Network:
         # self.remove_infeasible_irreversible_reactions(verbose=verbose)
 
         if verbose:
-            print('Removed %d reactions and %d metabolites' %
+            print('Removed %d reactions and %d metabolites in total' %
                   (reaction_count - self.N.shape[1], metabolite_count - self.N.shape[0]))
         pass
 
+    def cancel_singly(self, verbose=False):
+        """
+        Urbanczik A4 T4
+        :param verbose:
+        :return:
+        """
+        if verbose:
+            print('Trying to cancel compounds by singly produced/consumed metabolites')
+
+        internal_metabolite_indices = np.setdiff1d(range(len(self.metabolites)), self.external_metabolite_indices())
+        total_internal_metabolites = len(internal_metabolite_indices)
+
+        for iteration, index in enumerate(internal_metabolite_indices):
+            if verbose:
+                print('Cancelling compounds - %.2f%%' % (iteration / float(total_internal_metabolites) * 100))
+
+            reaction_index = None
+            if np.count_nonzero(np.maximum(self.N[index, :], [0] * self.N.shape[1])) == 1:
+                # This internal metabolite is produced by only 1 reaction
+                reaction_index = [reaction_index for reaction_index in range(len(self.reactions)) if self.N[index, reaction_index] > 0][0]
+                if verbose:
+                    print('Metabolite %s is only produced in irreversible reaction %s. It will be cancelled through addition' % (self.metabolites[index].id, self.reactions[reaction_index].id))
+            elif np.count_nonzero(np.minimum(self.N[index, :], [0] * self.N.shape[1])) == 1:
+                # This internal metabolite is consumed by only 1 reaction
+                reaction_index = [reaction_index for reaction_index in range(len(self.reactions)) if self.N[index, reaction_index] < 0][0]
+                if verbose:
+                    print('Metabolite %s is only consumed in irreversible reaction %s. It will be cancelled through addition' % (self.metabolites[index].id, self.reactions[reaction_index].id))
+            else:
+                continue
+
+            for other_reaction_index in range(self.N.shape[1]):
+                if other_reaction_index != reaction_index and self.N[index, other_reaction_index] != 0:
+                    factor = np.abs(self.N[index, other_reaction_index] / self.N[index, reaction_index])
+                    self.N[:, other_reaction_index] = np.add(self.N[:, other_reaction_index],
+                                                                  self.N[:, reaction_index] * factor)
+
+                    if not self.reactions[reaction_index].reversible:
+                        # Reactions changed by irreversible reactions must become irreversible too
+                        self.reactions[other_reaction_index].reversible = False
+
+        removable_metabolites, removable_reactions = [], []
+        for metabolite_index in range(len(self.metabolites)):
+            if metabolite_index not in self.external_metabolite_indices() and \
+                            np.count_nonzero(self.N[metabolite_index, :]) == 1:
+                # This metabolite is used in only one reaction
+                reaction_index = [index for index in range(len(self.reactions)) if self.N[metabolite_index, index] != 0][0]
+                removable_metabolites.append(metabolite_index)
+                removable_reactions.append(reaction_index)
+
+        self.drop_reactions(removable_reactions)
+        self.drop_metabolites(removable_metabolites)
+
     def cancel_compounds(self, verbose=False):
+        """
+        Urbanczik A4 T3
+        :param verbose:
+        :return:
+        """
         if verbose:
             print('Trying to cancel compounds by reversible reactions')
 
@@ -76,7 +143,8 @@ class Network:
         total_reversible_reactions = len(reversible_reactions)
 
         for iteration, reaction_index in enumerate(reversible_reactions):
-            print('Cancelling compounds - %.2f%%' % (iteration / float(total_reversible_reactions) * 100))
+            if verbose:
+                print('Cancelling compounds - %.2f%%' % (iteration / float(total_reversible_reactions) * 100))
             reaction = self.N[:, reaction_index]
             metabolite_indices = [index for index in range(len(self.metabolites)) if reaction[index] != 0 and
                                   index not in self.external_metabolite_indices()]
@@ -100,8 +168,8 @@ class Network:
                                                                   self.N[:, reaction_index] * \
                                                                   (self.N[target, other_reaction_index] /
                                                                    self.N[target, reaction_index]))
-                    self.reactions[other_reaction_index].name = '(%s - %s)' % (self.reactions[other_reaction_index].name,
-                                                                      reaction_index)
+                    # self.reactions[other_reaction_index].name = '(%s - %s)' % (self.reactions[other_reaction_index].name,
+                    #                                                   reaction_index)
 
         removable_metabolites, removable_reactions = [], []
         for metabolite_index in range(len(self.metabolites)):
@@ -116,6 +184,11 @@ class Network:
         self.drop_metabolites(removable_metabolites)
 
     def remove_infeasible_irreversible_reactions(self, verbose=False):
+        """
+        Urbanczik A4 T1
+        :param verbose:
+        :return:
+        """
         reversible = self.reversible_reaction_indices()
         irreversible_columns = [i for i in range(self.N.shape[1]) if i not in reversible]
         number_irreversible = len(irreversible_columns)

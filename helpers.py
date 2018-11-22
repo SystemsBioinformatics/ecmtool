@@ -3,7 +3,7 @@ from subprocess import check_call, STDOUT, PIPE
 from os import remove, devnull as os_devnull
 
 import cbmpy
-import matlab.engine
+# import matlab.engine
 
 import cdd
 import numpy as np
@@ -99,19 +99,19 @@ def normalise_betas(result):
     return result
 
 
-def get_extreme_rays_efmtool(inequality_matrix, matlab_root='/Applications/MATLAB_R2018b.app/'):
-    H = inequality_matrix
-    r, m = H.shape
-    N = np.append(-np.identity(r), H, axis=1)
-
-    engine = matlab.engine.start_matlab()
-    engine.cd('efmtool')
-    engine.workspace['N'] = matlab.double([list(row) for row in N])
-    engine.workspace['rev'] = ([False] * r) + ([True] * m)
-    result = engine.CalculateFluxModes(matlab.double([list(row) for row in N]), matlab.logical(([False] * r) + ([True] * m)))
-    v = result['efms']
-    x = np.transpose(np.asarray(v)[r:, :])
-    return x
+# def get_extreme_rays_efmtool(inequality_matrix, matlab_root='/Applications/MATLAB_R2018b.app/'):
+#     H = inequality_matrix
+#     r, m = H.shape
+#     N = np.append(-np.identity(r), H, axis=1)
+#
+#     engine = matlab.engine.start_matlab()
+#     engine.cd('efmtool')
+#     engine.workspace['N'] = matlab.double([list(row) for row in N])
+#     engine.workspace['rev'] = ([False] * r) + ([True] * m)
+#     result = engine.CalculateFluxModes(matlab.double([list(row) for row in N]), matlab.logical(([False] * r) + ([True] * m)))
+#     v = result['efms']
+#     x = np.transpose(np.asarray(v)[r:, :])
+#     return x
 
 
 def get_extreme_rays_cdd(inequality_matrix):
@@ -132,17 +132,23 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, fractional=Tr
             raise Exception('No equality or inequality argument given')
 
     # Write equalities system to disk as space separated file
+    if verbose:
+        print('Writing equalities to file')
     if equality_matrix is not None:
         with open('tmp/egm_eq_%d.txt' % rand, 'w') as file:
             for row in range(equality_matrix.shape[0]):
                 file.write(' '.join([str(val) for val in equality_matrix[row, :]]) + '\r\n')
 
     # Write inequalities system to disk as space separated file
+    if verbose:
+        print('Writing inequalities to file')
     with open('tmp/egm_iq_%d.txt' % rand, 'w') as file:
         for row in range(inequality_matrix.shape[0]):
             file.write(' '.join([str(val) for val in inequality_matrix[row, :]]) + '\r\n')
 
     # Run external extreme ray enumeration tool
+    if verbose:
+        print('Running polco')
     with open(os_devnull, 'w') as devnull:
         check_call(('java -Xms1g -Xmx7g -jar polco/polco.jar -kind text ' +
                     '-arithmetic %s ' % (' '.join(['fractional' if fractional else 'double'] * 3)) +
@@ -151,6 +157,8 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, fractional=Tr
             stdout=(devnull if not verbose else None), stderr=(devnull if not verbose else None))
 
     # Read resulting extreme rays
+    if verbose:
+        print('Parsing computed rays')
     with open('tmp/generators_%d.txt' % rand, 'r') as file:
         lines = file.readlines()
 
@@ -279,7 +287,7 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     # TODO: parse stoichiometry, reactions, and metabolites using CBMPy too
     cbmpy_model = cbmpy.readSBML3FBC(path)
     pairs = cbmpy.CBTools.findDeadEndReactions(cbmpy_model)
-    external_metabolites, external_reactions = zip(*pairs)
+    external_metabolites, external_reactions = zip(*pairs) if len(pairs) else (zip(*cbmpy.CBTools.findDeadEndMetabolites(cbmpy_model))[0], [])
 
     network = Network()
     network.metabolites = [Metabolite(item.id, item.name, item.compartment, item.id in external_metabolites) for item in species]
@@ -294,6 +302,11 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     if determine_inputs_outputs:
         for metabolite in [network.metabolites[index] for index in network.external_metabolite_indices()]:
             index = external_metabolites.index(metabolite.id)
+
+            if index >= len(external_reactions):
+                print('Warning: missing exchange reaction for metabolite %s. Skipping marking this metabolite as input or output.' % metabolite.id)
+                continue
+
             reaction_id = external_reactions[index]
             reaction = cbmpy_model.getReaction(reaction_id)
 
@@ -305,7 +318,7 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
             stoichiometries = reaction.getStoichiometry()
 
             if len(stoichiometries) != 1:
-                print('Warning, exchange reaction %s has more than one substrate or product. Skipping marking its metabolite as input or output.' % reaction.id)
+                print('Warning: exchange reaction %s has more than one substrate or product. Skipping marking its metabolite as input or output.' % reaction.id)
                 continue
 
             metabolite.direction = 'input' if stoichiometries[0][0] >= 0 else 'output'

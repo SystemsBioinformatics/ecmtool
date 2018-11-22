@@ -1,3 +1,5 @@
+import os
+
 from scipy.optimize import linprog
 
 from helpers import *
@@ -19,7 +21,7 @@ if __name__ == '__main__':
     start = time()
 
     parser = ArgumentParser(description='Calculate Elementary Conversion Modes from an SBML model. For medium-to large networks, be sure to define --inputs and --outputs. This reduces the enumeration problem complexity considerably.')
-    parser.add_argument('--model_path', default='models/e_coli_core.xml', help='Relative or absolute path to an SBML model .xml file')
+    parser.add_argument('--model_path', type=str, default='', help='Relative or absolute path to an SBML model .xml file')
     parser.add_argument('--compress', type=str2bool, default=True, help='Perform compression to which the conversions are invariant, and reduce the network size considerably (default: True)')
     parser.add_argument('--out_path', default='conversion_cone.csv', help='Relative or absolute path to the .csv file you want to save the calculated conversions to')
     parser.add_argument('--add_objective_metabolite', type=str2bool, default=True, help='Add a virtual metabolite containing the stoichiometry of the objective function of the model')
@@ -30,6 +32,14 @@ if __name__ == '__main__':
     parser.add_argument('--inputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true, that can only be consumed')
     parser.add_argument('--outputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true, that can only be produced')
     args = parser.parse_args()
+
+    if args.model_path == '':
+        print('No model given, please specify --model_path')
+        exit()
+
+    if len(args.inputs) or len(args.outputs):
+        # Disable automatic determination of external metabolite direction if lists are given manually
+        args.auto_direction = False
 
     model_path = args.model_path
 
