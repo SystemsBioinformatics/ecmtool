@@ -47,7 +47,7 @@ if __name__ == '__main__':
 
     debug_tags = []  # CS, ME1, ME2, PYK
     # debug_tags = [14, 44, 45, 62]  # CS, ME1, ME2, PYK
-    # add_debug_tags(network, debug_tags)
+    # add_debug_tags(network)
 
     orig_ids = [m.id for m in network.metabolites]
     orig_N = network.N
@@ -63,12 +63,12 @@ if __name__ == '__main__':
     if args.print_metabolites:
         print('Metabolites%s:' % (' after compression' if args.compress else ''))
         for index, item in enumerate(network.metabolites):
-            print(index, item.id, item.name)
+            print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
 
     symbolic = True
     inputs = network.input_metabolite_indices() if args.auto_direction else [int(index) for index in args.inputs.split(',') if len(index)]
     outputs = network.output_metabolite_indices() if args.auto_direction else [int(index) for index in args.outputs.split(',') if len(index)]
-    if len(outputs) < 1:
+    if len(outputs) < 1 and len(inputs) >= 1:
         # If no outputs are given, define all external metabolites that are not inputs as outputs
         print('No output metabolites given or determined from model. All non-input metabolites will be defined as outputs.')
         outputs = np.setdiff1d(network.external_metabolite_indices(), inputs)
