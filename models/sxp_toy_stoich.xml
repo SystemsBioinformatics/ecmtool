@@ -1,0 +1,40 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sbml xmlns="http://www.sbml.org/sbml/level3/version1/core" fbc:required="false" level="3" version="1"
+      xmlns:fbc="http://www.sbml.org/sbml/level3/version1/fbc/version2">
+  <notes>Taken from Feng et al., 1012: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3447728/. Biomass function added as FBC plugin, and species IDs standardised.</notes>
+  <model id="Demo_TOY" fbc:strict="true" >
+    <fbc:listOfObjectives xmlns:fbc="http://www.sbml.org/sbml/level3/version1/fbc/version2" fbc:activeObjective="obj">
+      <fbc:objective fbc:id="obj" fbc:type="maximize">
+        <fbc:listOfFluxObjectives>
+          <fbc:fluxObjective fbc:coefficient="1" fbc:reaction="v2" />
+        </fbc:listOfFluxObjectives>
+      </fbc:objective>
+    </fbc:listOfObjectives>
+    <listOfCompartments>
+      <compartment id="cell" name="cell" constant="true"/>
+    </listOfCompartments>
+    <listOfSpecies>
+      <species id="s" name="s" compartment="e" hasOnlySubstanceUnits="false" boundaryCondition="false" constant="false"/>
+      <species id="x" name="x" compartment="c" hasOnlySubstanceUnits="false" boundaryCondition="false" constant="false"/>
+      <species id="p" name="p" compartment="e" hasOnlySubstanceUnits="false" boundaryCondition="false" constant="false"/>
+    </listOfSpecies>
+    <listOfReactions>
+      <reaction id="v1" name="v1" reversible="false" fast="false" compartment="cell">
+        <listOfReactants>
+          <speciesReference species="s" stoichiometry="1" constant="false"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="x" stoichiometry="2" constant="false"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="v2" name="v2" reversible="false" fast="false" compartment="cell">
+        <listOfReactants>
+          <speciesReference species="x" stoichiometry="1" constant="false"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="p" stoichiometry="1" constant="false"/>
+        </listOfProducts>
+      </reaction>
+    </listOfReactions>
+  </model>
+</sbml>

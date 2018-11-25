@@ -22,6 +22,7 @@ if __name__ == '__main__':
 
     parser = ArgumentParser(description='Calculate Elementary Conversion Modes from an SBML model. For medium-to large networks, be sure to define --inputs and --outputs. This reduces the enumeration problem complexity considerably.')
     parser.add_argument('--model_path', type=str, default='', help='Relative or absolute path to an SBML model .xml file')
+    parser.add_argument('--symbolic', type=str2bool, default=True, help='All computation is done using fractional numbers, and symbolic operations. When disabled, floating point numbers and numeric operations are used (default: True)')
     parser.add_argument('--compress', type=str2bool, default=True, help='Perform compression to which the conversions are invariant, and reduce the network size considerably (default: True)')
     parser.add_argument('--out_path', default='conversion_cone.csv', help='Relative or absolute path to the .csv file you want to save the calculated conversions to')
     parser.add_argument('--add_objective_metabolite', type=str2bool, default=True, help='Add a virtual metabolite containing the stoichiometry of the objective function of the model')
@@ -65,7 +66,7 @@ if __name__ == '__main__':
         for index, item in enumerate(network.metabolites):
             print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
 
-    symbolic = True
+    symbolic = args.symbolic
     inputs = network.input_metabolite_indices() if args.auto_direction else [int(index) for index in args.inputs.split(',') if len(index)]
     outputs = network.output_metabolite_indices() if args.auto_direction else [int(index) for index in args.outputs.split(',') if len(index)]
     if len(outputs) < 1 and len(inputs) >= 1:

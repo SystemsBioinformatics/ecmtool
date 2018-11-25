@@ -1,6 +1,8 @@
 from os import system
 
 import numpy as np
+from scipy.linalg import svd
+
 from helpers import *
 from sympy import Matrix
 from time import time
@@ -163,6 +165,12 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
         if reaction_index in reversible_reactions:
             G = np.append(G, [-G[reaction_index, :]], axis=0)
 
+    # # TODO: remove debug block
+    # if verbose:
+    #      print('Calculating nullspace of G')
+    # A = nullspace(G, symbolic=symbolic)
+    # svd(G)
+
     # Calculate H as the union of our linearities and the extreme rays of matrix G (all as row vectors)
     if verbose:
          print('Calculating extreme rays H of inequalities system G')
@@ -239,7 +247,7 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
 
     # rays = np.asarray(list(get_extreme_rays_efmtool(H_total)))
     # rays = np.asarray(list(get_extreme_rays(None, H_total, verbose=verbose)))
-    rays = np.asarray(list(get_extreme_rays(H_eq if len(H_eq) else None, H_ineq, verbose=verbose)))
+    rays = np.asarray(list(get_extreme_rays(H_eq if len(H_eq) else None, H_ineq, fractional=symbolic, verbose=verbose)))
     # rays = get_extreme_rays_cdd(H_total)
 
     if rays.shape[0] == 0:

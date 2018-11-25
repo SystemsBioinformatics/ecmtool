@@ -152,6 +152,7 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, fractional=Tr
     with open(os_devnull, 'w') as devnull:
         check_call(('java -Xms1g -Xmx7g -jar polco/polco.jar -kind text ' +
                     '-arithmetic %s ' % (' '.join(['fractional' if fractional else 'double'] * 3)) +
+                    '-zero %s ' % (' '.join(['B=NaN' if fractional else '1e-10'] * 3)) +
                     ('' if equality_matrix is None else '-eq tmp/egm_eq_%d.txt ' % (rand)) +
                     '-iq tmp/egm_iq_%d.txt -out text tmp/generators_%d.txt' % (rand, rand)).split(' '),
             stdout=(devnull if not verbose else None), stderr=(devnull if not verbose else None))
