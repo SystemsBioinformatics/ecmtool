@@ -163,38 +163,25 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
         if reaction_index in reversible_reactions:
             G = np.append(G, [-G[reaction_index, :]], axis=0)
 
+    G_red = deflate_matrix(G, external_metabolites)
+
+    # Calculate H as the union of our linearities and the extreme rays of matrix G (all as row vectors)
+    if verbose:
+         print('Calculating null space of inequalities system G')
+    linearities = np.transpose(nullspace(G, symbolic=symbolic))
+
     # Calculate H as the union of our linearities and the extreme rays of matrix G (all as row vectors)
     if verbose:
          print('Calculating extreme rays H of inequalities system G')
 
     # Calculate generating set of the dual of our initial conversion cone C0, C0*
-    rays_full = np.asarray(list(get_extreme_rays_cdd(G)))
+    rays_full_red = np.asarray(list(get_extreme_rays_cdd(G_red)))
 
     # Add bidirectional (in- and output) metabolites in reverse direction
-    rays_full = np.append(rays_full, -rays_full[:, in_out_metabolites], axis=1)
+    rays_full_red = np.append(rays_full_red, -rays_full_red[:, in_out_metabolites], axis=1)
 
-    # Remove internal metabolites from the rays, since they are all equal to 0 in the conversion cone
-    rays_deflated = deflate_matrix(rays_full, extended_external_metabolites)
-
-    # if verbose:
-    #     print('Removing redundant rows from H')
-    # rays_deflated = redund(rays_deflated)
-
-    H_ineq = np.ndarray(shape=(0, rays_deflated.shape[1]))
-    linearities = np.ndarray(shape=(0, rays_deflated.shape[1]))
-
-    # Fill H_ineq with all generating rays that are not part of the nullspace (aka lineality space) of the dual cone C0*.
-    # These represent the system of inequalities of our initial conversion cone C0.
-    for row in range(rays_deflated.shape[0]):
-        if np.all(np.dot(G, rays_full[row, :G.shape[1]]) == 0):
-            # This is a linearity
-            linearities = np.append(linearities, [rays_deflated[row, :]], axis=0)
-        else:
-            # This is a normal extreme ray
-            H_ineq = np.append(H_ineq, [rays_deflated[row, :]], axis=0)
-
-
-    H_eq = linearities
+    H_ineq = rays_full_red
+    H_eq = deflate_matrix(linearities, external_metabolites)
 
     # Add input/output constraints to H_ineq
     if not H_ineq.shape[0]:
@@ -219,19 +206,6 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
         index = external_metabolites.index(output_metabolite)
         H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
 
-    # If there are inequalities, apply trick A3 from (Urbanczik, 2005, appendix)
-    # make_homogeneous = H_ineq.shape[0] > 0
-    make_homogeneous = False
-
-    if verbose and make_homogeneous:
-        print('Calculating nullspace A of H_eq')
-
-    A = nullspace(H_eq, symbolic=symbolic) if make_homogeneous else None
-
-    # Combine equality and inequality equations into homogenous inequality system
-    # using Urbanczik A3.
-    H_total = np.dot(H_ineq, A) if make_homogeneous else np.append(H_eq, -H_eq, axis=0)
-
     # Calculate the extreme rays of the cone C represented by inequalities H_total, resulting in
     # the elementary conversion modes of the input system.
     if verbose:
@@ -247,12 +221,8 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
         return rays
 
     if verbose:
-        print('Extracting deflated rays')
-    rays_deflated = np.transpose(np.dot(A, np.transpose(rays))) if make_homogeneous else rays
-
-    if verbose:
         print('Inflating rays')
-    rays_inflated = inflate_matrix(rays_deflated, extended_external_metabolites, amount_metabolites + len(in_out_metabolites))
+    rays_inflated = inflate_matrix(rays, extended_external_metabolites, amount_metabolites + len(in_out_metabolites))
 
     # Merge bidirectional metabolites again, and drop duplicate rows
     # np.unique() requires non-object matrices, so here we cast our results into float64.
