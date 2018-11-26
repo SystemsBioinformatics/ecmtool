@@ -179,9 +179,10 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
 
     # Add bidirectional (in- and output) metabolites in reverse direction
     rays_full_red = np.append(rays_full_red, -rays_full_red[:, in_out_metabolites], axis=1)
+    linearities = np.append(linearities, -linearities[:, in_out_metabolites], axis=1)
 
     H_ineq = rays_full_red
-    H_eq = deflate_matrix(linearities, external_metabolites)
+    H_eq = deflate_matrix(linearities, extended_external_metabolites)
 
     # Add input/output constraints to H_ineq
     if not H_ineq.shape[0]:
@@ -209,7 +210,7 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     # Calculate the extreme rays of the cone C represented by inequalities H_total, resulting in
     # the elementary conversion modes of the input system.
     if verbose:
-        print('Calculating extreme rays C of inequalities system H_total')
+        print('Calculating extreme rays C of inequalities system H_eq, H_ineq')
 
     # rays = np.asarray(list(get_extreme_rays_efmtool(H_total)))
     # rays = np.asarray(list(get_extreme_rays(None, H_total, verbose=verbose)))
