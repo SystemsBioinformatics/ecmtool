@@ -221,6 +221,10 @@ def get_used_rows_columns(A_matrix, result):
     return active_columns, active_rows
 
 
+def nullspace_polco(N, verbose=False):
+    return np.asarray(list(get_extreme_rays(N, None, verbose=verbose)))
+
+
 def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
     """
     Calculates the null space of given matrix N.
