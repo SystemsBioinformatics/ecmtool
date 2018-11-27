@@ -139,6 +139,23 @@ def get_clementine_conversion_cone(N, external_metabolites=[], reversible_reacti
     return G
 
 
+def split_columns_semipositively(matrix, columns):
+    orig_column_count = matrix.shape[1]
+    matrix = split_columns(matrix, columns)
+    semipositive_columns = columns + [orig_column_count + index for index in range(len(columns))]
+
+    for row in range(matrix.shape[0]):
+        for column in semipositive_columns:
+            matrix[row, column] = max(matrix[row, column], 0)
+
+    return matrix
+
+
+def split_columns(matrix, columns):
+    matrix = np.append(matrix, -matrix[:, columns], axis=1)
+    return matrix
+
+
 def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], input_metabolites=[], output_metabolites=[],
                         symbolic=True, verbose=False):
     """
@@ -154,6 +171,7 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     in_out_metabolites = np.setdiff1d(external_metabolites, np.append(input_metabolites, output_metabolites, axis=0))
     added_virtual_metabolites = np.asarray(np.add(range(len(in_out_metabolites)), amount_metabolites), dtype='int')
     extended_external_metabolites = np.append(external_metabolites, added_virtual_metabolites, axis=0)
+    in_out_indices = [external_metabolites.index(index) for index in in_out_metabolites]
 
     # Compose G of the columns of N
     G = np.transpose(N)
@@ -164,11 +182,13 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
             G = np.append(G, [-G[reaction_index, :]], axis=0)
 
     G_red = deflate_matrix(G, external_metabolites)
+    G_split = split_columns_semipositively(G, in_out_indices)
 
     # Calculate H as the union of our linearities and the extreme rays of matrix G (all as row vectors)
     if verbose:
          print('Calculating null space of inequalities system G')
     linearities = np.transpose(nullspace(G, symbolic=symbolic))
+    linearities_deflated = deflate_matrix(linearities, external_metabolites)
 
     # Calculate H as the union of our linearities and the extreme rays of matrix G (all as row vectors)
     if verbose:
@@ -178,11 +198,11 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     rays_full_red = np.asarray(list(get_extreme_rays_cdd(G_red)))
 
     # Add bidirectional (in- and output) metabolites in reverse direction
-    rays_full_red = np.append(rays_full_red, -rays_full_red[:, in_out_metabolites], axis=1)
-    linearities = np.append(linearities, -linearities[:, in_out_metabolites], axis=1)
+    rays_full_split = split_columns_semipositively(rays_full_red, in_out_indices)
+    linearities_split = split_columns(linearities_deflated, in_out_indices)
 
-    H_ineq = rays_full_red
-    H_eq = deflate_matrix(linearities, extended_external_metabolites)
+    H_ineq = rays_full_split
+    H_eq = linearities_split
 
     # Add input/output constraints to H_ineq
     if not H_ineq.shape[0]:
@@ -191,8 +211,8 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     identity = np.identity(H_ineq.shape[1])
 
     # Bidirectional (in- and output) metabolites
-    for list_index, inout_metabolite in enumerate(in_out_metabolites):
-        index = external_metabolites.index(inout_metabolite)
+    for list_index, inout_metabolite_index in enumerate(in_out_indices):
+        index = inout_metabolite_index
         H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
         index = len(external_metabolites) + list_index
         H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)

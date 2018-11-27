@@ -19,7 +19,7 @@
       <species id="p" name="p" compartment="e" hasOnlySubstanceUnits="false" boundaryCondition="false" constant="false"/>
     </listOfSpecies>
     <listOfReactions>
-      <reaction id="v1" name="v1" reversible="false" fast="false" compartment="cell">
+      <reaction id="v1" name="v1" reversible="true" fast="false" compartment="cell">
         <listOfReactants>
           <speciesReference species="s" stoichiometry="1" constant="false"/>
         </listOfReactants>
@@ -27,7 +27,7 @@
           <speciesReference species="x" stoichiometry="1" constant="false"/>
         </listOfProducts>
       </reaction>
-      <reaction id="v2" name="v2" reversible="false" fast="false" compartment="cell">
+      <reaction id="v2" name="v2" reversible="true" fast="false" compartment="cell">
         <listOfReactants>
           <speciesReference species="x" stoichiometry="1" constant="false"/>
         </listOfReactants>
