@@ -175,19 +175,29 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
 
     # Compose G of the columns of N
     G = np.transpose(N)
+    G_rev = np.ndarray(shape=(0, G.shape[1]))
+    G_irrev = np.ndarray(shape=(0, G.shape[1]))
 
     # Add reversible reactions (columns) of N to G in the negative direction as well
     for reaction_index in range(G.shape[0]):
         if reaction_index in reversible_reactions:
-            G = np.append(G, [-G[reaction_index, :]], axis=0)
+            G_rev = np.append(G_rev, [-G[reaction_index, :]], axis=0)
+        else:
+            G_irrev = np.append(G_irrev, [G[reaction_index, :]], axis=0)
 
-    G_red = deflate_matrix(G, external_metabolites)
-    G_split = split_columns_semipositively(G, in_out_indices)
 
     # Calculate H as the union of our linearities and the extreme rays of matrix G (all as row vectors)
     if verbose:
          print('Calculating null space of inequalities system G')
-    linearities = np.transpose(nullspace(G, symbolic=symbolic))
+    linearities = nullspace_polco(G, verbose=verbose)
+    if linearities.shape[0] == 0:
+        linearities = np.ndarray(shape=(0, G.shape[1]))
+
+    if symbolic and linearities.shape[0] > 0:
+        assert np.sum(np.sum(np.dot(G, np.transpose(linearities)), axis=0)) == 0
+    elif linearities.shape[0] > 0:
+        sum = np.sum(np.sum(np.dot(G, np.transpose(linearities)), axis=0))
+        assert -10 ** -6 <= sum <= 10 ** -6
     linearities_deflated = deflate_matrix(linearities, external_metabolites)
 
     # Calculate H as the union of our linearities and the extreme rays of matrix G (all as row vectors)
@@ -195,13 +205,15 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
          print('Calculating extreme rays H of inequalities system G')
 
     # Calculate generating set of the dual of our initial conversion cone C0, C0*
-    rays_full_red = np.asarray(list(get_extreme_rays_cdd(G_red)))
+    rays = np.asarray(list(get_extreme_rays(np.append(linearities, G_rev, axis=0), G_irrev, verbose=verbose)))
+    rays = rays if rays.shape[0] else np.ndarray(shape=(0, G.shape[1]))
+    rays_deflated = deflate_matrix(rays, external_metabolites)
 
     # Add bidirectional (in- and output) metabolites in reverse direction
-    rays_full_split = split_columns_semipositively(rays_full_red, in_out_indices)
+    rays_split = split_columns_semipositively(rays_deflated, in_out_indices)
     linearities_split = split_columns(linearities_deflated, in_out_indices)
 
-    H_ineq = rays_full_split
+    H_ineq = rays_split
     H_eq = linearities_split
 
     # Add input/output constraints to H_ineq

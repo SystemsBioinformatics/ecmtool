@@ -125,6 +125,12 @@ def get_extreme_rays_cdd(inequality_matrix):
 def get_extreme_rays(equality_matrix=None, inequality_matrix=None, fractional=True, verbose=False):
     rand = randint(1, 10 ** 6)
 
+    if inequality_matrix is not None and inequality_matrix.shape[0] == 0:
+        inequality_matrix = None
+
+    if equality_matrix is not None and equality_matrix.shape[0] == 0:
+        equality_matrix = None
+
     if inequality_matrix is None:
         if equality_matrix is not None:
             inequality_matrix = np.identity(equality_matrix.shape[1])
@@ -135,14 +141,14 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, fractional=Tr
     if verbose:
         print('Writing equalities to file')
     if equality_matrix is not None:
-        with open('tmp/egm_eq_%d.txt' % rand, 'w') as file:
+        with open('tmp/eq_%d.txt' % rand, 'w') as file:
             for row in range(equality_matrix.shape[0]):
                 file.write(' '.join([str(val) for val in equality_matrix[row, :]]) + '\r\n')
 
     # Write inequalities system to disk as space separated file
     if verbose:
         print('Writing inequalities to file')
-    with open('tmp/egm_iq_%d.txt' % rand, 'w') as file:
+    with open('tmp/iq_%d.txt' % rand, 'w') as file:
         for row in range(inequality_matrix.shape[0]):
             file.write(' '.join([str(val) for val in inequality_matrix[row, :]]) + '\r\n')
 
@@ -152,8 +158,9 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, fractional=Tr
     with open(os_devnull, 'w') as devnull:
         check_call(('java -Xms1g -Xmx7g -jar polco/polco.jar -kind text ' +
                     '-arithmetic %s ' % (' '.join(['fractional' if fractional else 'double'] * 3)) +
-                    ('' if equality_matrix is None else '-eq tmp/egm_eq_%d.txt ' % (rand)) +
-                    '-iq tmp/egm_iq_%d.txt -out text tmp/generators_%d.txt' % (rand, rand)).split(' '),
+                    ('' if equality_matrix is None else '-eq tmp/eq_%d.txt ' % (rand)) +
+                    ('' if inequality_matrix is None else '-iq tmp/iq_%d.txt ' % (rand)) +
+                    '-out text tmp/generators_%d.txt' % rand).split(' '),
             stdout=(devnull if not verbose else None), stderr=(devnull if not verbose else None))
 
     # Read resulting extreme rays
@@ -170,9 +177,9 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, fractional=Tr
 
     # Clean up the files created above
     if equality_matrix is not None:
-        remove('tmp/egm_eq_%d.txt' % rand)
+        remove('tmp/eq_%d.txt' % rand)
 
-    remove('tmp/egm_iq_%d.txt' % rand)
+    remove('tmp/iq_%d.txt' % rand)
     remove('tmp/generators_%d.txt' % rand)
 
 
