@@ -175,12 +175,14 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
 
     # Compose G of the columns of N
     G = np.transpose(N)
-    G_rev = np.ndarray(shape=(0, G.shape[1]))
-    G_irrev = np.ndarray(shape=(0, G.shape[1]))
+    G_exp = G[:,:]
+    G_rev = np.ndarray(shape=(0, G.shape[1]), dtype='object')
+    G_irrev = np.ndarray(shape=(0, G.shape[1]), dtype='object')
 
     # Add reversible reactions (columns) of N to G in the negative direction as well
     for reaction_index in range(G.shape[0]):
         if reaction_index in reversible_reactions:
+            G_exp = np.append(G_exp, [-G[reaction_index, :]], axis=0)
             G_rev = np.append(G_rev, [-G[reaction_index, :]], axis=0)
         else:
             G_irrev = np.append(G_irrev, [G[reaction_index, :]], axis=0)
@@ -189,15 +191,17 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     # Calculate H as the union of our linearities and the extreme rays of matrix G (all as row vectors)
     if verbose:
          print('Calculating null space of inequalities system G')
-    linearities = nullspace_polco(G, verbose=verbose)
+    # linearities = np.transpose(nullspace(G, symbolic=symbolic))
+    linearities = np.transpose(nullspace_terzer(G, verbose=verbose))
+    # linearities = nullspace_polco(G, verbose=verbose)
     if linearities.shape[0] == 0:
         linearities = np.ndarray(shape=(0, G.shape[1]))
 
-    if symbolic and linearities.shape[0] > 0:
-        assert np.sum(np.sum(np.dot(G, np.transpose(linearities)), axis=0)) == 0
-    elif linearities.shape[0] > 0:
-        sum = np.sum(np.sum(np.dot(G, np.transpose(linearities)), axis=0))
-        assert -10 ** -6 <= sum <= 10 ** -6
+    # if symbolic and linearities.shape[0] > 0:
+    #     assert np.sum(np.sum(np.dot(G, np.transpose(linearities)), axis=0)) == 0
+    # elif linearities.shape[0] > 0:
+    #     sum = np.sum(np.sum(np.dot(G, np.transpose(linearities)), axis=0))
+    #     assert -10 ** -6 <= sum <= 10 ** -6
     linearities_deflated = deflate_matrix(linearities, external_metabolites)
 
     # Calculate H as the union of our linearities and the extreme rays of matrix G (all as row vectors)
@@ -205,7 +209,7 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
          print('Calculating extreme rays H of inequalities system G')
 
     # Calculate generating set of the dual of our initial conversion cone C0, C0*
-    rays = np.asarray(list(get_extreme_rays(np.append(linearities, G_rev, axis=0), G_irrev, verbose=verbose)))
+    rays = np.asarray(list(get_extreme_rays(np.append(linearities, G_rev, axis=0), G_irrev, verbose=verbose, symbolic=symbolic)))
     rays = rays if rays.shape[0] else np.ndarray(shape=(0, G.shape[1]))
     rays_deflated = deflate_matrix(rays, external_metabolites)
 
@@ -246,7 +250,7 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
 
     # rays = np.asarray(list(get_extreme_rays_efmtool(H_total)))
     # rays = np.asarray(list(get_extreme_rays(None, H_total, verbose=verbose)))
-    rays = np.asarray(list(get_extreme_rays(H_eq if len(H_eq) else None, H_ineq, verbose=verbose)))
+    rays = np.asarray(list(get_extreme_rays(H_eq if len(H_eq) else None, H_ineq, verbose=verbose, symbolic=symbolic)))
     # rays = get_extreme_rays_cdd(H_total)
 
     if rays.shape[0] == 0:
