@@ -192,8 +192,9 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     if verbose:
          print('Calculating null space of inequalities system G')
     # linearities = np.transpose(nullspace(G, symbolic=symbolic))
-    linearities = np.transpose(nullspace_terzer(G, verbose=verbose))
+    # linearities = np.transpose(nullspace_terzer(G, verbose=verbose))
     # linearities = nullspace_polco(G, verbose=verbose)
+    linearities = np.loadtxt("/tmp/lin_ecoli2.csv", delimiter=',', dtype='int')
     if linearities.shape[0] == 0:
         linearities = np.ndarray(shape=(0, G.shape[1]))
 

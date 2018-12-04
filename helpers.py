@@ -140,6 +140,8 @@ def nullspace_rank_internal(src, dst, verbose=False):
 
         if pivot_dividend == 0:
             # Done, col is rank
+            # TODO: this is likely wrong. When a column is filled with only zeroes,
+            # we need to move on to the next column.
             return col, dst
 
         pivot_divisor = src[row_pivot, col].denominator
@@ -148,14 +150,14 @@ def nullspace_rank_internal(src, dst, verbose=False):
         src[row_pivot, :] *= Fraction(pivot_dividend, pivot_divisor)
         dst[row_pivot, :] *= Fraction(pivot_dividend, pivot_divisor)
 
-        for row in range(rows):
-            if row != col:
+        for other_row in range(rows):
+            if other_row != col:
                 # Make it a 0
-                col_pivot_dividend = src[row, col].numerator
-                if col_pivot_dividend != 0:
-                    col_pivot_divisor = src[row, col].denominator
-                    src[row_pivot, :] = -src[row_pivot, :] + (src[row, :] * Fraction(col_pivot_dividend, col_pivot_divisor))
-                    dst[row_pivot, :] = -dst[row_pivot, :] + (dst[row, :] * Fraction(col_pivot_dividend, col_pivot_divisor))
+                other_row_pivot_dividend = src[other_row, col].numerator
+                if other_row_pivot_dividend != 0:
+                    other_row_pivot_divisor = src[other_row, col].denominator
+                    src[other_row, :] -= src[row_pivot, :] * Fraction(other_row_pivot_dividend, other_row_pivot_divisor)
+                    dst[other_row, :] -= dst[row_pivot, :] * Fraction(other_row_pivot_dividend, other_row_pivot_divisor)
 
     return cols, dst
 
@@ -178,6 +180,7 @@ def nullspace_terzer(src, verbose=False):
         sign = 0  # Originally "sgn" in Polco
         scp = 1
 
+        # Find one common multiplicand that makes all cells' fractions integer
         for col in range(len):
             dividend = dst[row, col].numerator
             if dividend != 0:
@@ -186,9 +189,11 @@ def nullspace_terzer(src, verbose=False):
                 scp *= divisor
                 sign += np.sign(dividend)
 
+        # We want as many cells in this row to be positive as possible
         if np.sign(scp) != np.sign(sign):
             scp *= -1
 
+        # Scale all cells to integer values
         for col in range(len):
             dividend = dst[row, col].numerator
             value = None
