@@ -284,6 +284,7 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     reactions = model.reactions
     objective_reaction_column = None
 
+
     # TODO: parse stoichiometry, reactions, and metabolites using CBMPy too
     cbmpy_model = cbmpy.readSBML3FBC(path)
     pairs = cbmpy.CBTools.findDeadEndReactions(cbmpy_model)
@@ -302,7 +303,7 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     if determine_inputs_outputs:
         for metabolite in [network.metabolites[index] for index in network.external_metabolite_indices()]:
             index = external_metabolites.index(metabolite.id)
-
+            print(metabolite.id)
             if index >= len(external_reactions):
                 print('Warning: missing exchange reaction for metabolite %s. Skipping marking this metabolite as input or output.' % metabolite.id)
                 continue
@@ -354,7 +355,9 @@ def add_debug_tags(network, reactions=[]):
 
     for reaction in reactions:
         network.metabolites.append(Metabolite('virtual_tag_%s' % network.reactions[reaction].id,
-                                              'Virtual tag for %s' % network.reactions[reaction].id, compartment='e'))
+                                              'Virtual tag for %s' % network.reactions[reaction].id,
+                                              compartment='e', is_external=True,
+                                              direction='both' if network.reactions[reaction].reversible else 'output'))
     network.N = np.append(network.N, np.identity(len(network.reactions))[reactions, :], axis=0)
 
 
