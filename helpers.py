@@ -240,7 +240,7 @@ def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
             zero.
     """
     if not symbolic:
-        N = np.asarray(N, dtype='float64')
+        N = np.asarray(N, dtype='int64')
         u, s, vh = svd(N)
         tol = max(atol, rtol * s[0])
         nnz = (s >= tol).sum()
@@ -317,7 +317,7 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True
     if verbose:
         print('Running polco')
     with open(os_devnull, 'w') as devnull:
-        check_call(('java -Xms1g -Xmx7g -jar polco/polco.jar -kind text ' +
+        check_call(('java -Xms1g -Xmx7g -jar polco/polco.jar -kind text -sortinput AbsLexMin ' +
                     '-arithmetic %s ' % (' '.join(['fractional' if symbolic else 'double'] * 3)) +
                     '-zero %s ' % (' '.join(['NaN' if symbolic else '1e-10'] * 3)) +
                     ('' if equality_matrix is None else '-eq tmp/eq_%d.txt ' % (rand)) +
@@ -412,12 +412,16 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     species_index = {item.id: index for index, item in enumerate(species)}
     reactions = model.reactions
     objective_reaction_column = None
+    wrong_direction_reactions = [] # Reactions that have only negative flux
 
 
     # TODO: parse stoichiometry, reactions, and metabolites using CBMPy too
     cbmpy_model = cbmpy.readSBML3FBC(path)
     pairs = cbmpy.CBTools.findDeadEndReactions(cbmpy_model)
     external_metabolites, external_reactions = zip(*pairs) if len(pairs) else (zip(*cbmpy.CBTools.findDeadEndMetabolites(cbmpy_model))[0], [])
+
+    # Catch any metabolites that were not recognised automatically, but are likely external
+    external_metabolites = [item.id for item in species if item.id in external_metabolites or item.id.endswith('_e') or item.id.endswith('_ex')]
 
     network = Network()
     network.metabolites = [Metabolite(item.id, item.name, item.compartment, item.id in external_metabolites) for item in species]
@@ -428,6 +432,16 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
 
     if skip_external_reactions:
         reactions = [reaction for reaction in reactions if reaction.id not in external_reactions]
+
+    for reaction in reactions:
+        id, lower, upper, equal = cbmpy_model.getReactionBounds(reaction.id)
+
+        # Mark reversible reactions that are only possible in one direction irreversible
+        if reaction.reversible and ((lower == 0 or lower is None) or (upper == 0 or upper is None)):
+            reaction.reversible = False
+
+        # If only the reversible direction is possible, we swap the substrates and products later
+        wrong_direction_reactions.append(reaction.id)
 
     if determine_inputs_outputs:
         for metabolite in [network.metabolites[index] for index in network.external_metabolite_indices()]:
@@ -458,12 +472,16 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     for column, reaction in enumerate(reactions):
         network.reactions.append(Reaction(reaction.id, reaction.name, reaction.reversible))
 
+        # If reaction was defined with only negative flux possible, we should
+        # swap substrates and products
+        modifier = -1 if reaction.id in wrong_direction_reactions else 1
+
         for metabolite in reaction.reactants:
             row = species_index[metabolite.species]
-            N[row, column] = Fraction(str(-metabolite.stoichiometry))
+            N[row, column] = Fraction(str(-metabolite.stoichiometry * modifier))
         for metabolite in reaction.products:
             row = species_index[metabolite.species]
-            N[row, column] = Fraction(str(metabolite.stoichiometry))
+            N[row, column] = Fraction(str(metabolite.stoichiometry * modifier))
 
         if add_objective and reaction.id == objective_name:
             objective_reaction_column = column

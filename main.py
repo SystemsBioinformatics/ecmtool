@@ -44,7 +44,9 @@ if __name__ == '__main__':
 
     model_path = args.model_path
 
-    network = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite, determine_inputs_outputs=args.auto_direction)
+    network = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite,
+                                         determine_inputs_outputs=args.auto_direction,
+                                         skip_external_reactions=False)
 
     debug_tags = []  # CS, ME1, ME2, PYK
     # debug_tags = [14, 44, 45, 62]  # CS, ME1, ME2, PYK
