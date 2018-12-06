@@ -437,7 +437,7 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
         id, lower, upper, equal = cbmpy_model.getReactionBounds(reaction.id)
 
         # Mark reversible reactions that are only possible in one direction irreversible
-        if reaction.reversible and ((lower == 0 or lower is None) or (upper == 0 or upper is None)):
+        if reaction.reversible and ((lower == 0) or (upper == 0)):
             reaction.reversible = False
 
         # If only the reversible direction is possible, we swap the substrates and products later
