@@ -215,11 +215,12 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
 
     # Calculate generating set of the dual of our initial conversion cone C0, C0*
     rays = np.asarray(list(get_extreme_rays(np.append(linearities, G_rev, axis=0), G_irrev, verbose=verbose, symbolic=symbolic)))
+    # rays = np.asarray(list(get_extreme_rays(None, G_exp, verbose=verbose, symbolic=symbolic)))
     rays = rays if rays.shape[0] else np.ndarray(shape=(0, G.shape[1]))
     rays_deflated = deflate_matrix(rays, external_metabolites)
 
     # Add bidirectional (in- and output) metabolites in reverse direction
-    rays_split = split_columns_semipositively(rays_deflated, in_out_indices)
+    rays_split = split_columns(rays_deflated, in_out_indices)
     linearities_split = split_columns(linearities_deflated, in_out_indices)
 
     H_ineq = rays_split

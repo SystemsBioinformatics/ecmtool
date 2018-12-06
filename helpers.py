@@ -441,7 +441,8 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
             reaction.reversible = False
 
         # If only the reversible direction is possible, we swap the substrates and products later
-        wrong_direction_reactions.append(reaction.id)
+        if (upper == 0 or upper is None) and (lower is not None and lower < 0):
+            wrong_direction_reactions.append(reaction.id)
 
     if determine_inputs_outputs:
         for metabolite in [network.metabolites[index] for index in network.external_metabolite_indices()]:
