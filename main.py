@@ -61,7 +61,7 @@ if __name__ == '__main__':
     if args.print_reactions:
         print('Reactions%s:' % (' after compression' if args.compress else ''))
         for index, item in enumerate(network.reactions):
-            print(index, item.id, item.name)
+            print(index, item.id, item.name, 'reversible' if item.reversible else 'irreversible')
 
     if args.print_metabolites:
         print('Metabolites%s:' % (' after compression' if args.compress else ''))
