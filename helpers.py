@@ -412,7 +412,6 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     species_index = {item.id: index for index, item in enumerate(species)}
     reactions = model.reactions
     objective_reaction_column = None
-    wrong_direction_reactions = [] # Reactions that have only negative flux
 
 
     # TODO: parse stoichiometry, reactions, and metabolites using CBMPy too
@@ -433,21 +432,10 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     if skip_external_reactions:
         reactions = [reaction for reaction in reactions if reaction.id not in external_reactions]
 
-    for reaction in reactions:
-        id, lower, upper, equal = cbmpy_model.getReactionBounds(reaction.id)
-
-        # Mark reversible reactions that are only possible in one direction irreversible
-        if reaction.reversible and ((lower == 0) or (upper == 0)):
-            reaction.reversible = False
-
-        # If only the reversible direction is possible, we swap the substrates and products later
-        if (upper == 0 or upper is None) and (lower is not None and lower < 0):
-            wrong_direction_reactions.append(reaction.id)
-
     if determine_inputs_outputs:
         for metabolite in [network.metabolites[index] for index in network.external_metabolite_indices()]:
             index = external_metabolites.index(metabolite.id)
-
+            print(metabolite.id)
             if index >= len(external_reactions):
                 print('Warning: missing exchange reaction for metabolite %s. Skipping marking this metabolite as input or output.' % metabolite.id)
                 continue
@@ -468,29 +456,25 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
 
             metabolite.direction = 'input' if stoichiometries[0][0] >= 0 else 'output'
 
-    N = to_fractions(np.zeros(shape=(len(species), len(reactions)), dtype='object'))
+    N = np.zeros(shape=(len(species), len(reactions)), dtype='object')
 
     for column, reaction in enumerate(reactions):
         network.reactions.append(Reaction(reaction.id, reaction.name, reaction.reversible))
 
-        # If reaction was defined with only negative flux possible, we should
-        # swap substrates and products
-        modifier = -1 if reaction.id in wrong_direction_reactions else 1
-
         for metabolite in reaction.reactants:
             row = species_index[metabolite.species]
-            N[row, column] = Fraction(str(-metabolite.stoichiometry * modifier))
+            N[row, column] = Fraction(str(-metabolite.stoichiometry))
         for metabolite in reaction.products:
             row = species_index[metabolite.species]
-            N[row, column] = Fraction(str(metabolite.stoichiometry * modifier))
+            N[row, column] = Fraction(str(metabolite.stoichiometry))
 
         if add_objective and reaction.id == objective_name:
             objective_reaction_column = column
 
     if add_objective and objective_reaction_column:
         network.metabolites.append(Metabolite('objective', 'Virtual objective metabolite', 'e', is_external=True, direction='output'))
-        N = np.append(N, to_fractions(np.zeros(shape=(1, N.shape[1]))), axis=0)
-        N[-1, objective_reaction_column] = Fraction(1, 1)
+        N = np.append(N, np.zeros(shape=(1, N.shape[1])), axis=0)
+        N[-1, objective_reaction_column] = 1
 
     network.N = N
 

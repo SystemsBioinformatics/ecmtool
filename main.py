@@ -68,6 +68,9 @@ if __name__ == '__main__':
         for index, item in enumerate(network.metabolites):
             print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
 
+
+            #Glucose, ammonium, O2, phosphate
+
     symbolic = args.symbolic
     inputs = network.input_metabolite_indices() if args.auto_direction else [int(index) for index in args.inputs.split(',') if len(index)]
     outputs = network.output_metabolite_indices() if args.auto_direction else [int(index) for index in args.outputs.split(',') if len(index)]
