@@ -79,11 +79,11 @@ if __name__ == '__main__':
         print('No output metabolites given or determined from model. All non-input metabolites will be defined as outputs.')
         outputs = np.setdiff1d(network.external_metabolite_indices(), inputs)
 
-    cone = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
-                               # verbose=True, symbolic=symbolic)
-                               input_metabolites=inputs, output_metabolites=outputs, verbose=True, symbolic=symbolic)
-    # cone = get_clementine_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
-    #                            input_metabolites=inputs, output_metabolites=outputs, verbose=True)
+    # cone = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
+    #                            # verbose=True, symbolic=symbolic)
+    #                            input_metabolites=inputs, output_metabolites=outputs, verbose=True, symbolic=symbolic)
+    cone = get_clementine_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
+                               input_metabolites=inputs, output_metabolites=outputs, verbose=True)
 
     # Undo compression so we have results in the same dimensionality as original data
     expanded_c = np.zeros(shape=(cone.shape[0], len(orig_ids)))

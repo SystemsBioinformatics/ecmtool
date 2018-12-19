@@ -74,6 +74,35 @@ def redund(matrix, verbose=False):
     return matrix_nored[:, 1:]
 
 
+def get_zero_set(G, equalities):
+    dot_products = np.transpose(np.asarray([np.dot(G, equality) for equality in equalities]))
+    zero_set = [set([index for index, value in enumerate(row) if value == 0]) for row in dot_products]
+    return zero_set
+
+
+def drop_nonextreme(G, zero_set, verbose=False):
+    keep_rows = []
+
+    for row in range(G.shape[0]):
+        remove = False
+        for other_row in range(G.shape[0]):
+            # The current row (reaction) has a zero set that is
+            # a proper subset of another row's. This means the other
+            # row represents a more extreme vector in the same plane.
+            if zero_set[row] < zero_set[other_row]:
+                remove = True
+                break
+
+        if not remove:
+            keep_rows.append(row)
+
+
+    if verbose:
+        print('Removing %d nonextreme rays' % (G.shape[0] - len(keep_rows)))
+
+    return G[keep_rows, :]
+
+
 def get_clementine_conversion_cone(N, external_metabolites=[], reversible_reactions=[], input_metabolites=[], output_metabolites=[],
                                    verbose=True):
     """
@@ -91,6 +120,7 @@ def get_clementine_conversion_cone(N, external_metabolites=[], reversible_reacti
     internal_metabolites = np.setdiff1d(range(amount_metabolites), external_metabolites)
 
     identity = np.identity(amount_metabolites)
+    equalities = [identity[:, index] for index in internal_metabolites]
 
     # Compose G of the columns of N
     G = np.transpose(N)
@@ -100,6 +130,7 @@ def get_clementine_conversion_cone(N, external_metabolites=[], reversible_reacti
         if reaction_index in reversible_reactions:
             G = np.append(G, [-G[reaction_index, :]], axis=0)
 
+    # For each internal metabolite, intersect the intermediary cone with an equality to 0 for that metabolite
     for index, internal_metabolite in enumerate(internal_metabolites):
         if verbose:
             print('Iteration %d/%d' % (index, len(internal_metabolites)))
@@ -115,7 +146,7 @@ def get_clementine_conversion_cone(N, external_metabolites=[], reversible_reacti
             continue
 
         # Project conversions that use this metabolite onto the hyperplane internal_metabolite = 0
-        projections = np.dot(G[active_conversions, :], identity[:, internal_metabolite])
+        projections = np.dot(G[active_conversions, :], equalities[index])
         positive = active_conversions[np.argwhere(projections > 0)[:, 0]]
         negative = active_conversions[np.argwhere(projections < 0)[:, 0]]
         candidates = np.ndarray(shape=(0, amount_metabolites))
@@ -135,6 +166,8 @@ def get_clementine_conversion_cone(N, external_metabolites=[], reversible_reacti
             print('Removing %d rays\n' % (G.shape[0] - len(keep)))
         G = G[keep, :]
         G = np.append(G, candidates, axis=0)
+        # G = drop_nonextreme(G, get_zero_set(G, equalities), verbose=verbose)
+        G = redund(G, verbose=verbose)
 
     return G
 
