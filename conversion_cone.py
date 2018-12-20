@@ -42,7 +42,7 @@ def redund(matrix, verbose=False):
     matrix = to_fractions(matrix)
 
     with open('tmp/matrix.ine', 'w') as file:
-        file.write('H-representation\n')
+        file.write('V-representation\n')
         file.write('begin\n')
         file.write('%d %d rational\n' % (matrix.shape[0], matrix.shape[1] + 1))
         for row in range(matrix.shape[0]):
@@ -60,7 +60,7 @@ def redund(matrix, verbose=False):
         lines = file.readlines()
         for line in [line for line in lines if line not in ['\n', '']]:
             # Skip comment and INE format lines
-            if np.any([target in line for target in ['*', 'H-representation', 'begin', 'end', 'rational']]):
+            if np.any([target in line for target in ['*', 'V-representation', 'begin', 'end', 'rational']]):
                 continue
             row = [Fraction(x) for x in line.replace('\n', '').split(' ') if x != '']
             matrix_nored = np.append(matrix_nored, [row], axis=0)

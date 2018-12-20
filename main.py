@@ -4,7 +4,7 @@ from scipy.optimize import linprog
 
 from helpers import *
 from time import time
-from conversion_cone import get_conversion_cone, clementine_equality_compression
+from conversion_cone import get_conversion_cone
 from argparse import ArgumentParser, ArgumentTypeError
 
 
@@ -48,7 +48,7 @@ if __name__ == '__main__':
 
     network = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite,
                                          determine_inputs_outputs=args.auto_direction,
-                                         skip_external_reactions=False)
+                                         skip_external_reactions=True)
 
     debug_tags = []  # CS, ME1, ME2, PYK
     # debug_tags = [14, 44, 45, 62]  # CS, ME1, ME2, PYK
@@ -98,7 +98,7 @@ if __name__ == '__main__':
                                # verbose=True, symbolic=symbolic)
                                input_metabolites=network.input_metabolite_indices(), output_metabolites=network.output_metabolite_indices(), verbose=True, symbolic=symbolic)
     # cone = clementine_equality_compression(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
-    #                                        input_metabolites=inputs, output_metabolites=outputs, verbose=True)
+    #                                        input_metabolites=network.input_metabolite_indices(), output_metabolites=network.output_metabolite_indices(), verbose=True)
 
     # Undo compression so we have results in the same dimensionality as original data
     expanded_c = np.zeros(shape=(cone.shape[0], len(orig_ids)))
