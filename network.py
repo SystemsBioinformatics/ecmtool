@@ -41,6 +41,14 @@ class Network:
     def external_metabolite_indices(self):
         return [index for index, metabolite in enumerate(self.metabolites) if metabolite.is_external]
 
+    def set_inputs(self, input_indices):
+        for index in input_indices:
+            self.metabolites[index].direction = 'input'
+
+    def set_outputs(self, output_indices):
+        for index in output_indices:
+            self.metabolites[index].direction = 'output'
+
     def input_metabolite_indices(self):
         return [index for index, metabolite in enumerate(self.metabolites) if metabolite.direction == 'input']
 

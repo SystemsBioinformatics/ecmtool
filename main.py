@@ -22,6 +22,7 @@ if __name__ == '__main__':
 
     parser = ArgumentParser(description='Calculate Elementary Conversion Modes from an SBML model. For medium-to large networks, be sure to define --inputs and --outputs. This reduces the enumeration problem complexity considerably.')
     parser.add_argument('--model_path', type=str, default='', help='Relative or absolute path to an SBML model .xml file')
+    parser.add_argument('--symbolic', type=str2bool, default=True, help='All computation is done using fractional numbers, and symbolic operations. When disabled, floating point numbers and numeric operations are used (default: True)')
     parser.add_argument('--compress', type=str2bool, default=True, help='Perform compression to which the conversions are invariant, and reduce the network size considerably (default: True)')
     parser.add_argument('--out_path', default='conversion_cone.csv', help='Relative or absolute path to the .csv file you want to save the calculated conversions to')
     parser.add_argument('--add_objective_metabolite', type=str2bool, default=True, help='Add a virtual metabolite containing the stoichiometry of the objective function of the model')
@@ -52,32 +53,48 @@ if __name__ == '__main__':
     orig_ids = [m.id for m in network.metabolites]
     orig_N = network.N
 
-    if args.compress:
-        network.compress(verbose=True)
 
     if args.print_reactions:
-        print('Reactions%s:' % (' after compression' if args.compress else ''))
+        print('Reactions%s:' % (' before compression' if args.compress else ''))
         for index, item in enumerate(network.reactions):
-            print(index, item.id, item.name)
+            print(index, item.id, item.name, 'reversible' if item.reversible else 'irreversible')
 
     if args.print_metabolites:
-        print('Metabolites%s:' % (' after compression' if args.compress else ''))
+        print('Metabolites%s:' % (' before compression' if args.compress else ''))
         for index, item in enumerate(network.metabolites):
             print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
 
-    symbolic = True
-    inputs = network.input_metabolite_indices() if args.auto_direction else [int(index) for index in args.inputs.split(',') if len(index)]
-    outputs = network.output_metabolite_indices() if args.auto_direction else [int(index) for index in args.outputs.split(',') if len(index)]
-    if len(outputs) < 1 and len(inputs) >= 1:
-        # If no outputs are given, define all external metabolites that are not inputs as outputs
-        print('No output metabolites given or determined from model. All non-input metabolites will be defined as outputs.')
-        outputs = np.setdiff1d(network.external_metabolite_indices(), inputs)
+    symbolic = args.symbolic
+    if not args.auto_direction:
+        inputs = [int(index) for index in args.inputs.split(',') if len(index)]
+        outputs = [int(index) for index in args.outputs.split(',') if len(index)]
+        if len(outputs) < 1 and len(inputs) >= 1:
+            # If no outputs are given, define all external metabolites that are not inputs as outputs
+            print(
+                'No output metabolites given or determined from model. All non-input metabolites will be defined as outputs.')
+            outputs = np.setdiff1d(network.external_metabolite_indices(), inputs)
+
+        network.set_inputs(inputs)
+        network.set_outputs(outputs)
+
+    if args.compress:
+        network.compress(verbose=True)
+
+    if args.print_reactions and args.compress:
+        print('Reactions (after compression):')
+        for index, item in enumerate(network.reactions):
+            print(index, item.id, item.name, 'reversible' if item.reversible else 'irreversible')
+
+    if args.print_metabolites and args.compress:
+        print('Metabolites (after compression):')
+        for index, item in enumerate(network.metabolites):
+            print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
 
     cone = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
                                # verbose=True, symbolic=symbolic)
-                               input_metabolites=inputs, output_metabolites=outputs, verbose=True, symbolic=symbolic)
+                               input_metabolites=network.input_metabolite_indices(), output_metabolites=network.output_metabolite_indices(), verbose=True, symbolic=symbolic)
     # cone = get_clementine_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
-    #                            input_metabolites=inputs, output_metabolites=outputs, verbose=True)
+    #                            input_metabolites=network.input_metabolite_indices(), output_metabolites=network.output_metabolite_indices(), verbose=True)
 
     # Undo compression so we have results in the same dimensionality as original data
     expanded_c = np.zeros(shape=(cone.shape[0], len(orig_ids)))
