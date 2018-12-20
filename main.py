@@ -4,7 +4,7 @@ from scipy.optimize import linprog
 
 from helpers import *
 from time import time
-from conversion_cone import get_conversion_cone, get_clementine_conversion_cone
+from conversion_cone import get_conversion_cone, clementine_equality_compression
 from argparse import ArgumentParser, ArgumentTypeError
 
 
@@ -16,6 +16,8 @@ def str2bool(v):
     else:
         raise ArgumentTypeError('Boolean value expected.')
 
+
+# Note [Tom]: Glucose, ammonium, O2, phosphate
 
 if __name__ == '__main__':
     start = time()
@@ -30,8 +32,8 @@ if __name__ == '__main__':
     parser.add_argument('--print_metabolites', type=str2bool, default=True, help='Print the names and IDs of metabolites in the (compressed) metabolic network')
     parser.add_argument('--print_reactions', type=str2bool, default=True, help='Print the names and IDs of reactions in the (compressed) metabolic network')
     parser.add_argument('--auto_direction', type=str2bool, default=True, help='Automatically determine external metabolites that can only be consumed or produced')
-    parser.add_argument('--inputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true, that can only be consumed')
-    parser.add_argument('--outputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true, that can only be produced')
+    parser.add_argument('--inputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be consumed')
+    parser.add_argument('--outputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be produced')
     args = parser.parse_args()
 
     if args.model_path == '':
@@ -55,35 +57,48 @@ if __name__ == '__main__':
     orig_ids = [m.id for m in network.metabolites]
     orig_N = network.N
 
-    if args.compress:
-        network.compress(verbose=True)
 
     if args.print_reactions:
-        print('Reactions%s:' % (' after compression' if args.compress else ''))
+        print('Reactions%s:' % (' before compression' if args.compress else ''))
         for index, item in enumerate(network.reactions):
             print(index, item.id, item.name, 'reversible' if item.reversible else 'irreversible')
 
     if args.print_metabolites:
-        print('Metabolites%s:' % (' after compression' if args.compress else ''))
+        print('Metabolites%s:' % (' before compression' if args.compress else ''))
         for index, item in enumerate(network.metabolites):
             print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
 
-
-            #Glucose, ammonium, O2, phosphate
-
     symbolic = args.symbolic
-    inputs = network.input_metabolite_indices() if args.auto_direction else [int(index) for index in args.inputs.split(',') if len(index)]
-    outputs = network.output_metabolite_indices() if args.auto_direction else [int(index) for index in args.outputs.split(',') if len(index)]
-    if len(outputs) < 1 and len(inputs) >= 1:
-        # If no outputs are given, define all external metabolites that are not inputs as outputs
-        print('No output metabolites given or determined from model. All non-input metabolites will be defined as outputs.')
-        outputs = np.setdiff1d(network.external_metabolite_indices(), inputs)
+    if not args.auto_direction:
+        inputs = [int(index) for index in args.inputs.split(',') if len(index)]
+        outputs = [int(index) for index in args.outputs.split(',') if len(index)]
+        if len(outputs) < 1 and len(inputs) >= 1:
+            # If no outputs are given, define all external metabolites that are not inputs as outputs
+            print(
+                'No output metabolites given or determined from model. All non-input metabolites will be defined as outputs.')
+            outputs = np.setdiff1d(network.external_metabolite_indices(), inputs)
 
-    # cone = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
-    #                            # verbose=True, symbolic=symbolic)
-    #                            input_metabolites=inputs, output_metabolites=outputs, verbose=True, symbolic=symbolic)
-    cone = get_clementine_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
-                               input_metabolites=inputs, output_metabolites=outputs, verbose=True)
+        network.set_inputs(inputs)
+        network.set_outputs(outputs)
+
+    if args.compress:
+        network.compress(verbose=True)
+
+    if args.print_reactions and args.compress:
+        print('Reactions (after compression):')
+        for index, item in enumerate(network.reactions):
+            print(index, item.id, item.name, 'reversible' if item.reversible else 'irreversible')
+
+    if args.print_metabolites and args.compress:
+        print('Metabolites (after compression):')
+        for index, item in enumerate(network.metabolites):
+            print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
+
+    cone = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
+                               # verbose=True, symbolic=symbolic)
+                               input_metabolites=network.input_metabolite_indices(), output_metabolites=network.output_metabolite_indices(), verbose=True, symbolic=symbolic)
+    # cone = clementine_equality_compression(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
+    #                                        input_metabolites=inputs, output_metabolites=outputs, verbose=True)
 
     # Undo compression so we have results in the same dimensionality as original data
     expanded_c = np.zeros(shape=(cone.shape[0], len(orig_ids)))
