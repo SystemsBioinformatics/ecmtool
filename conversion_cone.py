@@ -154,7 +154,7 @@ def get_clementine_conversion_cone(N, external_metabolites=[], reversible_reacti
         if verbose:
             print('Adding %d candidates' % (len(positive) * len(negative)))
 
-        # Make convex combinations of all pairs (positive, negative) such that their internal_metabolite = 0
+        # Make conic combinations of all pairs (positive, negative) such that their internal_metabolite = 0
         for pos in positive:
             for neg in negative:
                 candidate = np.add(G[pos, :], G[neg, :] * (G[pos, internal_metabolite] / -G[neg, internal_metabolite]))
