@@ -337,7 +337,7 @@ class Network:
         self.N = np.transpose(compressed_G)
         drop = []
         for row in range(self.N.shape[0]):
-            if np.sum(self.N[row, :]) == 0:
+            if np.count_nonzero(self.N[row, :]) == 0:
                 drop.append(row)
         self.drop_metabolites(drop)
 
