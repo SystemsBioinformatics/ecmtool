@@ -3,7 +3,7 @@ from subprocess import check_call, STDOUT, PIPE
 from os import remove, devnull as os_devnull
 
 import cbmpy
-# import matlab.engine
+import matlab.engine
 
 import cdd
 import numpy as np
@@ -112,6 +112,14 @@ def normalise_betas(result):
 #     v = result['efms']
 #     x = np.transpose(np.asarray(v)[r:, :])
 #     return x
+
+def get_efms(N, reversibility):
+    engine = matlab.engine.start_matlab()
+    engine.cd('efmtool')
+    result = engine.CalculateFluxModes(matlab.double([list(row) for row in N]), matlab.logical(reversibility))
+    v = result['efms']
+    x = np.transpose(np.asarray(v))
+    return x
 
 
 def get_extreme_rays_cdd(inequality_matrix):
