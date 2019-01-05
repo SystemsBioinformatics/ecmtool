@@ -160,6 +160,8 @@ def get_clementine_conversion_cone(N, external_metabolites=[], reversible_reacti
                 candidate = np.add(G[pos, :], G[neg, :] * (G[pos, internal_metabolite] / -G[neg, internal_metabolite]))
                 candidates = np.append(candidates, [candidate], axis=0)
 
+        candidates = redund(candidates, verbose=verbose)
+
         # Keep only rays that satisfy internal_metabolite = 0
         keep = np.setdiff1d(range(G.shape[0]), np.append(positive, negative, axis=0))
         if verbose:
