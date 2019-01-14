@@ -131,18 +131,17 @@ class Network:
                 continue
 
             for other_reaction_index in np.setdiff1d(reactions_to_cancel, [reaction_index]):
-                    factor = np.abs(self.N[index, other_reaction_index] / self.N[index, reaction_index])
-                    self.N[:, other_reaction_index] = np.add(self.N[:, other_reaction_index],
-                                                                  self.N[:, reaction_index] * factor)
+                factor = self.N[index, other_reaction_index] / self.N[index, reaction_index]
+                self.N[:, other_reaction_index] = np.subtract(self.N[:, other_reaction_index],
+                                                              self.N[:, reaction_index] * factor)
 
-                    if not self.reactions[reaction_index].reversible:
-                        # Reactions changed by irreversible reactions must become irreversible too
-                        self.reactions[other_reaction_index].reversible = False
+                if not self.reactions[reaction_index].reversible and self.reactions[other_reaction_index].reversible:
+                    # Reactions changed by irreversible reactions must become irreversible too
+                    self.reactions[other_reaction_index].reversible = False
 
         removable_metabolites, removable_reactions = [], []
-        for metabolite_index in range(len(self.metabolites)):
-            if metabolite_index not in self.external_metabolite_indices() and \
-                            np.count_nonzero(self.N[metabolite_index, :]) == 1:
+        for metabolite_index in internal_metabolite_indices:
+            if np.count_nonzero(self.N[metabolite_index, :]) == 1:
                 # This metabolite is used in only one reaction
                 reaction_index = [index for index in range(len(self.reactions)) if self.N[metabolite_index, index] != 0][0]
                 removable_metabolites.append(metabolite_index)
@@ -160,6 +159,7 @@ class Network:
         if verbose:
             print('Trying to cancel compounds by reversible reactions')
 
+        internal_metabolite_indices = np.setdiff1d(range(len(self.metabolites)), self.external_metabolite_indices())
         reversible_reactions = self.reversible_reaction_indices()
         total_reversible_reactions = len(reversible_reactions)
 
@@ -179,7 +179,7 @@ class Network:
             if not isinstance(busiest_metabolite, int) and not isinstance(busiest_metabolite, np.int64):
                 busiest_metabolite = busiest_metabolite[0]
 
-            # We want to cancel the metabolite that is used in the largest amount of other reactions
+            # Heuristic: we choose to cancel the metabolite that is used in the largest number of other reactions
             target = metabolite_indices[busiest_metabolite]
 
             for other_reaction_index in range(self.N.shape[1]):
@@ -193,9 +193,8 @@ class Network:
                     #                                                   reaction_index)
 
         removable_metabolites, removable_reactions = [], []
-        for metabolite_index in range(len(self.metabolites)):
-            if metabolite_index not in self.external_metabolite_indices() and \
-                            np.count_nonzero(self.N[metabolite_index, :]) == 1:
+        for metabolite_index in internal_metabolite_indices:
+            if np.count_nonzero(self.N[metabolite_index, :]) == 1:
                 # This metabolite is used in only one reaction
                 reaction_index = [index for index in range(len(self.reactions)) if self.N[metabolite_index, index] != 0][0]
                 removable_metabolites.append(metabolite_index)
