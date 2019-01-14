@@ -473,7 +473,7 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
 
     if add_objective and objective_reaction_column:
         network.metabolites.append(Metabolite('objective', 'Virtual objective metabolite', 'e', is_external=True, direction='output'))
-        N = np.append(N, np.zeros(shape=(1, N.shape[1])), axis=0)
+        N = np.append(N, to_fractions(np.zeros(shape=(1, N.shape[1]))), axis=0)
         N[-1, objective_reaction_column] = 1
 
     network.N = N
