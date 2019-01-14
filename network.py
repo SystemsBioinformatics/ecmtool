@@ -103,21 +103,34 @@ class Network:
                 print('Cancelling compounds - %.2f%%' % (iteration / float(total_internal_metabolites) * 100))
 
             reaction_index = None
-            if np.count_nonzero(np.maximum(self.N[index, :], [0] * self.N.shape[1])) == 1:
+            producing_reactions = list(np.where(self.N[index, :] > 0)[0])
+            consuming_reactions = list(np.where(self.N[index, :] < 0)[0])
+            reactions_to_cancel = []
+
+            for reaction_index in producing_reactions:
+                if self.reactions[reaction_index].reversible and reaction_index not in consuming_reactions:
+                    consuming_reactions.append(reaction_index)
+
+            for reaction_index in consuming_reactions:
+                if self.reactions[reaction_index].reversible and reaction_index not in producing_reactions:
+                    producing_reactions.append(reaction_index)
+
+            if len(producing_reactions) == 1:
                 # This internal metabolite is produced by only 1 reaction
-                reaction_index = [reaction_index for reaction_index in range(len(self.reactions)) if self.N[index, reaction_index] > 0][0]
+                reaction_index = producing_reactions[0]
+                reactions_to_cancel = consuming_reactions
                 if verbose:
-                    print('Metabolite %s is only produced in irreversible reaction %s. It will be cancelled through addition' % (self.metabolites[index].id, self.reactions[reaction_index].id))
-            elif np.count_nonzero(np.minimum(self.N[index, :], [0] * self.N.shape[1])) == 1:
+                    print('Metabolite %s is only produced in reaction %s. It will be cancelled through addition' % (self.metabolites[index].id, self.reactions[reaction_index].id))
+            elif len(consuming_reactions) == 1:
                 # This internal metabolite is consumed by only 1 reaction
-                reaction_index = [reaction_index for reaction_index in range(len(self.reactions)) if self.N[index, reaction_index] < 0][0]
+                reaction_index = consuming_reactions[0]
+                reactions_to_cancel = producing_reactions
                 if verbose:
-                    print('Metabolite %s is only consumed in irreversible reaction %s. It will be cancelled through addition' % (self.metabolites[index].id, self.reactions[reaction_index].id))
+                    print('Metabolite %s is only consumed in reaction %s. It will be cancelled through addition' % (self.metabolites[index].id, self.reactions[reaction_index].id))
             else:
                 continue
 
-            for other_reaction_index in range(self.N.shape[1]):
-                if other_reaction_index != reaction_index and self.N[index, other_reaction_index] != 0:
+            for other_reaction_index in np.setdiff1d(reactions_to_cancel, [reaction_index]):
                     factor = np.abs(self.N[index, other_reaction_index] / self.N[index, reaction_index])
                     self.N[:, other_reaction_index] = np.add(self.N[:, other_reaction_index],
                                                                   self.N[:, reaction_index] * factor)
