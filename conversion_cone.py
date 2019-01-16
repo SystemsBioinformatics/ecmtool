@@ -210,7 +210,7 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     G = np.transpose(N)
 
     # TODO: remove debug block
-    # G = np.asarray(G * 10**6, dtype='int')
+    G = np.asarray(G * 10**3, dtype='int64')
 
     G_exp = G[:,:]
     G_rev = np.ndarray(shape=(0, G.shape[1]), dtype='object')
@@ -228,7 +228,8 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     # Calculate H as the union of our linearities and the extreme rays of matrix G (all as row vectors)
     if verbose:
          print('Calculating null space of inequalities system G')
-    linearities = np.transpose(nullspace(G, symbolic=symbolic))
+    linearities = np.transpose(nullspace(G, symbolic=False))
+    # linearities = np.transpose(nullspace(G, symbolic=symbolic))
     # linearities = np.transpose(nullspace_terzer(G, verbose=verbose))
     # linearities = nullspace_polco(G, verbose=verbose)
     # linearities = np.loadtxt("/tmp/lin_ecoli2.csv", delimiter=',', dtype='int')
