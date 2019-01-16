@@ -405,7 +405,7 @@ def get_sbml_model(path):
     return model
 
 
-def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions=True, determine_inputs_outputs=False):
+def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions=True, determine_inputs_outputs=False, external_compartment='e'):
     """
     Parses an SBML file containing a metabolic network, and returns a Network instance
     with the metabolites, reactions, and stoichiometry initialised. By default will look
@@ -428,7 +428,7 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     external_metabolites, external_reactions = zip(*pairs) if len(pairs) else (zip(*cbmpy.CBTools.findDeadEndMetabolites(cbmpy_model))[0], [])
 
     # Catch any metabolites that were not recognised automatically, but are likely external
-    external_metabolites = [item.id for item in species if item.id in external_metabolites or item.id.endswith('_e') or item.id.endswith('_ex')]
+    external_metabolites = list(external_metabolites) + [item.id for item in species if item.compartment == external_compartment]
 
     network = Network()
     network.metabolites = [Metabolite(item.id, item.name, item.compartment, item.id in external_metabolites) for item in species]
@@ -443,26 +443,35 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     if determine_inputs_outputs:
         for metabolite in [network.metabolites[index] for index in network.external_metabolite_indices()]:
             index = external_metabolites.index(metabolite.id)
-            print(metabolite.id)
             if index >= len(external_reactions):
                 print('Warning: missing exchange reaction for metabolite %s. Skipping marking this metabolite as input or output.' % metabolite.id)
                 continue
 
             reaction_id = external_reactions[index]
             reaction = cbmpy_model.getReaction(reaction_id)
+            lowerBound, upperBound, _ = cbmpy_model.getFluxBoundsByReactionID(reaction_id)
+            stoichiometries = reaction.getStoichiometry()
+            stoichiometry = [stoich[0] for stoich in stoichiometries if stoich[1] == metabolite.id][0]
 
             if reaction.reversible:
-                # Reversible reactions are both inputs and outputs
-                # TODO: check SBML flux boundaries here to see if the reaction is truly bidirectional
-                continue
+                # Check if the reaction is truly bidirectional
+                if lowerBound.value == 0 or upperBound.value == 0:
+                    reaction.reversible = False
+                else:
+                    # Reversible reactions are both inputs and outputs, so don't mark as either
+                    continue
 
-            stoichiometries = reaction.getStoichiometry()
+                if lowerBound.value > upperBound.value:
+                    # Direction of model is inverted (substrates are products and vice versa. This happens sometimes,
+                    # e.g. https://github.com/SBRG/bigg_models/issues/324
+                    print('Swapping direction of reversible reaction %s that can only run in reverse direction.' % reaction_id)
+                    stoichiometry *= -1
+                    for met in model.getReaction(reaction_id).reactants:
+                        met.setStoichiometry(-met.getStoichiometry())
+                    for met in model.getReaction(reaction_id).products:
+                        met.setStoichiometry(-met.getStoichiometry())
 
-            if len(stoichiometries) != 1:
-                print('Warning: exchange reaction %s has more than one substrate or product. Skipping marking its metabolite as input or output.' % reaction.id)
-                continue
-
-            metabolite.direction = 'input' if stoichiometries[0][0] >= 0 else 'output'
+            metabolite.direction = 'input' if stoichiometry >= 0 else 'output'
 
     N = np.zeros(shape=(len(species), len(reactions)), dtype='object')
 
