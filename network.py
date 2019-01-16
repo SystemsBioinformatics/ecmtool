@@ -189,7 +189,9 @@ class Network:
         if verbose:
             print('Compressing network')
 
-        metabolite_count, reaction_count = self.N.shape
+        original_metabolite_count, original_reaction_count = self.N.shape
+        original_internal = len(self.metabolites) - len(self.external_metabolite_indices())
+        original_reversible = len(self.reversible_reaction_indices())
 
         metabolite_count_intermediate, reaction_count_intermediate = self.N.shape
         self.cancel_compounds(verbose=verbose)
@@ -220,7 +222,17 @@ class Network:
 
         if verbose:
             print('Removed %d reactions and %d metabolites in total' %
-                  (reaction_count - self.N.shape[1], metabolite_count - self.N.shape[0]))
+                  (original_reaction_count - self.N.shape[1], original_metabolite_count - self.N.shape[0]))
+
+            internal = len(self.metabolites) - len(self.external_metabolite_indices())
+            reversible = len(self.reversible_reaction_indices())
+            metabolite_count, reaction_count = self.N.shape
+            print('Original: %d metabolites (%d internal), %d reactions (%d reversible)' %
+                  (original_metabolite_count, original_internal, original_reaction_count, original_reversible))
+            print('Compressed: %d metabolites (%d internal), %d reactions (%d reversible)' %
+                  (metabolite_count, internal, reaction_count, reversible))
+            print('Compressed size: %.2f%%' % (((float(reaction_count) * metabolite_count) / (original_reaction_count * original_metabolite_count)) * 100))
+
         pass
 
     def cancel_singly(self, verbose=False):
