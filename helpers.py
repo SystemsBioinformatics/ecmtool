@@ -1,4 +1,4 @@
-from fractions import Fraction
+from fractions import Fraction, gcd
 from subprocess import check_call, STDOUT, PIPE
 from os import remove, devnull as os_devnull
 
@@ -99,6 +99,167 @@ def normalise_betas(result):
     return result
 
 
+def nullspace_rank_internal(src, dst, verbose=False):
+    """
+    Translated directly from Polco's NullspaceRank:nullspaceRankInternal().
+    :param src: ndarray of Fraction() objects
+    :param dst:
+    :return:
+    """
+    rows, cols = src.shape
+    row_mapping = [row for row in range(rows)]
+
+    if verbose:
+        print('Starting rank calculation')
+
+    for col in range(cols):
+        if verbose:
+            print('Processing columns (rank) - %.2f%%' % (col / float(cols) * 100))
+
+        row_pivot = col
+        if row_pivot >= rows:
+            return rows, dst
+
+        pivot_dividend = src[row_pivot, col].numerator
+        pivot_divisor = None
+
+        # If pivotDividend == 0, try to find another non-dependent row
+        for row in range(row_pivot + 1, rows):
+            if pivot_dividend != 0:
+                break
+
+            pivot_dividend = src[row, col].numerator
+            if pivot_dividend != 0:
+                # Swap rows
+                src[[row_pivot, row]] = src[[row, row_pivot]]
+                dst[[row_pivot, row]] = dst[[row, row_pivot]]
+
+                tmp = row_mapping[row_pivot]
+                row_mapping[row_pivot] = row_mapping[row]
+                row_mapping[row] = tmp
+
+        if pivot_dividend == 0:
+            # Done, col is rank
+            # TODO: this is likely wrong. When a column is filled with only zeroes,
+            # we need to move on to the next column.
+            return col, dst
+
+        pivot_divisor = src[row_pivot, col].denominator
+
+        # Make pivot a 1
+        src[row_pivot, :] *= Fraction(pivot_dividend, pivot_divisor)
+        dst[row_pivot, :] *= Fraction(pivot_dividend, pivot_divisor)
+
+        for other_row in range(rows):
+            if other_row != col:
+                # Make it a 0
+                other_row_pivot_dividend = src[other_row, col].numerator
+                if other_row_pivot_dividend != 0:
+                    other_row_pivot_divisor = src[other_row, col].denominator
+                    src[other_row, :] -= src[row_pivot, :] * Fraction(other_row_pivot_dividend, other_row_pivot_divisor)
+                    dst[other_row, :] -= dst[row_pivot, :] * Fraction(other_row_pivot_dividend, other_row_pivot_divisor)
+
+    return cols, dst
+
+
+def nullspace_terzer(src, verbose=False):
+    src_T = np.transpose(src[:, :])
+    dst = to_fractions(np.identity(src_T.shape[0]))
+    rank, dst = nullspace_rank_internal(src_T, dst, verbose=verbose)
+    len = src_T.shape[0]
+
+    nullspace = to_fractions(np.zeros(shape=(len - rank, dst.shape[1])))
+
+    if verbose:
+        print('Starting nullspace calculation')
+
+    for row in range(rank, len):
+        if verbose:
+            print('Processing rows (rank) - %.2f%%' % ((row - rank) / float(len - rank) * 100))
+
+        sign = 0  # Originally "sgn" in Polco
+        scp = 1
+
+        # Find one common multiplicand that makes all cells' fractions integer
+        for col in range(len):
+            dividend = dst[row, col].numerator
+            if dividend != 0:
+                divisor = dst[row, col].denominator
+                scp /= gcd(scp, divisor)
+                scp *= divisor
+                sign += np.sign(dividend)
+
+        # We want as many cells in this row to be positive as possible
+        if np.sign(scp) != np.sign(sign):
+            scp *= -1
+
+        # Scale all cells to integer values
+        for col in range(len):
+            dividend = dst[row, col].numerator
+            value = None
+
+            if dividend == 0:
+                value = Fraction(0, 1)
+            else:
+                divisor = dst[row, col].denominator
+                value = dividend * Fraction(scp, divisor)
+
+            nullspace[row - rank, col] = value
+
+    return np.transpose(nullspace)
+
+
+def nullspace_matlab(N):
+    engine = matlab.engine.start_matlab()
+    result = engine.null(matlab.double([list(row) for row in N]), 'r')
+    x = to_fractions(np.asarray(result))
+    return x
+
+
+def nullspace_polco(N, verbose=False):
+    return np.transpose(np.asarray(list(get_extreme_rays(N, None, verbose=verbose)), dtype='object'))
+
+
+def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
+    """
+    Calculates the null space of given matrix N.
+    Source: https://scipy-cookbook.readthedocs.io/items/RankNullspace.html
+    :param N: ndarray
+            A should be at most 2-D.  A 1-D array with length k will be treated
+            as a 2-D with shape (1, k)
+    :param atol: float
+            The absolute tolerance for a zero singular value.  Singular values
+            smaller than `atol` are considered to be zero.
+    :param rtol: float
+            The relative tolerance.  Singular values less than rtol*smax are
+            considered to be zero, where smax is the largest singular value.
+    :return: If `A` is an array with shape (m, k), then `ns` will be an array
+            with shape (k, n), where n is the estimated dimension of the
+            nullspace of `A`.  The columns of `ns` are a basis for the
+            nullspace; each element in numpy.dot(A, ns) will be approximately
+            zero.
+    """
+    if not symbolic:
+        N = np.asarray(N, dtype='int64')
+        u, s, vh = svd(N)
+        tol = max(atol, rtol * s[0])
+        nnz = (s >= tol).sum()
+        ns = vh[nnz:].conj()
+        return np.transpose(ns)
+    else:
+        nullspace_vectors = Matrix(N).nullspace()
+
+        # Add nullspace vectors to a nullspace matrix as row vectors
+        # Must be a sympy Matrix so we can do rref()
+        nullspace_matrix = nullspace_vectors[0].T if len(nullspace_vectors) else None
+        for i in range(1, len(nullspace_vectors)):
+            nullspace_matrix = nullspace_matrix.row_insert(-1, nullspace_vectors[i].T)
+
+        return to_fractions(
+            np.transpose(np.asarray(nullspace_matrix.rref()[0], dtype='object'))) if nullspace_matrix \
+            else np.ndarray(shape=(N.shape[0], 0))
+
+
 # def get_extreme_rays_efmtool(inequality_matrix, matlab_root='/Applications/MATLAB_R2018b.app/'):
 #     H = inequality_matrix
 #     r, m = H.shape
@@ -130,8 +291,14 @@ def get_extreme_rays_cdd(inequality_matrix):
     return np.asarray(gen)[:, 1:]
 
 
-def get_extreme_rays(equality_matrix=None, inequality_matrix=None, fractional=True, verbose=False):
+def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True, verbose=False):
     rand = randint(1, 10 ** 6)
+
+    if inequality_matrix is not None and inequality_matrix.shape[0] == 0:
+        inequality_matrix = None
+
+    if equality_matrix is not None and equality_matrix.shape[0] == 0:
+        equality_matrix = None
 
     if inequality_matrix is None:
         if equality_matrix is not None:
@@ -143,14 +310,14 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, fractional=Tr
     if verbose:
         print('Writing equalities to file')
     if equality_matrix is not None:
-        with open('tmp/egm_eq_%d.txt' % rand, 'w') as file:
+        with open('tmp/eq_%d.txt' % rand, 'w') as file:
             for row in range(equality_matrix.shape[0]):
                 file.write(' '.join([str(val) for val in equality_matrix[row, :]]) + '\r\n')
 
     # Write inequalities system to disk as space separated file
     if verbose:
         print('Writing inequalities to file')
-    with open('tmp/egm_iq_%d.txt' % rand, 'w') as file:
+    with open('tmp/iq_%d.txt' % rand, 'w') as file:
         for row in range(inequality_matrix.shape[0]):
             file.write(' '.join([str(val) for val in inequality_matrix[row, :]]) + '\r\n')
 
@@ -158,10 +325,12 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, fractional=Tr
     if verbose:
         print('Running polco')
     with open(os_devnull, 'w') as devnull:
-        check_call(('java -Xms1g -Xmx7g -jar polco/polco.jar -kind text ' +
-                    '-arithmetic %s ' % (' '.join(['fractional' if fractional else 'double'] * 3)) +
-                    ('' if equality_matrix is None else '-eq tmp/egm_eq_%d.txt ' % (rand)) +
-                    '-iq tmp/egm_iq_%d.txt -out text tmp/generators_%d.txt' % (rand, rand)).split(' '),
+        check_call(('java -Xms1g -Xmx7g -jar polco/polco.jar -kind text -sortinput AbsLexMin ' +
+                    '-arithmetic %s ' % (' '.join(['fractional' if symbolic else 'double'] * 3)) +
+                    '-zero %s ' % (' '.join(['NaN' if symbolic else '1e-10'] * 3)) +
+                    ('' if equality_matrix is None else '-eq tmp/eq_%d.txt ' % (rand)) +
+                    ('' if inequality_matrix is None else '-iq tmp/iq_%d.txt ' % (rand)) +
+                    '-out text tmp/generators_%d.txt' % rand).split(' '),
             stdout=(devnull if not verbose else None), stderr=(devnull if not verbose else None))
 
     # Read resulting extreme rays
@@ -178,9 +347,9 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, fractional=Tr
 
     # Clean up the files created above
     if equality_matrix is not None:
-        remove('tmp/egm_eq_%d.txt' % rand)
+        remove('tmp/eq_%d.txt' % rand)
 
-    remove('tmp/egm_iq_%d.txt' % rand)
+    remove('tmp/iq_%d.txt' % rand)
     remove('tmp/generators_%d.txt' % rand)
 
 
@@ -229,46 +398,6 @@ def get_used_rows_columns(A_matrix, result):
     return active_columns, active_rows
 
 
-def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
-    """
-    Calculates the null space of given matrix N.
-    Source: https://scipy-cookbook.readthedocs.io/items/RankNullspace.html
-    :param N: ndarray
-            A should be at most 2-D.  A 1-D array with length k will be treated
-            as a 2-D with shape (1, k)
-    :param atol: float
-            The absolute tolerance for a zero singular value.  Singular values
-            smaller than `atol` are considered to be zero.
-    :param rtol: float
-            The relative tolerance.  Singular values less than rtol*smax are
-            considered to be zero, where smax is the largest singular value.
-    :return: If `A` is an array with shape (m, k), then `ns` will be an array
-            with shape (k, n), where n is the estimated dimension of the
-            nullspace of `A`.  The columns of `ns` are a basis for the
-            nullspace; each element in numpy.dot(A, ns) will be approximately
-            zero.
-    """
-    if not symbolic:
-        N = np.asarray(N, dtype='float64')
-        u, s, vh = svd(N)
-        tol = max(atol, rtol * s[0])
-        nnz = (s >= tol).sum()
-        ns = vh[nnz:].conj()
-        return np.transpose(ns)
-    else:
-        nullspace_vectors = Matrix(N).nullspace()
-
-        # Add nullspace vectors to a nullspace matrix as row vectors
-        # Must be a sympy Matrix so we can do rref()
-        nullspace_matrix = nullspace_vectors[0].T if len(nullspace_vectors) else None
-        for i in range(1, len(nullspace_vectors)):
-            nullspace_matrix = nullspace_matrix.row_insert(-1, nullspace_vectors[i].T)
-
-        return to_fractions(
-            np.transpose(np.asarray(nullspace_matrix.rref()[0], dtype='object'))) if nullspace_matrix \
-            else np.ndarray(shape=(N.shape[0], 0))
-
-
 def get_sbml_model(path):
     doc = sbml.readSBMLFromFile(path)
     model = doc.getModel()
@@ -297,6 +426,9 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     cbmpy_model = cbmpy.readSBML3FBC(path)
     pairs = cbmpy.CBTools.findDeadEndReactions(cbmpy_model)
     external_metabolites, external_reactions = zip(*pairs) if len(pairs) else (zip(*cbmpy.CBTools.findDeadEndMetabolites(cbmpy_model))[0], [])
+
+    # Catch any metabolites that were not recognised automatically, but are likely external
+    external_metabolites = [item.id for item in species if item.id in external_metabolites or item.id.endswith('_e') or item.id.endswith('_ex')]
 
     network = Network()
     network.metabolites = [Metabolite(item.id, item.name, item.compartment, item.id in external_metabolites) for item in species]
@@ -369,15 +501,17 @@ def add_debug_tags(network, reactions=[]):
     network.N = np.append(network.N, np.identity(len(network.reactions))[reactions, :], axis=0)
 
 
-def to_fractions(matrix, quasi_zero_correction=True, quasi_zero_tolerance=1e-13):
+def to_fractions(matrix, quasi_zero_correction=False, quasi_zero_tolerance=1e-13):
     if quasi_zero_correction:
         # Make almost zero values equal to zero
-        matrix[(matrix < quasi_zero_tolerance) & (matrix > -quasi_zero_correction)] = 0
+        matrix[(matrix < quasi_zero_tolerance) & (matrix > -quasi_zero_tolerance)] = Fraction(0, 1)
 
     fraction_matrix = matrix.astype('object')
 
     for row in range(matrix.shape[0]):
         for col in range(matrix.shape[1]):
+            # str() here makes Sympy use true fractions instead of the double-precision
+            # floating point approximation
             fraction_matrix[row, col] = Fraction(str(matrix[row, col]))
 
     return fraction_matrix

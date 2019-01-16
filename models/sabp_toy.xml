@@ -6,7 +6,7 @@
     <fbc:listOfObjectives xmlns:fbc="http://www.sbml.org/sbml/level3/version1/fbc/version2" fbc:activeObjective="obj">
       <fbc:objective fbc:id="obj" fbc:type="maximize">
         <fbc:listOfFluxObjectives>
-          <fbc:fluxObjective fbc:coefficient="1" fbc:reaction="v4" />
+          <fbc:fluxObjective fbc:coefficient="1" fbc:reaction="v3" />
         </fbc:listOfFluxObjectives>
       </fbc:objective>
     </fbc:listOfObjectives>
@@ -26,28 +26,20 @@
         </listOfReactants>
         <listOfProducts>
           <!--<speciesReference species="a" stoichiometry="1" constant="false"/>-->
-          <!--<speciesReference species="b" stoichiometry="0.5" constant="false"/>-->
-          <speciesReference species="b" stoichiometry="1" constant="false"/>
+          <!--<speciesReference species="a" stoichiometry="0.5" constant="false"/>-->
+          <speciesReference species="a" stoichiometry="1" constant="false"/>
         </listOfProducts>
       </reaction>
       <reaction id="v2" name="v2" reversible="true" fast="false" compartment="cell">
         <listOfReactants>
-          <speciesReference species="s" stoichiometry="1" constant="false"/>
+          <speciesReference species="a" stoichiometry="1" constant="false"/>
         </listOfReactants>
         <listOfProducts>
-          <!--<speciesReference species="a" stoichiometry="2" constant="false"/>-->
-          <speciesReference species="a" stoichiometry="1" constant="false"/>
+          <!--<speciesReference species="b" stoichiometry="2" constant="false"/>-->
+          <speciesReference species="b" stoichiometry="1" constant="false"/>
         </listOfProducts>
       </reaction>
       <reaction id="v3" name="v3" reversible="true" fast="false" compartment="cell">
-        <listOfReactants>
-          <speciesReference species="a" stoichiometry="1" constant="false"/>
-        </listOfReactants>
-        <listOfProducts>
-          <speciesReference species="p" stoichiometry="1" constant="false"/>
-        </listOfProducts>
-      </reaction>
-      <reaction id="v4" name="v4" reversible="true" fast="false" compartment="cell">
         <listOfReactants>
           <speciesReference species="b" stoichiometry="1" constant="false"/>
         </listOfReactants>

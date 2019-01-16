@@ -4,7 +4,7 @@ from scipy.optimize import linprog
 
 from helpers import *
 from time import time
-from conversion_cone import get_conversion_cone, get_clementine_conversion_cone
+from conversion_cone import get_conversion_cone
 from argparse import ArgumentParser, ArgumentTypeError
 
 
@@ -16,6 +16,8 @@ def str2bool(v):
     else:
         raise ArgumentTypeError('Boolean value expected.')
 
+
+# Note [Tom]: Glucose, ammonium, O2, phosphate
 
 if __name__ == '__main__':
     start = time()
@@ -31,8 +33,8 @@ if __name__ == '__main__':
     parser.add_argument('--print_metabolites', type=str2bool, default=True, help='Print the names and IDs of metabolites in the (compressed) metabolic network')
     parser.add_argument('--print_reactions', type=str2bool, default=True, help='Print the names and IDs of reactions in the (compressed) metabolic network')
     parser.add_argument('--auto_direction', type=str2bool, default=True, help='Automatically determine external metabolites that can only be consumed or produced')
-    parser.add_argument('--inputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true, that can only be consumed')
-    parser.add_argument('--outputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true, that can only be produced')
+    parser.add_argument('--inputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be consumed')
+    parser.add_argument('--outputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be produced')
     args = parser.parse_args()
 
     if args.model_path == '':
@@ -45,7 +47,9 @@ if __name__ == '__main__':
 
     model_path = args.model_path
 
-    network = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite, determine_inputs_outputs=args.auto_direction)
+    network = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite,
+                                         determine_inputs_outputs=args.auto_direction,
+                                         skip_external_reactions=True)
 
     debug_tags = []  # CS, ME1, ME2, PYK
     # debug_tags = [14, 44, 45, 62]  # CS, ME1, ME2, PYK
@@ -93,8 +97,8 @@ if __name__ == '__main__':
     cone = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
                                # verbose=True, symbolic=symbolic)
                                input_metabolites=network.input_metabolite_indices(), output_metabolites=network.output_metabolite_indices(), verbose=True, symbolic=symbolic)
-    # cone = get_clementine_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
-    #                            input_metabolites=network.input_metabolite_indices(), output_metabolites=network.output_metabolite_indices(), verbose=True)
+    # cone = clementine_equality_compression(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
+    #                                        input_metabolites=network.input_metabolite_indices(), output_metabolites=network.output_metabolite_indices(), verbose=True)
 
     # Undo compression so we have results in the same dimensionality as original data
     expanded_c = np.zeros(shape=(cone.shape[0], len(orig_ids)))
