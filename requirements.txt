@@ -4,3 +4,4 @@ sympy
 python-libsbml
 cbmpy
 pycddlib
+psutil

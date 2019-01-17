@@ -1,3 +1,4 @@
+import psutil
 from fractions import Fraction, gcd
 from subprocess import check_call, STDOUT, PIPE
 from os import remove, devnull as os_devnull
@@ -14,6 +15,26 @@ from numpy.linalg import svd
 from sympy import Matrix
 
 from network import Network, Reaction, Metabolite
+
+def get_total_memory_gb():
+    """
+    Returns total system memory in GiB (gibibytes)
+    :return:
+    """
+    return psutil.virtual_memory().total / 1024**3
+
+
+def get_min_max_java_memory():
+    """
+    Returns plausible starting and maximum virtual memory sizes in gibibytes
+    for a java VM, as used to run e.g. Polco. Min is either 10% of system RAM
+    or 1 gigabyte, whichever is larger. Max is 80% of system RAM.
+    :return:
+    """
+    total = get_total_memory_gb()
+    min = int(np.ceil(float(total) * 0.1))
+    max = int(np.round(float(total) * 0.8))
+    return min, max
 
 
 def nullspace_rank_internal(src, dst, verbose=False):
@@ -239,10 +260,12 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True
             file.write(' '.join([str(val) for val in inequality_matrix[row, :]]) + '\r\n')
 
     # Run external extreme ray enumeration tool
+    min_mem, max_mem = get_min_max_java_memory()
     if verbose:
-        print('Running polco')
+        print('Running polco (%d-%d GiB java VM memory)' % (min_mem, max_mem))
     with open(os_devnull, 'w') as devnull:
-        check_call(('java -Xms1g -Xmx7g -jar polco/polco.jar -memory out-core -tmpdir /tmp -kind text -sortinput AbsLexMin ' +
+        check_call(('java -Xms%dg -Xmx%dg ' % (min_mem, max_mem) +
+                    '-jar polco/polco.jar -kind text -sortinput AbsLexMin ' +
                     '-arithmetic %s ' % (' '.join(['fractional' if symbolic else 'double'] * 3)) +
                     '-zero %s ' % (' '.join(['NaN' if symbolic else '1e-10'] * 3)) +
                     ('' if equality_matrix is None else '-eq tmp/eq_%d.txt ' % (rand)) +
