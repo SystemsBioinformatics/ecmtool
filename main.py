@@ -121,7 +121,7 @@ if __name__ == '__main__':
         objective = ecm[objective_index]
         if args.add_objective_metabolite and objective > 0:
             ecm /= objective
-            expanded_c[index, :] /= expanded_c[index, objective_index]
+            expanded_c[index, :] /= objective
 
         print('\nECM #%d:' % index)
         for metabolite_index, stoichiometry_val in enumerate(ecm):
