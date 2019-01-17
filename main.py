@@ -45,6 +45,7 @@ if __name__ == '__main__':
         # Disable automatic determination of external metabolite direction if lists are given manually
         args.auto_direction = False
 
+    symbolic = args.symbolic
     model_path = args.model_path
 
     network = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite,
@@ -58,17 +59,6 @@ if __name__ == '__main__':
     orig_ids = [m.id for m in network.metabolites]
     orig_N = network.N
 
-    if args.print_reactions:
-        print('Reactions%s:' % (' before compression' if args.compress else ''))
-        for index, item in enumerate(network.reactions):
-            print(index, item.id, item.name, 'reversible' if item.reversible else 'irreversible')
-
-    if args.print_metabolites:
-        print('Metabolites%s:' % (' before compression' if args.compress else ''))
-        for index, item in enumerate(network.metabolites):
-            print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
-
-    symbolic = args.symbolic
     if not args.auto_direction:
         inputs = [int(index) for index in args.inputs.split(',') if len(index)]
         outputs = [int(index) for index in args.outputs.split(',') if len(index)]
@@ -80,6 +70,16 @@ if __name__ == '__main__':
 
         network.set_inputs(inputs)
         network.set_outputs(outputs)
+
+    if args.print_reactions:
+        print('Reactions%s:' % (' before compression' if args.compress else ''))
+        for index, item in enumerate(network.reactions):
+            print(index, item.id, item.name, 'reversible' if item.reversible else 'irreversible')
+
+    if args.print_metabolites:
+        print('Metabolites%s:' % (' before compression' if args.compress else ''))
+        for index, item in enumerate(network.metabolites):
+            print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
 
     if args.compress:
         network.compress(verbose=True)
