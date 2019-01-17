@@ -11,7 +11,7 @@ from helpers import to_fractions, redund
 def clementine_equality_compression(N, external_metabolites=[], reversible_reactions=[], input_metabolites=[], output_metabolites=[],
                                     verbose=True):
     """
-    Calculates the conversion cone using Superior Clementine Equality Intersection (all rights reserved).
+    Compresses a metabolic network using Superior Clementine Equality Intersection (all rights reserved).
     Follows the general Double Description method by Motzkin, using G as initial basis and intersecting
     hyperplanes of internal metabolites = 0.
     :param N:
@@ -23,6 +23,7 @@ def clementine_equality_compression(N, external_metabolites=[], reversible_react
     """
     number_metabolites, amount_reactions = N.shape[0], N.shape[1]
     internal_metabolites = np.setdiff1d(range(number_metabolites), external_metabolites)
+    candidates_since_last_redund = 0
 
     identity = to_fractions(np.identity(number_metabolites))
     equalities = [identity[:, index] for index in internal_metabolites]
@@ -73,6 +74,8 @@ def clementine_equality_compression(N, external_metabolites=[], reversible_react
                 if np.count_nonzero(candidate) > 0:
                     candidates = np.append(candidates, [candidate], axis=0)
 
+        candidates_since_last_redund += len(candidates)
+
         # Keep only rays that satisfy internal_metabolite = 0
         keep = np.setdiff1d(range(G.shape[0]), active_reactions)
         if verbose:
@@ -80,6 +83,16 @@ def clementine_equality_compression(N, external_metabolites=[], reversible_react
         G = G[keep, :]
         G = np.append(G, candidates, axis=0)
         # G = drop_nonextreme(G, get_zero_set(G, equalities), verbose=verbose)
+
+        if candidates_since_last_redund > 100:
+            if verbose:
+                print('Running redund')
+            G = redund(G, verbose=verbose)
+            candidates_since_last_redund = 0
+
+    if candidates_since_last_redund > 0:
+        if verbose:
+            print('Running redund')
         G = redund(G, verbose=verbose)
 
     return G
