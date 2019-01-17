@@ -1,60 +1,11 @@
 from cdd import Fraction
-from os import system, remove
+import libsbml as sbml
+import cbmpy
 
 from scipy.optimize import linprog
 import numpy as np
 
-
-def to_fractions(matrix, quasi_zero_correction=False, quasi_zero_tolerance=1e-13):
-    if quasi_zero_correction:
-        # Make almost zero values equal to zero
-        matrix[(matrix < quasi_zero_tolerance) & (matrix > -quasi_zero_tolerance)] = Fraction(0, 1)
-
-    fraction_matrix = matrix.astype('object')
-
-    for row in range(matrix.shape[0]):
-        for col in range(matrix.shape[1]):
-            # str() here makes Sympy use true fractions instead of the double-precision
-            # floating point approximation
-            fraction_matrix[row, col] = Fraction(str(matrix[row, col]))
-
-    return fraction_matrix
-
-
-def redund(matrix, verbose=False):
-    matrix = to_fractions(matrix)
-
-    with open('tmp/matrix.ine', 'w') as file:
-        file.write('V-representation\n')
-        file.write('begin\n')
-        file.write('%d %d rational\n' % (matrix.shape[0], matrix.shape[1] + 1))
-        for row in range(matrix.shape[0]):
-            file.write(' 0')
-            for col in range(matrix.shape[1]):
-                file.write(' %s' % str(matrix[row, col]))
-            file.write('\n')
-        file.write('end\n')
-
-    system('scripts/redund tmp/matrix.ine > tmp/matrix_nored.ine')
-
-    matrix_nored = np.ndarray(shape=(0, matrix.shape[1] + 1), dtype='object')
-
-    with open('tmp/matrix_nored.ine') as file:
-        lines = file.readlines()
-        for line in [line for line in lines if line not in ['\n', '']]:
-            # Skip comment and INE format lines
-            if np.any([target in line for target in ['*', 'V-representation', 'begin', 'end', 'rational']]):
-                continue
-            row = [Fraction(x) for x in line.replace('\n', '').split(' ') if x != '']
-            matrix_nored = np.append(matrix_nored, [row], axis=0)
-
-    remove('tmp/matrix.ine')
-    remove('tmp/matrix_nored.ine')
-
-    if verbose:
-        print('Removed %d redundant rows' % (matrix.shape[0] - matrix_nored.shape[0]))
-
-    return matrix_nored[:, 1:]
+from helpers import to_fractions, redund
 
 
 def clementine_equality_compression(N, external_metabolites=[], reversible_reactions=[], input_metabolites=[], output_metabolites=[],
@@ -132,6 +83,121 @@ def clementine_equality_compression(N, external_metabolites=[], reversible_react
         G = redund(G, verbose=verbose)
 
     return G
+
+
+
+
+def get_sbml_model(path):
+    doc = sbml.readSBMLFromFile(path)
+    model = doc.getModel()
+    model.__keep_doc_alive__ = doc
+    return model
+
+
+def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions=True, determine_inputs_outputs=False, external_compartment='e'):
+    """
+    Parses an SBML file containing a metabolic network, and returns a Network instance
+    with the metabolites, reactions, and stoichiometry initialised. By default will look
+    for an SBML v3 FBC objective function, and skip reactions that contain '_EX_' in their ID.
+    :param path: string absolute or relative path to the .sbml file
+    :param add_objective: Look for SBML v3 FBC objective definition
+    :param skip_external_reactions: Ignore external reactions, as identified by '_EX_' in their ID
+    :return: Network
+    """
+    model = get_sbml_model(path)
+    species = list(model.species)
+    species_index = {item.id: index for index, item in enumerate(species)}
+    reactions = model.reactions
+    objective_reaction_column = None
+
+
+    # TODO: parse stoichiometry, reactions, and metabolites using CBMPy too
+    cbmpy_model = cbmpy.readSBML3FBC(path)
+    pairs = cbmpy.CBTools.findDeadEndReactions(cbmpy_model)
+    external_metabolites, external_reactions = zip(*pairs) if len(pairs) else (zip(*cbmpy.CBTools.findDeadEndMetabolites(cbmpy_model))[0], [])
+
+    # Catch any metabolites that were not recognised automatically, but are likely external
+    external_metabolites = list(external_metabolites) + [item.id for item in species if item.compartment == external_compartment]
+
+    network = Network()
+    network.metabolites = [Metabolite(item.id, item.name, item.compartment, item.id in external_metabolites) for item in species]
+
+    if add_objective:
+        plugin = model.getPlugin('fbc')
+        objective_name = plugin.getObjective(0).flux_objectives[0].reaction
+
+    if skip_external_reactions:
+        reactions = [reaction for reaction in reactions if reaction.id not in external_reactions]
+
+    if determine_inputs_outputs:
+        for metabolite in [network.metabolites[index] for index in network.external_metabolite_indices()]:
+            index = external_metabolites.index(metabolite.id)
+            if index >= len(external_reactions):
+                print('Warning: missing exchange reaction for metabolite %s. Skipping marking this metabolite as input or output.' % metabolite.id)
+                continue
+
+            reaction_id = external_reactions[index]
+            reaction = cbmpy_model.getReaction(reaction_id)
+            lowerBound, upperBound, _ = cbmpy_model.getFluxBoundsByReactionID(reaction_id)
+            stoichiometries = reaction.getStoichiometry()
+            stoichiometry = [stoich[0] for stoich in stoichiometries if stoich[1] == metabolite.id][0]
+
+            if reaction.reversible:
+                # Check if the reaction is truly bidirectional
+                if lowerBound.value == 0 or upperBound.value == 0:
+                    reaction.reversible = False
+                else:
+                    # Reversible reactions are both inputs and outputs, so don't mark as either
+                    continue
+
+                if lowerBound.value > upperBound.value:
+                    # Direction of model is inverted (substrates are products and vice versa. This happens sometimes,
+                    # e.g. https://github.com/SBRG/bigg_models/issues/324
+                    print('Swapping direction of reversible reaction %s that can only run in reverse direction.' % reaction_id)
+                    stoichiometry *= -1
+                    for met in model.getReaction(reaction_id).reactants:
+                        met.setStoichiometry(-met.getStoichiometry())
+                    for met in model.getReaction(reaction_id).products:
+                        met.setStoichiometry(-met.getStoichiometry())
+
+            metabolite.direction = 'input' if stoichiometry >= 0 else 'output'
+
+    # Build stoichiometry matrix N
+    N = np.zeros(shape=(len(species), len(reactions)), dtype='object')
+    for column, reaction in enumerate(reactions):
+        network.reactions.append(Reaction(reaction.id, reaction.name, reaction.reversible))
+
+        for metabolite in reaction.reactants:
+            row = species_index[metabolite.species]
+            N[row, column] = Fraction(str(-metabolite.stoichiometry))
+        for metabolite in reaction.products:
+            row = species_index[metabolite.species]
+            N[row, column] = Fraction(str(metabolite.stoichiometry))
+
+        if add_objective and reaction.id == objective_name:
+            objective_reaction_column = column
+
+    # Add objective metabolite from objective reaction
+    if add_objective and objective_reaction_column:
+        network.metabolites.append(Metabolite('objective', 'Virtual objective metabolite', 'e', is_external=True, direction='output'))
+        N = np.append(N, to_fractions(np.zeros(shape=(1, N.shape[1]))), axis=0)
+        N[-1, objective_reaction_column] = 1
+
+    network.N = N
+
+    return network
+
+
+def add_debug_tags(network, reactions=[]):
+    if len(reactions) == 0:
+        reactions = range(len(network.reactions))
+
+    for reaction in reactions:
+        network.metabolites.append(Metabolite('virtual_tag_%s' % network.reactions[reaction].id,
+                                              'Virtual tag for %s' % network.reactions[reaction].id,
+                                              compartment='e', is_external=True,
+                                              direction='both' if network.reactions[reaction].reversible else 'output'))
+    network.N = np.append(network.N, np.identity(len(network.reactions))[reactions, :], axis=0)
 
 class Reaction:
     id = ''

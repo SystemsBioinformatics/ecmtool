@@ -1,8 +1,4 @@
-from os import system
-
-import numpy as np
 from helpers import *
-from sympy import Matrix
 from time import time
 
 
@@ -36,42 +32,6 @@ def inflate_matrix(A, kept_columns, original_width):
         B[:, col] = A[:, index]
 
     return B
-
-
-def redund(matrix, verbose=False):
-    matrix = to_fractions(matrix)
-
-    with open('tmp/matrix.ine', 'w') as file:
-        file.write('V-representation\n')
-        file.write('begin\n')
-        file.write('%d %d rational\n' % (matrix.shape[0], matrix.shape[1] + 1))
-        for row in range(matrix.shape[0]):
-            file.write(' 0')
-            for col in range(matrix.shape[1]):
-                file.write(' %s' % str(matrix[row, col]))
-            file.write('\n')
-        file.write('end\n')
-
-    system('scripts/redund tmp/matrix.ine > tmp/matrix_nored.ine')
-
-    matrix_nored = np.ndarray(shape=(0, matrix.shape[1] + 1), dtype='object')
-
-    with open('tmp/matrix_nored.ine') as file:
-        lines = file.readlines()
-        for line in [line for line in lines if line not in ['\n', '']]:
-            # Skip comment and INE format lines
-            if np.any([target in line for target in ['*', 'V-representation', 'begin', 'end', 'rational']]):
-                continue
-            row = [Fraction(x) for x in line.replace('\n', '').split(' ') if x != '']
-            matrix_nored = np.append(matrix_nored, [row], axis=0)
-
-    remove('tmp/matrix.ine')
-    remove('tmp/matrix_nored.ine')
-
-    if verbose:
-        print('Removed %d redundant rows' % (matrix.shape[0] - matrix_nored.shape[0]))
-
-    return matrix_nored[:, 1:]
 
 
 def get_zero_set(G, equalities):

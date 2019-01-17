@@ -1,20 +1,17 @@
+import os
+import sys
+
 import psutil
 from fractions import Fraction, gcd
 from subprocess import check_call, STDOUT, PIPE
-from os import remove, devnull as os_devnull
-
-import cbmpy
-import matlab.engine
+from os import remove, devnull as os_devnull, system
 
 import cdd
 import numpy as np
-import libsbml as sbml
 from random import randint
 
 from numpy.linalg import svd
 from sympy import Matrix
-
-from network import Network, Reaction, Metabolite
 
 def get_total_memory_gb():
     """
@@ -148,6 +145,7 @@ def nullspace_terzer(src, verbose=False):
 
 
 def nullspace_matlab(N):
+    import matlab.engine
     engine = matlab.engine.start_matlab()
     result = engine.null(matlab.double([list(row) for row in N]), 'r')
     x = to_fractions(np.asarray(result))
@@ -213,6 +211,7 @@ def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
 #     return x
 
 def get_efms(N, reversibility):
+    import matlab.engine
     engine = matlab.engine.start_matlab()
     engine.cd('efmtool')
     result = engine.CalculateFluxModes(matlab.double([list(row) for row in N]), matlab.logical(reversibility))
@@ -292,118 +291,61 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True
     remove('tmp/iq_%d.txt' % rand)
     remove('tmp/generators_%d.txt' % rand)
 
-
-def get_sbml_model(path):
-    doc = sbml.readSBMLFromFile(path)
-    model = doc.getModel()
-    model.__keep_doc_alive__ = doc
-    return model
-
-
-def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions=True, determine_inputs_outputs=False, external_compartment='e'):
-    """
-    Parses an SBML file containing a metabolic network, and returns a Network instance
-    with the metabolites, reactions, and stoichiometry initialised. By default will look
-    for an SBML v3 FBC objective function, and skip reactions that contain '_EX_' in their ID.
-    :param path: string absolute or relative path to the .sbml file
-    :param add_objective: Look for SBML v3 FBC objective definition
-    :param skip_external_reactions: Ignore external reactions, as identified by '_EX_' in their ID
-    :return: Network
-    """
-    model = get_sbml_model(path)
-    species = list(model.species)
-    species_index = {item.id: index for index, item in enumerate(species)}
-    reactions = model.reactions
-    objective_reaction_column = None
+def binary_exists(binary_file):
+    return any(
+        os.access(os.path.join(path, binary_file), os.X_OK)
+        for path in os.environ["PATH"].split(os.pathsep)
+    )
 
 
-    # TODO: parse stoichiometry, reactions, and metabolites using CBMPy too
-    cbmpy_model = cbmpy.readSBML3FBC(path)
-    pairs = cbmpy.CBTools.findDeadEndReactions(cbmpy_model)
-    external_metabolites, external_reactions = zip(*pairs) if len(pairs) else (zip(*cbmpy.CBTools.findDeadEndMetabolites(cbmpy_model))[0], [])
+def get_redund_binary():
+    if sys.platform.startswith('linux'):
+        if not binary_exists('redund'):
+            raise EnvironmentError('Executable "redund" was not found in your path. Please install package lrslib (e.g. apt install lrslib)')
+        return 'redund'
+    elif sys.platform.startswith('win32'):
+        return 'redund/redund_win.exe'
+    elif sys.platform.startswith('darwin'):
+        return 'redund/redund_mac'
+    else:
+        raise OSError('Unsupported operating system platform: %s' % sys.platform)
 
-    # Catch any metabolites that were not recognised automatically, but are likely external
-    external_metabolites = list(external_metabolites) + [item.id for item in species if item.compartment == external_compartment]
 
-    network = Network()
-    network.metabolites = [Metabolite(item.id, item.name, item.compartment, item.id in external_metabolites) for item in species]
+def redund(matrix, verbose=False):
+    matrix = to_fractions(matrix)
+    binary = get_redund_binary()
 
-    if add_objective:
-        plugin = model.getPlugin('fbc')
-        objective_name = plugin.getObjective(0).flux_objectives[0].reaction
+    with open('tmp/matrix.ine', 'w') as file:
+        file.write('V-representation\n')
+        file.write('begin\n')
+        file.write('%d %d rational\n' % (matrix.shape[0], matrix.shape[1] + 1))
+        for row in range(matrix.shape[0]):
+            file.write(' 0')
+            for col in range(matrix.shape[1]):
+                file.write(' %s' % str(matrix[row, col]))
+            file.write('\n')
+        file.write('end\n')
 
-    if skip_external_reactions:
-        reactions = [reaction for reaction in reactions if reaction.id not in external_reactions]
+    system('%s tmp/matrix.ine > tmp/matrix_nored.ine' % binary)
 
-    if determine_inputs_outputs:
-        for metabolite in [network.metabolites[index] for index in network.external_metabolite_indices()]:
-            index = external_metabolites.index(metabolite.id)
-            if index >= len(external_reactions):
-                print('Warning: missing exchange reaction for metabolite %s. Skipping marking this metabolite as input or output.' % metabolite.id)
+    matrix_nored = np.ndarray(shape=(0, matrix.shape[1] + 1), dtype='object')
+
+    with open('tmp/matrix_nored.ine') as file:
+        lines = file.readlines()
+        for line in [line for line in lines if line not in ['\n', '']]:
+            # Skip comment and INE format lines
+            if np.any([target in line for target in ['*', 'V-representation', 'begin', 'end', 'rational']]):
                 continue
+            row = [Fraction(x) for x in line.replace('\n', '').split(' ') if x != '']
+            matrix_nored = np.append(matrix_nored, [row], axis=0)
 
-            reaction_id = external_reactions[index]
-            reaction = cbmpy_model.getReaction(reaction_id)
-            lowerBound, upperBound, _ = cbmpy_model.getFluxBoundsByReactionID(reaction_id)
-            stoichiometries = reaction.getStoichiometry()
-            stoichiometry = [stoich[0] for stoich in stoichiometries if stoich[1] == metabolite.id][0]
+    remove('tmp/matrix.ine')
+    remove('tmp/matrix_nored.ine')
 
-            if reaction.reversible:
-                # Check if the reaction is truly bidirectional
-                if lowerBound.value == 0 or upperBound.value == 0:
-                    reaction.reversible = False
-                else:
-                    # Reversible reactions are both inputs and outputs, so don't mark as either
-                    continue
+    if verbose:
+        print('Removed %d redundant rows' % (matrix.shape[0] - matrix_nored.shape[0]))
 
-                if lowerBound.value > upperBound.value:
-                    # Direction of model is inverted (substrates are products and vice versa. This happens sometimes,
-                    # e.g. https://github.com/SBRG/bigg_models/issues/324
-                    print('Swapping direction of reversible reaction %s that can only run in reverse direction.' % reaction_id)
-                    stoichiometry *= -1
-                    for met in model.getReaction(reaction_id).reactants:
-                        met.setStoichiometry(-met.getStoichiometry())
-                    for met in model.getReaction(reaction_id).products:
-                        met.setStoichiometry(-met.getStoichiometry())
-
-            metabolite.direction = 'input' if stoichiometry >= 0 else 'output'
-
-    # Build stoichiometry matrix N
-    N = np.zeros(shape=(len(species), len(reactions)), dtype='object')
-    for column, reaction in enumerate(reactions):
-        network.reactions.append(Reaction(reaction.id, reaction.name, reaction.reversible))
-
-        for metabolite in reaction.reactants:
-            row = species_index[metabolite.species]
-            N[row, column] = Fraction(str(-metabolite.stoichiometry))
-        for metabolite in reaction.products:
-            row = species_index[metabolite.species]
-            N[row, column] = Fraction(str(metabolite.stoichiometry))
-
-        if add_objective and reaction.id == objective_name:
-            objective_reaction_column = column
-
-    # Add objective metabolite from objective reaction
-    if add_objective and objective_reaction_column:
-        network.metabolites.append(Metabolite('objective', 'Virtual objective metabolite', 'e', is_external=True, direction='output'))
-        N = np.append(N, to_fractions(np.zeros(shape=(1, N.shape[1]))), axis=0)
-        N[-1, objective_reaction_column] = 1
-
-    network.N = N
-
-    return network
-
-
-def add_debug_tags(network, reactions=[]):
-    if len(reactions) == 0:
-        reactions = range(len(network.reactions))
-
-    for reaction in reactions:
-        network.metabolites.append(Metabolite('virtual_tag_%s' % network.reactions[reaction].id,
-                                              'Virtual tag for %s' % network.reactions[reaction].id,
-                                              compartment='e', is_external=True,
-                                              direction='both' if network.reactions[reaction].reversible else 'output'))
-    network.N = np.append(network.N, np.identity(len(network.reactions))[reactions, :], axis=0)
+    return matrix_nored[:, 1:]
 
 
 def to_fractions(matrix, quasi_zero_correction=False, quasi_zero_tolerance=1e-13):

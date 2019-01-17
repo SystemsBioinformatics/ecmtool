@@ -1,11 +1,11 @@
-import os
-
 from scipy.optimize import linprog
 
 from helpers import *
 from time import time
 from conversion_cone import get_conversion_cone
 from argparse import ArgumentParser, ArgumentTypeError
+
+from network import extract_sbml_stoichiometry
 
 
 def str2bool(v):
@@ -29,7 +29,7 @@ if __name__ == '__main__':
     parser.add_argument('--out_path', default='conversion_cone.csv', help='Relative or absolute path to the .csv file you want to save the calculated conversions to')
     parser.add_argument('--add_objective_metabolite', type=str2bool, default=True, help='Add a virtual metabolite containing the stoichiometry of the objective function of the model')
     parser.add_argument('--check_feasibility', type=str2bool, default=False, help='For each found ECM, verify that a feasible flux exists that produces it')
-    parser.add_argument('--check_bijection', type=str2bool, default=True, help='Verify completeness of found ECMs by calculating ECMs from EFMs and proving bijection (don\'t use on large networks)')
+    parser.add_argument('--check_bijection', type=str2bool, default=False, help='Verify completeness of found ECMs by calculating ECMs from EFMs and proving bijection (don\'t use on large networks)')
     parser.add_argument('--print_metabolites', type=str2bool, default=True, help='Print the names and IDs of metabolites in the (compressed) metabolic network')
     parser.add_argument('--print_reactions', type=str2bool, default=True, help='Print the names and IDs of reactions in the (compressed) metabolic network')
     parser.add_argument('--auto_direction', type=str2bool, default=True, help='Automatically determine external metabolites that can only be consumed or produced')
