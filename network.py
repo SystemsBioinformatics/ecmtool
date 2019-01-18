@@ -505,3 +505,18 @@ class Network:
 
         if len(self.metabolites):
             self.metabolites = [self.metabolites[index] for index in metabolites_to_keep]
+
+    def hide(self, metabolite_indices):
+        """
+        Hides external metabolites by transforming them into internal metabolites through the
+        addition of bidirectional exchange reactions.
+        :param metabolite_indices: list of metabolite indices
+        :return:
+        """
+        for index in metabolite_indices:
+            self.metabolites[index].is_external = False
+            reaction_name = 'R_HIDDEN_EX_%s' % self.metabolites[index].id
+            self.reactions.append(Reaction(reaction_name, reaction_name, reversible=True))
+            row = to_fractions(np.zeros(shape=(self.N.shape[0], 1)))
+            row[index, 0] += 1
+            self.N = np.append(self.N, row, axis=1)

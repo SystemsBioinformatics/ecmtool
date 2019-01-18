@@ -35,6 +35,7 @@ if __name__ == '__main__':
     parser.add_argument('--auto_direction', type=str2bool, default=True, help='Automatically determine external metabolites that can only be consumed or produced')
     parser.add_argument('--inputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be consumed')
     parser.add_argument('--outputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be produced')
+    parser.add_argument('--hide', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that are transformed into internal metabolites by adding bidirectional exchange reactions')
     args = parser.parse_args()
 
     if args.model_path == '':
@@ -70,6 +71,10 @@ if __name__ == '__main__':
 
         network.set_inputs(inputs)
         network.set_outputs(outputs)
+
+    if args.hide:
+        hide_indices = [int(index) for index in args.hide.split(',') if len(index)]
+        network.hide(hide_indices)
 
     if args.print_reactions:
         print('Reactions%s:' % (' before compression' if args.compress else ''))
