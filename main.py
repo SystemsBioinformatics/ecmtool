@@ -19,6 +19,68 @@ def str2bool(v):
 
 # Note [Tom]: Glucose, ammonium, O2, phosphate
 
+def print_ECMs(cone, debug_tags, network, orig_N, add_objective_metabolite, check_feasibility):
+    for index, ecm in enumerate(cone):
+        # Normalise by objective metabolite, if applicable
+        objective_index = -1 - len(debug_tags)
+        objective = ecm[objective_index]
+        if add_objective_metabolite and objective > 0:
+            ecm /= objective
+            expanded_c[index, :] /= objective
+
+        print('\nECM #%d:' % index)
+        for metabolite_index, stoichiometry_val in enumerate(ecm):
+            if stoichiometry_val != 0.0:
+                print('%d %s\t\t->\t%.4f' % (metabolite_index, network.metabolites[metabolite_index].name, stoichiometry_val))
+
+        if check_feasibility:
+            allowed_error = 10**-6
+            solution = linprog(c=[0] * orig_N.shape[1], A_eq=orig_N, b_eq=expanded_c[index, :],
+                               bounds=[(-1000, 1000)] * orig_N.shape[1], options={'tol': allowed_error})
+            print('ECM satisfies stoichiometry' if solution.status == 0 else 'ECM does not satisfy stoichiometry')
+
+
+def check_bijection(conversion_cone, network, model_path, add_objective_metabolite):
+    # Add exchange reactions because EFMtool needs them
+    full_model = extract_sbml_stoichiometry(model_path, add_objective=add_objective_metabolite,
+                                            skip_external_reactions=True)
+    ex_N = full_model.N
+    identity = np.identity(len(full_model.metabolites))
+    reversibilities = [reaction.reversible for reaction in full_model.reactions]
+
+    for index, metabolite in enumerate(full_model.metabolites):
+        if metabolite.is_external:
+            reaction = identity[:, index] if metabolite.direction != 'output' else -identity[index]
+            ex_N = np.append(ex_N, np.transpose([reaction]), axis=1)
+            reversibilities.append(True if metabolite.direction == 'both' else False)
+
+    efms = get_efms(ex_N, reversibilities)
+    ecms = np.transpose(np.dot(full_model.N, np.transpose(efms[:, :len(full_model.reactions)])))
+    ecms_unique = np.unique(np.asarray(ecms, dtype='float64'), axis=0)
+
+    is_bijection = True
+
+    for index, ecm in enumerate(conversion_cone):
+        if ecm not in ecms_unique:
+            is_bijection = False
+            print('\nEnumerated ECM #%d not in calculated list:' % index)
+            for metabolite_index, stoichiometry_val in enumerate(ecm):
+                if stoichiometry_val != 0.0:
+                    print('%d %s\t\t->\t%.4f' % (
+                    metabolite_index, network.metabolites[metabolite_index].name, stoichiometry_val))
+
+    for index, ecm in enumerate(ecms_unique):
+        if ecm not in conversion_cone:
+            is_bijection = False
+            print('\nCalculated ECM #%d not in enumerated list:' % index)
+            for metabolite_index, stoichiometry_val in enumerate(ecm):
+                if stoichiometry_val != 0.0:
+                    print('%d %s\t\t->\t%.4f' % (
+                    metabolite_index, network.metabolites[metabolite_index].name, stoichiometry_val))
+
+    print('Enumerated ECMs and calculated ECMs are%s bijective' % ('' if is_bijection else ' not'))
+
+
 if __name__ == '__main__':
     start = time()
 
@@ -53,8 +115,7 @@ if __name__ == '__main__':
                                          determine_inputs_outputs=args.auto_direction,
                                          skip_external_reactions=True)
 
-    debug_tags = []  # CS, ME1, ME2, PYK
-    # debug_tags = [14, 44, 45, 62]  # CS, ME1, ME2, PYK
+    debug_tags = []
     # add_debug_tags(network)
 
     orig_ids = [m.id for m in network.metabolites]
@@ -102,8 +163,6 @@ if __name__ == '__main__':
     cone = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
                                # verbose=True, symbolic=symbolic)
                                input_metabolites=network.input_metabolite_indices(), output_metabolites=network.output_metabolite_indices(), verbose=True, symbolic=symbolic)
-    # cone = clementine_equality_compression(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
-    #                                        input_metabolites=network.input_metabolite_indices(), output_metabolites=network.output_metabolite_indices(), verbose=True)
 
     # Undo compression so we have results in the same dimensionality as original data
     expanded_c = np.zeros(shape=(cone.shape[0], len(orig_ids)))
@@ -117,64 +176,10 @@ if __name__ == '__main__':
 
     np.savetxt(args.out_path, expanded_c, delimiter=',')
 
-    for index, ecm in enumerate(cone):
-        # if not ecm[-1]:
-        #     continue
-
-        # Normalise by objective metabolite, if applicable
-        objective_index = -1 - len(debug_tags)
-        objective = ecm[objective_index]
-        if args.add_objective_metabolite and objective > 0:
-            ecm /= objective
-            expanded_c[index, :] /= objective
-
-        print('\nECM #%d:' % index)
-        for metabolite_index, stoichiometry_val in enumerate(ecm):
-            if stoichiometry_val != 0.0:
-                print('%d %s\t\t->\t%.4f' % (metabolite_index, network.metabolites[metabolite_index].name, stoichiometry_val))
-
-        if args.check_feasibility:
-            allowed_error = 10**-6
-            solution = linprog(c=[0] * orig_N.shape[1], A_eq=orig_N, b_eq=expanded_c[index, :],
-                               bounds=[(-1000, 1000)] * orig_N.shape[1], options={'tol': allowed_error})
-            print('ECM satisfies stoichiometry' if solution.status == 0 else 'ECM does not satisfy stoichiometry')
+    print_ECMs(cone, debug_tags, network, orig_N, args.add_objective_metabolite, args.check_feasibility)
 
     if args.check_bijection:
-        # Add exchange reactions because EFMtool needs them
-        full_model = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite, skip_external_reactions=True)
-        ex_N = full_model.N
-        identity = np.identity(len(full_model.metabolites))
-        reversibilities = [reaction.reversible for reaction in full_model.reactions]
-
-        for index, metabolite in enumerate(full_model.metabolites):
-            if metabolite.is_external:
-                reaction = identity[:, index] if metabolite.direction != 'output' else -identity[index]
-                ex_N = np.append(ex_N, np.transpose([reaction]), axis=1)
-                reversibilities.append(True if metabolite.direction == 'both' else False)
-
-        efms = get_efms(ex_N, reversibilities)
-        ecms = np.transpose(np.dot(full_model.N, np.transpose(efms[:, :len(full_model.reactions)])))
-        ecms_unique = np.unique(np.asarray(ecms, dtype='float64'), axis=0)
-
-        is_bijection = True
-
-        for index, ecm in enumerate(expanded_c):
-            if ecm not in ecms_unique:
-                is_bijection = False
-                print('\nEnumerated ECM #%d not in calculated list:' % index)
-                for metabolite_index, stoichiometry_val in enumerate(ecm):
-                    if stoichiometry_val != 0.0:
-                        print('%d %s\t\t->\t%.4f' % (metabolite_index, network.metabolites[metabolite_index].name, stoichiometry_val))
-
-        for index, ecm in enumerate(ecms_unique):
-            if ecm not in expanded_c:
-                is_bijection = False
-                print('\nCalculated ECM #%d not in enumerated list:' % index)
-                for metabolite_index, stoichiometry_val in enumerate(ecm):
-                    if stoichiometry_val != 0.0:
-                        print('%d %s\t\t->\t%.4f' % (metabolite_index, network.metabolites[metabolite_index].name, stoichiometry_val))
-
-        print('Enumerated ECMs and calculated ECMs are%s bijective' % ('' if is_bijection else ' not'))
+        check_bijection(expanded_c, network, model_path, args.add_objective_metabolite)
 
     end = time()
     print('Ran in %f seconds' % (end - start))
