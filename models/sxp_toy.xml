@@ -35,6 +35,16 @@
           <speciesReference species="p" stoichiometry="1" constant="false"/>
         </listOfProducts>
       </reaction>
+      <reaction id="ex1" name="ex1" reversible="false" fast="false" compartment="cell">
+        <listOfProducts>
+          <speciesReference species="s" stoichiometry="1" constant="false"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="ex2" name="ex2" reversible="false" fast="false" compartment="cell">
+        <listOfReactants>
+          <speciesReference species="p" stoichiometry="1" constant="false"/>
+        </listOfReactants>
+      </reaction>
     </listOfReactions>
   </model>
 </sbml>

@@ -490,39 +490,39 @@
          <species id="M_so4_p" name="Sulfate" boundaryCondition="false" compartment="Internal_Species" constant="false" hasOnlySubstanceUnits="false"/>
          <species id="M_succ_p" name="Succinate" boundaryCondition="false" compartment="Internal_Species" constant="false" hasOnlySubstanceUnits="false"/>
          <species id="M_zn2_p" name="Zinc" boundaryCondition="false" compartment="Internal_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="Biomass" name="Biomass" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_ca2_ex" name="M_ca2_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_cl_ex" name="M_cl_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_co2_ex" name="M_co2_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_cobalt2_ex" name="M_cobalt2_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_cu2_ex" name="M_cu2_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_fe2_ex" name="M_fe2_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_fe3_ex" name="M_fe3_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_glc_DASH_D_ex" name="M_glc_DASH_D_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_glyc_ex" name="M_glyc_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_h_ex" name="M_h_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_h2o_ex" name="M_h2o_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_k_ex" name="M_k_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_mg2_ex" name="M_mg2_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_mn2_ex" name="M_mn2_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_mobd_ex" name="M_mobd_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_nh4_ex" name="M_nh4_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_ni2_ex" name="M_ni2_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_o2_ex" name="M_o2_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_pi_ex" name="M_pi_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_so4_ex" name="M_so4_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_succ_ex" name="M_succ_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_zn2_ex" name="M_zn2_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_ac_ex" name="M_ac_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_etoh_ex" name="M_etoh_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_for_ex" name="M_for_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_h2_ex" name="M_h2_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_lac_ex" name="M_lac_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_4CRSOL_ex" name="M_4CRSOL_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_5DRIB_ex" name="M_5DRIB_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_AMOB_ex" name="M_AMOB_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_MTHTHF_ex" name="M_MTHTHF_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
-         <species id="M_meoh_ex" name="M_meoh_ex" boundaryCondition="true" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="Biomass" name="Biomass" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_ca2_ex" name="M_ca2_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_cl_ex" name="M_cl_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_co2_ex" name="M_co2_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_cobalt2_ex" name="M_cobalt2_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_cu2_ex" name="M_cu2_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_fe2_ex" name="M_fe2_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_fe3_ex" name="M_fe3_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_glc_DASH_D_ex" name="M_glc_DASH_D_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_glyc_ex" name="M_glyc_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_h_ex" name="M_h_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_h2o_ex" name="M_h2o_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_k_ex" name="M_k_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_mg2_ex" name="M_mg2_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_mn2_ex" name="M_mn2_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_mobd_ex" name="M_mobd_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_nh4_ex" name="M_nh4_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_ni2_ex" name="M_ni2_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_o2_ex" name="M_o2_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_pi_ex" name="M_pi_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_so4_ex" name="M_so4_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_succ_ex" name="M_succ_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_zn2_ex" name="M_zn2_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_ac_ex" name="M_ac_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_etoh_ex" name="M_etoh_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_for_ex" name="M_for_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_h2_ex" name="M_h2_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_lac_ex" name="M_lac_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_4CRSOL_ex" name="M_4CRSOL_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_5DRIB_ex" name="M_5DRIB_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_AMOB_ex" name="M_AMOB_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_MTHTHF_ex" name="M_MTHTHF_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
+         <species id="M_meoh_ex" name="M_meoh_ex" boundaryCondition="false" compartment="External_Species" constant="false" hasOnlySubstanceUnits="false"/>
          <species id="M_glxBIO_c" name="M_glxBIO_c" boundaryCondition="false" compartment="Internal_Species" constant="false" hasOnlySubstanceUnits="false"/>
          <species id="M_forBIO_c" name="M_forBIO_c" boundaryCondition="false" compartment="Internal_Species" constant="false" hasOnlySubstanceUnits="false"/>
       </listOfSpecies>

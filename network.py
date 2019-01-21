@@ -1,7 +1,137 @@
+from cdd import Fraction
+from os import system, remove
+
 from scipy.optimize import linprog
+import numpy as np
 
-from helpers import *
 
+def to_fractions(matrix, quasi_zero_correction=False, quasi_zero_tolerance=1e-13):
+    if quasi_zero_correction:
+        # Make almost zero values equal to zero
+        matrix[(matrix < quasi_zero_tolerance) & (matrix > -quasi_zero_tolerance)] = Fraction(0, 1)
+
+    fraction_matrix = matrix.astype('object')
+
+    for row in range(matrix.shape[0]):
+        for col in range(matrix.shape[1]):
+            # str() here makes Sympy use true fractions instead of the double-precision
+            # floating point approximation
+            fraction_matrix[row, col] = Fraction(str(matrix[row, col]))
+
+    return fraction_matrix
+
+
+def redund(matrix, verbose=False):
+    matrix = to_fractions(matrix)
+
+    with open('tmp/matrix.ine', 'w') as file:
+        file.write('V-representation\n')
+        file.write('begin\n')
+        file.write('%d %d rational\n' % (matrix.shape[0], matrix.shape[1] + 1))
+        for row in range(matrix.shape[0]):
+            file.write(' 0')
+            for col in range(matrix.shape[1]):
+                file.write(' %s' % str(matrix[row, col]))
+            file.write('\n')
+        file.write('end\n')
+
+    system('scripts/redund tmp/matrix.ine > tmp/matrix_nored.ine')
+
+    matrix_nored = np.ndarray(shape=(0, matrix.shape[1] + 1), dtype='object')
+
+    with open('tmp/matrix_nored.ine') as file:
+        lines = file.readlines()
+        for line in [line for line in lines if line not in ['\n', '']]:
+            # Skip comment and INE format lines
+            if np.any([target in line for target in ['*', 'V-representation', 'begin', 'end', 'rational']]):
+                continue
+            row = [Fraction(x) for x in line.replace('\n', '').split(' ') if x != '']
+            matrix_nored = np.append(matrix_nored, [row], axis=0)
+
+    remove('tmp/matrix.ine')
+    remove('tmp/matrix_nored.ine')
+
+    if verbose:
+        print('Removed %d redundant rows' % (matrix.shape[0] - matrix_nored.shape[0]))
+
+    return matrix_nored[:, 1:]
+
+
+def clementine_equality_compression(N, external_metabolites=[], reversible_reactions=[], input_metabolites=[], output_metabolites=[],
+                                    verbose=True):
+    """
+    Calculates the conversion cone using Superior Clementine Equality Intersection (all rights reserved).
+    Follows the general Double Description method by Motzkin, using G as initial basis and intersecting
+    hyperplanes of internal metabolites = 0.
+    :param N:
+    :param external_metabolites:
+    :param reversible_reactions:
+    :param input_metabolites:
+    :param output_metabolites:
+    :return:
+    """
+    number_metabolites, amount_reactions = N.shape[0], N.shape[1]
+    internal_metabolites = np.setdiff1d(range(number_metabolites), external_metabolites)
+
+    identity = to_fractions(np.identity(number_metabolites))
+    equalities = [identity[:, index] for index in internal_metabolites]
+
+    # Compose G of the columns of N
+    G = np.transpose(N)
+
+    # Add reversible reactions (columns) of N to G in the negative direction as well
+    for reaction_index in range(G.shape[0]):
+        if reaction_index in reversible_reactions:
+            G = np.append(G, [-G[reaction_index, :]], axis=0)
+
+    # For each internal metabolite, intersect the intermediary cone with an equality to 0 for that metabolite
+    for index, internal_metabolite in enumerate(internal_metabolites):
+        if verbose:
+            print('\nIteration %d/%d' % (index, len(internal_metabolites)))
+
+        # Find reactions that use this metabolite
+        active_reactions = np.asarray([reaction_index for reaction_index in range(G.shape[0])
+                              if G[reaction_index, internal_metabolite] != 0])
+
+        # Skip internal metabolites that aren't used anywhere
+        if len(active_reactions) == 0:
+            if verbose:
+                print('Skipping internal metabolite #%d, since it is not used by any reaction\n' % internal_metabolite)
+            continue
+
+        # Skip internal metabolites that are used too often (>= busy_threshold)
+        busy_threshold = 10
+        if len(active_reactions) >= busy_threshold:
+            if verbose:
+                print('Skipping internal metabolite #%d, since it is used by too many reactions\n' % internal_metabolite)
+            continue
+
+        # Project conversions that use this metabolite onto the hyperplane internal_metabolite = 0
+        projections = np.dot(G[active_reactions, :], equalities[index])
+        positive = active_reactions[np.argwhere(projections > 0)[:, 0]]
+        negative = active_reactions[np.argwhere(projections < 0)[:, 0]]
+        candidates = np.ndarray(shape=(0, number_metabolites))
+
+        if verbose:
+            print('Adding %d candidates' % (len(positive) * len(negative)))
+
+        # Make convex combinations of all pairs (positive, negative) such that their internal_metabolite = 0
+        for pos in positive:
+            for neg in negative:
+                candidate = np.add(G[pos, :], G[neg, :] * (G[pos, internal_metabolite] / -G[neg, internal_metabolite]))
+                if np.count_nonzero(candidate) > 0:
+                    candidates = np.append(candidates, [candidate], axis=0)
+
+        # Keep only rays that satisfy internal_metabolite = 0
+        keep = np.setdiff1d(range(G.shape[0]), active_reactions)
+        if verbose:
+            print('Removing %d rays\n' % (G.shape[0] - len(keep)))
+        G = G[keep, :]
+        G = np.append(G, candidates, axis=0)
+        # G = drop_nonextreme(G, get_zero_set(G, equalities), verbose=verbose)
+        G = redund(G, verbose=verbose)
+
+    return G
 
 class Reaction:
     id = ''
@@ -16,9 +146,12 @@ class Metabolite:
     id = ''
     name = ''
     compartment = ''
+    is_external = False
+    direction = 'both'  # input, output, or both
 
-    def __init__(self, id, name, compartment):
-        self.id, self.name, self.compartment = id, name, compartment
+    def __init__(self, id, name, compartment, is_external=False, direction='both'):
+        self.id, self.name, self.compartment, self.is_external, self.direction = \
+            id, name, compartment, is_external, direction
 
 
 class Network:
@@ -36,7 +169,21 @@ class Network:
         return [index for index, reaction in enumerate(self.reactions) if reaction.reversible]
 
     def external_metabolite_indices(self):
-        return [index for index, metabolite in enumerate(self.metabolites) if metabolite.compartment == 'e']
+        return [index for index, metabolite in enumerate(self.metabolites) if metabolite.is_external]
+
+    def set_inputs(self, input_indices):
+        for index in input_indices:
+            self.metabolites[index].direction = 'input'
+
+    def set_outputs(self, output_indices):
+        for index in output_indices:
+            self.metabolites[index].direction = 'output'
+
+    def input_metabolite_indices(self):
+        return [index for index, metabolite in enumerate(self.metabolites) if metabolite.direction == 'input']
+
+    def output_metabolite_indices(self):
+        return [index for index, metabolite in enumerate(self.metabolites) if metabolite.direction == 'output']
 
     def compress(self, verbose=False):
         if verbose:
@@ -44,7 +191,17 @@ class Network:
 
         metabolite_count, reaction_count = self.N.shape
 
+        metabolite_count_intermediate, reaction_count_intermediate = self.N.shape
         self.cancel_compounds(verbose=verbose)
+        if verbose:
+            print('Removed %d reactions and %d metabolites' %
+                  (reaction_count_intermediate - self.N.shape[1], metabolite_count_intermediate - self.N.shape[0]))
+
+        metabolite_count_intermediate, reaction_count_intermediate = self.N.shape
+        self.cancel_singly(verbose=verbose)
+        if verbose:
+            print('Removed %d reactions and %d metabolites' %
+                  (reaction_count_intermediate - self.N.shape[1], metabolite_count_intermediate - self.N.shape[0]))
 
         ## This does not seem to do anything on the tested metabolic networks
         # if not self.right_nullspace:
@@ -54,20 +211,98 @@ class Network:
         #
         # self.remove_infeasible_irreversible_reactions(verbose=verbose)
 
+
+        metabolite_count_intermediate, reaction_count_intermediate = self.N.shape
+        self.cancel_clementine(verbose=verbose)
         if verbose:
             print('Removed %d reactions and %d metabolites' %
+                  (reaction_count_intermediate - self.N.shape[1], metabolite_count_intermediate - self.N.shape[0]))
+
+        if verbose:
+            print('Removed %d reactions and %d metabolites in total' %
                   (reaction_count - self.N.shape[1], metabolite_count - self.N.shape[0]))
         pass
 
+    def cancel_singly(self, verbose=False):
+        """
+        Urbanczik A4 T4
+        :param verbose:
+        :return:
+        """
+        if verbose:
+            print('Trying to cancel compounds by singly produced/consumed metabolites')
+
+        internal_metabolite_indices = np.setdiff1d(range(len(self.metabolites)), self.external_metabolite_indices())
+        total_internal_metabolites = len(internal_metabolite_indices)
+
+        for iteration, index in enumerate(internal_metabolite_indices):
+            if verbose:
+                print('Cancelling compounds - %.2f%%' % (iteration / float(total_internal_metabolites) * 100))
+
+            reaction_index = None
+            producing_reactions = list(np.where(self.N[index, :] > 0)[0])
+            consuming_reactions = list(np.where(self.N[index, :] < 0)[0])
+            reactions_to_cancel = []
+
+            for reaction_index in producing_reactions:
+                if self.reactions[reaction_index].reversible and reaction_index not in consuming_reactions:
+                    consuming_reactions.append(reaction_index)
+
+            for reaction_index in consuming_reactions:
+                if self.reactions[reaction_index].reversible and reaction_index not in producing_reactions:
+                    producing_reactions.append(reaction_index)
+
+            if len(producing_reactions) == 1:
+                # This internal metabolite is produced by only 1 reaction
+                reaction_index = producing_reactions[0]
+                reactions_to_cancel = consuming_reactions
+                if verbose:
+                    print('Metabolite %s is only produced in reaction %s. It will be cancelled through addition' % (self.metabolites[index].id, self.reactions[reaction_index].id))
+            elif len(consuming_reactions) == 1:
+                # This internal metabolite is consumed by only 1 reaction
+                reaction_index = consuming_reactions[0]
+                reactions_to_cancel = producing_reactions
+                if verbose:
+                    print('Metabolite %s is only consumed in reaction %s. It will be cancelled through addition' % (self.metabolites[index].id, self.reactions[reaction_index].id))
+            else:
+                continue
+
+            for other_reaction_index in np.setdiff1d(reactions_to_cancel, [reaction_index]):
+                factor = self.N[index, other_reaction_index] / self.N[index, reaction_index]
+                self.N[:, other_reaction_index] = np.subtract(self.N[:, other_reaction_index],
+                                                              self.N[:, reaction_index] * factor)
+
+                if not self.reactions[reaction_index].reversible and self.reactions[other_reaction_index].reversible:
+                    # Reactions changed by irreversible reactions must become irreversible too
+                    self.reactions[other_reaction_index].reversible = False
+
+        removable_metabolites, removable_reactions = [], []
+        for metabolite_index in internal_metabolite_indices:
+            if np.count_nonzero(self.N[metabolite_index, :]) == 1:
+                # This metabolite is used in only one reaction
+                reaction_index = [index for index in range(len(self.reactions)) if self.N[metabolite_index, index] != 0][0]
+                removable_metabolites.append(metabolite_index)
+                removable_reactions.append(reaction_index)
+
+        self.drop_reactions(removable_reactions)
+        self.drop_metabolites(removable_metabolites)
+
     def cancel_compounds(self, verbose=False):
+        """
+        Urbanczik A4 T3
+        :param verbose:
+        :return:
+        """
         if verbose:
             print('Trying to cancel compounds by reversible reactions')
 
+        internal_metabolite_indices = np.setdiff1d(range(len(self.metabolites)), self.external_metabolite_indices())
         reversible_reactions = self.reversible_reaction_indices()
-        total_reactions = len(reversible_reactions)
+        total_reversible_reactions = len(reversible_reactions)
 
         for iteration, reaction_index in enumerate(reversible_reactions):
-            print('%.2f%%' % (iteration / float(total_reactions) * 100))
+            if verbose:
+                print('Cancelling compounds - %.2f%%' % (iteration / float(total_reversible_reactions) * 100))
             reaction = self.N[:, reaction_index]
             metabolite_indices = [index for index in range(len(self.metabolites)) if reaction[index] != 0 and
                                   index not in self.external_metabolite_indices()]
@@ -77,32 +312,63 @@ class Network:
                 # This reaction doesn't use any internal metabolites
                 continue
 
-            busiest_metabolite = np.argmax(involved_in_reactions)  # Involved in most reactions
-            if not isinstance(busiest_metabolite, int) and not isinstance(busiest_metabolite, np.int64):
-                busiest_metabolite = busiest_metabolite[0]
+            least_used_metabolite = np.argmin(involved_in_reactions)  # Involved in least reactions
+            # argmin returns list if equal values are found. In this case, save the first one
+            if not isinstance(least_used_metabolite, int) and not isinstance(least_used_metabolite, np.int64):
+                least_used_metabolite = least_used_metabolite[0]
 
-            target = metabolite_indices[busiest_metabolite]
+            # Heuristic: we choose to cancel the metabolite that is used in the smallest number of other reactions
+            target = metabolite_indices[least_used_metabolite]
 
             for other_reaction_index in range(self.N.shape[1]):
+                # Make all other reactions that consume or produce target metabolite zero for that metabolite
                 if other_reaction_index != reaction_index and self.N[target, other_reaction_index] != 0:
                     self.N[:, other_reaction_index] = np.subtract(self.N[:, other_reaction_index],
                                                                   self.N[:, reaction_index] * \
                                                                   (self.N[target, other_reaction_index] /
                                                                    self.N[target, reaction_index]))
+                    # self.reactions[other_reaction_index].name = '(%s - %s)' % (self.reactions[other_reaction_index].name,
+                    #                                                   reaction_index)
 
         removable_metabolites, removable_reactions = [], []
-        for metabolite_index in range(len(self.metabolites)):
-            if metabolite_index not in self.external_metabolite_indices() and \
-                            np.count_nonzero(self.N[metabolite_index, :]) == 1:
+
+        for metabolite_index in internal_metabolite_indices:
+            nonzero_count = np.count_nonzero(self.N[metabolite_index, :])
+            if nonzero_count == 1:
                 # This metabolite is used in only one reaction
                 reaction_index = [index for index in range(len(self.reactions)) if self.N[metabolite_index, index] != 0][0]
-                removable_metabolites.append(metabolite_index)
                 removable_reactions.append(reaction_index)
 
         self.drop_reactions(removable_reactions)
+
+        for metabolite_index in internal_metabolite_indices:
+            nonzero_count = np.count_nonzero(self.N[metabolite_index, :])
+            if nonzero_count == 0:
+                removable_metabolites.append(metabolite_index)
+
         self.drop_metabolites(removable_metabolites)
 
+    def cancel_clementine(self, verbose=False):
+        if verbose:
+            print('Compressing with SCEI')
+
+        compressed_G = clementine_equality_compression(self.N, self.external_metabolite_indices(),
+                                                       self.reversible_reaction_indices(), self.input_metabolite_indices(),
+                                                       self.output_metabolite_indices())
+        self.N = np.transpose(compressed_G)
+        self.reactions = [Reaction('R_%d' % i, 'Reaction %d' % i, reversible=False) for i in range(self.N.shape[0])]
+        drop = []
+        for row in range(self.N.shape[0]):
+            if np.count_nonzero(self.N[row, :]) == 0:
+                drop.append(row)
+        self.drop_metabolites(drop)
+
     def remove_infeasible_irreversible_reactions(self, verbose=False):
+        """
+        Urbanczik A4 T1
+        :param verbose:
+        :return:
+        """
         reversible = self.reversible_reaction_indices()
         irreversible_columns = [i for i in range(self.N.shape[1]) if i not in reversible]
         number_irreversible = len(irreversible_columns)
