@@ -239,6 +239,7 @@ class Network:
     metabolites = []
     objective_reaction = None
     right_nullspace = None
+    uncompressed_metabolite_ids = []
 
     def __init__(self):
         self.reactions = []
@@ -252,21 +253,25 @@ class Network:
 
     def set_inputs(self, input_indices):
         for index in input_indices:
+            self.metabolites[index].is_external = True
             self.metabolites[index].direction = 'input'
 
     def set_outputs(self, output_indices):
         for index in output_indices:
+            self.metabolites[index].is_external = True
             self.metabolites[index].direction = 'output'
 
     def input_metabolite_indices(self):
-        return [index for index, metabolite in enumerate(self.metabolites) if metabolite.direction == 'input']
+        return [index for index, metabolite in enumerate(self.metabolites) if metabolite.direction == 'input' and metabolite.is_external]
 
     def output_metabolite_indices(self):
-        return [index for index, metabolite in enumerate(self.metabolites) if metabolite.direction == 'output']
+        return [index for index, metabolite in enumerate(self.metabolites) if metabolite.direction == 'output' and metabolite.is_external]
 
     def compress(self, verbose=False):
         if verbose:
             print('Compressing network')
+
+        self.uncompressed_metabolite_ids = [met.id for met in self.metabolites]
 
         original_metabolite_count, original_reaction_count = self.N.shape
         original_internal = len(self.metabolites) - len(self.external_metabolite_indices())
@@ -313,6 +318,22 @@ class Network:
             print('Compressed size: %.2f%%' % (((float(reaction_count) * metabolite_count) / (original_reaction_count * original_metabolite_count)) * 100))
 
         pass
+
+    def uncompress(self, matrix):
+        """
+        Adds metabolite columns that were removed during compression to given
+        matrix of metabolite variables.
+        :param matrix: z by (m-n) matrix, with m number of original metabolites, and n removed during compression
+        :return: z by m matrix
+        """
+        expanded = to_fractions(np.zeros(shape=(matrix.shape[0], len(self.uncompressed_metabolite_ids))))
+
+        for column, id in enumerate([m.id for m in self.metabolites]):
+            orig_column = [index for index, orig_id in
+                           enumerate(self.uncompressed_metabolite_ids) if orig_id == id][0]
+            expanded[:, orig_column] = matrix[:, column]
+
+        return expanded
 
     def cancel_singly(self, verbose=False):
         """
@@ -447,11 +468,11 @@ class Network:
                                                        self.reversible_reaction_indices(), self.input_metabolite_indices(),
                                                        self.output_metabolite_indices())
         self.N = np.transpose(compressed_G)
-        self.reactions = [Reaction('R_%d' % i, 'Reaction %d' % i, reversible=False) for i in range(self.N.shape[0])]
+        self.reactions = [Reaction('R_%d' % i, 'Reaction %d' % i, reversible=False) for i in range(self.N.shape[1])]
         drop = []
-        for row in range(self.N.shape[0]):
-            if np.count_nonzero(self.N[row, :]) == 0:
-                drop.append(row)
+        for metabolite_index in range(self.N.shape[0]):
+            if np.count_nonzero(self.N[metabolite_index, :]) == 0:
+                drop.append(metabolite_index)
         self.drop_metabolites(drop)
 
     def remove_infeasible_irreversible_reactions(self, verbose=False):
@@ -516,7 +537,9 @@ class Network:
         for index in metabolite_indices:
             self.metabolites[index].is_external = False
             reaction_name = 'R_HIDDEN_EX_%s' % self.metabolites[index].id
-            self.reactions.append(Reaction(reaction_name, reaction_name, reversible=True))
+            reversible = self.metabolites[index].direction == 'both'
+
+            self.reactions.append(Reaction(reaction_name, reaction_name, reversible=reversible))
             row = to_fractions(np.zeros(shape=(self.N.shape[0], 1)))
-            row[index, 0] += 1
+            row[index, 0] += -1 if self.metabolites[index].direction == 'output' else 1
             self.N = np.append(self.N, row, axis=1)

@@ -2,7 +2,7 @@ from scipy.optimize import linprog
 
 from helpers import *
 from time import time
-from conversion_cone import get_conversion_cone
+from conversion_cone import get_conversion_cone, iterative_conversion_cone
 from argparse import ArgumentParser, ArgumentTypeError
 
 from network import extract_sbml_stoichiometry
@@ -118,8 +118,7 @@ if __name__ == '__main__':
     debug_tags = []
     # add_debug_tags(network)
 
-    orig_ids = [m.id for m in network.metabolites]
-    orig_N = network.N
+    adj = get_metabolite_adjacency(network.N)
 
     if not args.auto_direction:
         inputs = [int(index) for index in args.inputs.split(',') if len(index)]
@@ -147,6 +146,9 @@ if __name__ == '__main__':
         for index, item in enumerate(network.metabolites):
             print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
 
+    orig_ids = [m.id for m in network.metabolites]
+    orig_N = network.N
+
     if args.compress:
         network.compress(verbose=True)
 
@@ -160,12 +162,14 @@ if __name__ == '__main__':
         for index, item in enumerate(network.metabolites):
             print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
 
-    cone = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
-                               # verbose=True, symbolic=symbolic)
-                               input_metabolites=network.input_metabolite_indices(), output_metabolites=network.output_metabolite_indices(), verbose=True, symbolic=symbolic)
+    # cone = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
+    #                            # verbose=True, symbolic=symbolic)
+    #                            input_metabolites=network.input_metabolite_indices(),
+    #                            output_metabolites=network.output_metabolite_indices(), verbose=True, symbolic=symbolic)
+    cone = iterative_conversion_cone(network)
 
     # Undo compression so we have results in the same dimensionality as original data
-    expanded_c = np.zeros(shape=(cone.shape[0], len(orig_ids)))
+    expanded_c = to_fractions(np.zeros(shape=(cone.shape[0], len(orig_ids))))
 
     if args.compress:
         for column, id in enumerate([m.id for m in network.metabolites]):

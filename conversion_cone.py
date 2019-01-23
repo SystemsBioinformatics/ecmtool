@@ -1,6 +1,8 @@
 from helpers import *
 from time import time
 
+from network import Network, Reaction, Metabolite
+
 
 def normalize_rows(M):
     row_max = M.max(axis=1)
@@ -148,6 +150,9 @@ def split_columns(matrix, columns):
     matrix = np.append(matrix, -matrix[:, columns], axis=1)
     return matrix
 
+def unique(matrix):
+    return np.vstack({tuple(row) for row in matrix})
+
 
 def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], input_metabolites=[], output_metabolites=[],
                         symbolic=True, verbose=False):
@@ -170,7 +175,7 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     G = np.transpose(N)
 
     # TODO: remove debug block
-    G = np.asarray(G * 10**3, dtype='int64')
+    # G = np.asarray(G * 10**3, dtype='int64')
 
     G_exp = G[:,:]
     G_rev = np.ndarray(shape=(0, G.shape[1]), dtype='object')
@@ -188,9 +193,9 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     # Calculate H as the union of our linearities and the extreme rays of matrix G (all as row vectors)
     if verbose:
          print('Calculating null space of inequalities system G')
-    linearities = np.transpose(nullspace_polco(G, verbose=verbose))
+    # linearities = np.transpose(nullspace_polco(G, verbose=verbose))
     # linearities = np.transpose(nullspace(G, symbolic=symbolic))
-    # linearities = np.transpose(nullspace_terzer(G, verbose=verbose))
+    linearities = np.transpose(nullspace_terzer(G, verbose=verbose))
     # linearities = np.loadtxt("/tmp/lin_ecoli2.csv", delimiter=',', dtype='int')
     if linearities.shape[0] == 0:
         linearities = np.ndarray(shape=(0, G.shape[1]))
@@ -209,7 +214,11 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     # Calculate generating set of the dual of our initial conversion cone C0, C0*
     rays = np.asarray(list(get_extreme_rays(np.append(linearities, G_rev, axis=0), G_irrev, verbose=verbose, symbolic=symbolic)))
     # rays = np.asarray(list(get_extreme_rays(None, G_exp, verbose=verbose, symbolic=symbolic)))
-    rays = rays if rays.shape[0] else np.ndarray(shape=(0, G.shape[1]))
+
+    if rays.shape[0] == 0:
+        print('Warning: given system has no nonzero inequalities H. Returning empty conversion cone.')
+        return to_fractions(np.ndarray(shape=(0, G.shape[1])))
+
     rays_deflated = deflate_matrix(rays, external_metabolites)
 
     # Add bidirectional (in- and output) metabolites in reverse direction
@@ -263,8 +272,144 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     # Merge bidirectional metabolites again, and drop duplicate rows
     # np.unique() requires non-object matrices, so here we cast our results into float64.
     rays_inflated[:, in_out_metabolites] = np.subtract(rays_inflated[:, in_out_metabolites], rays_inflated[:, G.shape[1]:])
-    rays_merged = np.asarray(rays_inflated[:, :G.shape[1]], dtype='float64')
-    return np.unique(rays_merged, axis=0)
+    rays_merged = np.asarray(rays_inflated[:, :G.shape[1]], dtype='object')
+    return unique(rays_merged)
+
+
+def get_pseudo_external_direction(network, metabolite_index):
+    number_pos = 0
+    number_neg = 0
+
+    involved_reactions = np.where(network.N[metabolite_index, :] != 0)[0]
+
+    for reaction_index in involved_reactions:
+        reaction = network.reactions[reaction_index]
+        if reaction.reversible:
+            return 'both'
+
+        stoich = network.N[metabolite_index, reaction_index]
+        if stoich > 0:
+            number_pos += 1
+        elif stoich < 0:
+            number_neg += 1
+
+    return 'output' if number_neg == 0 else ('input' if number_pos == 0 else 'both')
+
+
+def iterative_conversion_cone(network, max_metabolites=20, max_connectivity=10, verbose=True):
+    adjacency = get_metabolite_adjacency(network.N)
+    metabolite_indices = range(len(network.metabolites))
+    internal_indices = [index for index,met in enumerate(network.metabolites) if not met.is_external]
+    original_length = len(internal_indices)
+
+    def get_connectivity(metabolite_index):
+        return np.sum(adjacency[metabolite_index, :])
+
+    # Perform one round of conversion cone calculation
+    while len(internal_indices) > 0:
+        print('\n======== Did %d/%d intermediary metabolites ========\n' % ((original_length - len(internal_indices)), original_length))
+
+        # Sort by adjacency, descending (because of pop())
+        internal_indices.sort(key=get_connectivity, reverse=True)
+
+        initial = internal_indices.pop()
+        if get_connectivity(initial) > max_connectivity:
+            print('No more internal metabolites below connectivity threshold')
+            break
+        selection = [initial]
+        last_round = [initial]
+        all_active_reactions = []
+
+        while len(selection) < max_metabolites:
+            current_round = []
+            for metabolite_index in last_round:
+                active_reactions = np.where(network.N[metabolite_index, :] != 0)[0]
+                all_active_reactions.extend(active_reactions)
+                all_active_reactions = list(np.unique(all_active_reactions))
+                adjacent = np.where(adjacency[metabolite_index, :] != 0)[0]
+                adjacent = list(np.setdiff1d(adjacent, selection))
+                adjacent.sort(key=get_connectivity)
+
+                for adjacent_index in adjacent:
+                    connectivity = get_connectivity(adjacent_index)
+                    if connectivity <= max_connectivity:
+                        current_round.append(adjacent_index)
+                    else:
+                        print('Skipping metabolite %s with %d adjacent metabolites' % (network.metabolites[adjacent_index].id, connectivity))
+
+            last_round = current_round
+
+            print ('Info: using %d/%d adjacent metabolites' % (len(current_round), max_metabolites))
+            if len(current_round) == 0:
+                break
+            else:
+                needed_metabolites = max_metabolites - len(selection)
+                needed_metabolites = np.min([needed_metabolites, len(current_round)])
+                selection.extend(current_round[:needed_metabolites])
+                internal_indices = list(np.setdiff1d(internal_indices, selection))
+
+        # Find all metabolites that are bordering to our subsystem
+        bordering = []
+        for metabolite_index in selection:
+            adjacent = np.where(adjacency[metabolite_index, :] != 0)[0]
+            bordering.extend(adjacent)
+        bordering = np.setdiff1d(bordering, selection)
+
+        # Add bordering metabolites to our subsystem
+        selection.extend(bordering)
+        selection = list(np.unique(selection))
+
+        temp_network = Network()
+        temp_network.N = network.N[:, all_active_reactions]
+        temp_network.N = temp_network.N[selection, :]
+        temp_network.reactions = list(np.asarray(network.reactions)[all_active_reactions])
+        temp_network.uncompressed_metabolite_ids = [met.id for met in network.metabolites]
+        temp_network.metabolites = [Metabolite(network.metabolites[index].id, network.metabolites[index].name,
+                                               network.metabolites[index].compartment,
+                                               network.metabolites[index].is_external,
+                                               network.metabolites[index].direction) for index in selection]
+
+        # Mark all non-external non-bordering metabolites as internal
+        for deflated_index, inflated_index in enumerate(selection):
+            if inflated_index in bordering or network.metabolites[inflated_index].is_external:
+                temp_network.metabolites[deflated_index].is_external = True
+            else:
+                temp_network.metabolites[deflated_index].is_external = False
+
+            temp_network.metabolites[deflated_index].direction = get_pseudo_external_direction(temp_network, deflated_index)
+
+        conversions = get_conversion_cone(temp_network.N, temp_network.external_metabolite_indices(),
+                                          temp_network.reversible_reaction_indices(),
+                                          temp_network.input_metabolite_indices(),
+                                          temp_network.output_metabolite_indices(),
+                                          verbose=verbose, symbolic=True)
+
+        if conversions.shape[0] == 0:
+            print('The following metabolites have no viable conversion:',
+                  ', '.join([met.id for met in temp_network.metabolites]))
+            continue
+
+        keep_reactions = np.setdiff1d(range(len(network.reactions)), all_active_reactions)
+        network.N = network.N[:, keep_reactions]
+        network.reactions = list(np.asarray(network.reactions)[keep_reactions])
+        network.N = np.append(network.N, np.transpose(temp_network.uncompress(conversions)), axis=1)
+
+        for _ in conversions:
+            network.reactions.append(Reaction('conversion', 'conversion', reversible=False))
+
+        # TODO: maybe remove now superfluous internal metabolites as well
+
+        adjacency = get_metabolite_adjacency(network.N)
+
+    # TODO: another conversion enumeration is only necessary if there are remaining internal metabolites,
+    # e.g. when there were internal ones with high connectivity
+    network.compress(verbose=verbose)
+    conversion_cone = get_conversion_cone(network.N, network.external_metabolite_indices(),
+                                          network.reversible_reaction_indices(),
+                                          network.input_metabolite_indices(),
+                                          network.output_metabolite_indices(),
+                                          verbose=verbose, symbolic=True)
+    return network.uncompress(conversion_cone)
 
 
 if __name__ == '__main__':

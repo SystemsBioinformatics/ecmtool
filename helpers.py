@@ -152,8 +152,30 @@ def nullspace_matlab(N):
     return x
 
 
-def nullspace_polco(N, verbose=False):
-    return np.transpose(np.asarray(list(get_extreme_rays(N, None, verbose=verbose)), dtype='object'))
+def nullspace_polco(A, verbose=False):
+
+    B_neg = np.append(-np.identity(A.shape[1]), np.ones(shape=(A.shape[1], 1)), axis=1)
+    B_pos = np.append(np.identity(A.shape[1]), np.ones(shape=(A.shape[1], 1)), axis=1)
+    B = np.append(B_neg, B_pos, axis=0)
+    A = np.append(A, np.zeros(shape=(A.shape[0], 1)), axis=1)
+
+    result = np.asarray(list(get_extreme_rays(A, B, verbose=verbose)), dtype='object')
+
+    for row in range(result.shape[0]):
+        result[row, :] /= 1 if result[row, -1] == 0 else result[row, -1]
+
+    null_vectors = result[:, :-1]
+    deduped_vectors = []
+
+    # for row in range(null_vectors.shape[0]):
+    #     if not np.any([np.sum(null_vectors[row, :] - entry) == 0 for entry in deduped_vectors]):
+    #         deduped_vectors.append(null_vectors[row, :])
+    #     else:
+    #         print('x')
+    #         pass
+    #
+    # return np.transpose(redund(np.asarray(deduped_vectors, dtype='object')))
+    return np.transpose(redund(np.asarray(null_vectors, dtype='object')))
 
 
 def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
@@ -239,9 +261,18 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True
 
     if inequality_matrix is None:
         if equality_matrix is not None:
-            inequality_matrix = np.identity(equality_matrix.shape[1])
+            # inequality_matrix = np.identity(equality_matrix.shape[1])
+            inequality_matrix = np.zeros(shape=(1, equality_matrix.shape[1]))
         else:
             raise Exception('No equality or inequality argument given')
+
+    # if inequality_matrix.shape[1] < 50:
+    #     if verbose:
+    #         print('Using CDD instead of Polco for enumeration of small system')
+    #     ineq = np.append(np.append(equality_matrix, -equality_matrix, axis=0), inequality_matrix, axis=0)
+    #     for ray in get_extreme_rays_cdd(ineq):
+    #         yield ray
+    #     return
 
     # Write equalities system to disk as space separated file
     if verbose:
@@ -362,3 +393,25 @@ def to_fractions(matrix, quasi_zero_correction=False, quasi_zero_tolerance=1e-13
             fraction_matrix[row, col] = Fraction(str(matrix[row, col]))
 
     return fraction_matrix
+
+
+def get_metabolite_adjacency(N):
+    """
+    Returns m by m adjacency matrix of metabolites, given
+    stoichiometry matrix N. Diagonal is 0, not 1.
+    :param N: stoichiometry matrix
+    :return: m by m adjacency matrix
+    """
+
+    number_metabolites = N.shape[0]
+    adjacency = np.zeros(shape=(number_metabolites, number_metabolites))
+
+    for metabolite_index in range(number_metabolites):
+        active_reactions = np.where(N[metabolite_index, :] != 0)[0]
+        for reaction_index in active_reactions:
+            adjacent_metabolites = np.where(N[:, reaction_index] != 0)[0]
+            for adjacent in [i for i in adjacent_metabolites if i != metabolite_index]:
+                adjacency[metabolite_index, adjacent] = 1
+                adjacency[adjacent, metabolite_index] = 1
+
+    return adjacency
