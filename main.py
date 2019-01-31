@@ -17,25 +17,25 @@ def str2bool(v):
         raise ArgumentTypeError('Boolean value expected.')
 
 
-# Note [Tom]: Glucose, ammonium, O2, phosphate
-
-def print_ECMs(cone, debug_tags, network, orig_N, add_objective_metabolite, check_feasibility):
+def print_ECMs(cone, expanded_cone, debug_tags, network, orig_N, add_objective_metabolite, check_feasibility):
     for index, ecm in enumerate(cone):
         # Normalise by objective metabolite, if applicable
         objective_index = -1 - len(debug_tags)
         objective = ecm[objective_index]
         if add_objective_metabolite and objective > 0:
             ecm /= objective
-            expanded_c[index, :] /= objective
+            expanded_cone[index, :] /= objective
+
+        metabolite_ids = [met.id for met in network.metabolites] if not network.compressed else network.uncompressed_metabolite_ids
 
         print('\nECM #%d:' % index)
         for metabolite_index, stoichiometry_val in enumerate(ecm):
             if stoichiometry_val != 0.0:
-                print('%d %s\t\t->\t%.4f' % (metabolite_index, network.metabolites[metabolite_index].name, stoichiometry_val))
+                print('%s\t\t->\t%.4f' % (metabolite_ids[metabolite_index], stoichiometry_val))
 
         if check_feasibility:
             allowed_error = 10**-6
-            solution = linprog(c=[0] * orig_N.shape[1], A_eq=orig_N, b_eq=expanded_c[index, :],
+            solution = linprog(c=[0] * orig_N.shape[1], A_eq=orig_N, b_eq=expanded_cone[index, :],
                                bounds=[(-1000, 1000)] * orig_N.shape[1], options={'tol': allowed_error})
             print('ECM satisfies stoichiometry' if solution.status == 0 else 'ECM does not satisfy stoichiometry')
 
@@ -67,7 +67,7 @@ def check_bijection(conversion_cone, network, model_path, add_objective_metaboli
             for metabolite_index, stoichiometry_val in enumerate(ecm):
                 if stoichiometry_val != 0.0:
                     print('%d %s\t\t->\t%.4f' % (
-                    metabolite_index, network.metabolites[metabolite_index].name, stoichiometry_val))
+                    metabolite_index, network.uncompressed_metabolites_names[metabolite_index], stoichiometry_val))
 
     for index, ecm in enumerate(ecms_unique):
         if ecm not in conversion_cone:
@@ -98,6 +98,7 @@ if __name__ == '__main__':
     parser.add_argument('--inputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be consumed')
     parser.add_argument('--outputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be produced')
     parser.add_argument('--hide', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that are transformed into internal metabolites by adding bidirectional exchange reactions')
+    parser.add_argument('--iterative', type=str2bool, default=True, help='Enable iterative conversion mode enumeration (helps on large, dense networks')
     args = parser.parse_args()
 
     if args.model_path == '':
@@ -107,6 +108,11 @@ if __name__ == '__main__':
     if len(args.inputs) or len(args.outputs):
         # Disable automatic determination of external metabolite direction if lists are given manually
         args.auto_direction = False
+
+    if args.iterative:
+        # Only compress when flag is enabled, and when not performing iterative enumeration.
+        # Iterative enumeration performs compression after the iteration steps.
+        args.compress = False
 
     symbolic = args.symbolic
     model_path = args.model_path
@@ -162,28 +168,25 @@ if __name__ == '__main__':
         for index, item in enumerate(network.metabolites):
             print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
 
-    # cone = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
-    #                            # verbose=True, symbolic=symbolic)
-    #                            input_metabolites=network.input_metabolite_indices(),
-    #                            output_metabolites=network.output_metabolite_indices(), verbose=True, symbolic=symbolic)
-    cone = iterative_conversion_cone(network)
+    if args.iterative:
+        cone = iterative_conversion_cone(network)
+    else:
+        cone = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
+                                   # verbose=True, symbolic=symbolic)
+                                   input_metabolites=network.input_metabolite_indices(),
+                                   output_metabolites=network.output_metabolite_indices(), verbose=True, symbolic=symbolic)
 
     # Undo compression so we have results in the same dimensionality as original data
-    expanded_c = to_fractions(np.zeros(shape=(cone.shape[0], len(orig_ids))))
+    expanded_cone = network.uncompress(cone)
 
-    if args.compress:
-        for column, id in enumerate([m.id for m in network.metabolites]):
-            orig_column = [index for index, orig_id in enumerate(orig_ids) if orig_id == id][0]
-            expanded_c[:, orig_column] = cone[:, column]
-    else:
-        expanded_c = cone
+    print('Compressed cone: %dx%d, uncompressed: %dx%d' % (cone.shape[0], cone.shape[1], expanded_cone.shape[0], expanded_cone.shape[1]))
 
-    np.savetxt(args.out_path, expanded_c, delimiter=',')
+    np.savetxt(args.out_path, expanded_cone, delimiter=',')
 
-    print_ECMs(cone, debug_tags, network, orig_N, args.add_objective_metabolite, args.check_feasibility)
+    print_ECMs(cone, expanded_cone, debug_tags, network, orig_N, args.add_objective_metabolite, args.check_feasibility)
 
     if args.check_bijection:
-        check_bijection(expanded_c, network, model_path, args.add_objective_metabolite)
+        check_bijection(expanded_cone, network, model_path, args.add_objective_metabolite)
 
     end = time()
     print('Ran in %f seconds' % (end - start))

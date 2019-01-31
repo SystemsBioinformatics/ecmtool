@@ -5,10 +5,11 @@ import cbmpy
 
 def do_fba(filename):
     mod = cbmpy.readSBML3FBC(filename)
-    cbmpy.doFBA(mod)
-    return mod.getReactionValues()
+    cbmpy.doFBAMinSum(mod)
+    # cbmpy.doFBA(mod)
+    return mod.getReactionValues(), mod.getObjFuncValue()
 
 
 if __name__ == '__main__':
-    result = do_fba('models/e_coli_core_constr.xml')
+    result, objective = do_fba('models/iNF517.xml')
     pass
