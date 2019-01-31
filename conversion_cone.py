@@ -216,8 +216,8 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
          print('Calculating extreme rays H of inequalities system G')
 
     # Calculate generating set of the dual of our initial conversion cone C0, C0*
-    rays = np.asarray(list(get_extreme_rays(np.append(linearities, G_rev, axis=0), G_irrev, verbose=verbose, symbolic=symbolic)))
-    # rays = np.asarray(list(get_extreme_rays(None, G_exp, verbose=verbose, symbolic=symbolic)))
+    # rays = np.asarray(list(get_extreme_rays(np.append(linearities, G_rev, axis=0), G_irrev, verbose=verbose, symbolic=symbolic)))
+    rays = np.asarray(list(get_extreme_rays(None, G_exp, verbose=verbose, symbolic=symbolic)))
 
     if rays.shape[0] == 0:
         print('Warning: given system has no nonzero inequalities H. Returning empty conversion cone.')
