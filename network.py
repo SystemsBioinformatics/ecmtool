@@ -349,6 +349,11 @@ class Network:
         return expanded
 
     def append_uncompressed_stoich(self, matrix):
+        """
+        Appends uncompressed reactions to compressed network
+        :param matrix:
+        :return:
+        """
         compressed_ids = [met.id for met in self.metabolites]
         mapping = [index for index, id in enumerate(self.uncompressed_metabolite_ids) if id in compressed_ids]
         self.N = np.append(self.N, matrix[mapping, :], axis=1)
@@ -543,7 +548,8 @@ class Network:
         #TODO: debug line
         for index in metabolite_indices:
             if self.metabolites[index].is_external:
-                print('Unused external metabolite %s was removed' % self.metabolites[index].id)
+                print('Tried to remove external metabolite %s, which was denied. External metabolites must remain.' % self.metabolites[index].id)
+                return
 
         metabolites_to_keep = [row for row in range(self.N.shape[0]) if row not in metabolite_indices]
         self.N = self.N[metabolites_to_keep, :]
@@ -617,3 +623,11 @@ class Network:
         for product in products:
             self.metabolites[product].direction = self.metabolites[product].orig_direction
             self.metabolites[product].is_external = self.metabolites[product].orig_external
+
+    def get_objective_reagents(self):
+        # TODO: add support for when biomass reaction isn't the last reaction
+        # (i.e. when restore_objective_function() has not just been called.
+        stoich = self.N[:, -1]
+        reactants = np.where(stoich < 0)[0]
+        products = np.where(stoich > 0)[0]
+        return reactants, products

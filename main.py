@@ -98,7 +98,7 @@ if __name__ == '__main__':
     parser.add_argument('--inputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be consumed')
     parser.add_argument('--outputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be produced')
     parser.add_argument('--hide', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that are transformed into internal metabolites by adding bidirectional exchange reactions')
-    parser.add_argument('--iterative', type=str2bool, default=True, help='Enable iterative conversion mode enumeration (helps on large, dense networks')
+    parser.add_argument('--iterative', type=str2bool, default=False, help='Enable iterative conversion mode enumeration (helps on large, dense networks')
     args = parser.parse_args()
 
     if args.model_path == '':

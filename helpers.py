@@ -346,6 +346,9 @@ def redund(matrix, verbose=False):
     matrix = to_fractions(matrix)
     binary = get_redund_binary()
 
+    if matrix.shape[0] <= 1:
+        return matrix
+
     with open('tmp/matrix.ine', 'w') as file:
         file.write('V-representation\n')
         file.write('begin\n')
