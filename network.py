@@ -628,6 +628,6 @@ class Network:
         # TODO: add support for when biomass reaction isn't the last reaction
         # (i.e. when restore_objective_function() has not just been called.
         stoich = self.N[:, -1]
-        reactants = np.where(stoich < 0)[0]
-        products = np.where(stoich > 0)[0]
+        reactants = list(np.where(stoich < 0)[0])
+        products = list(np.where(stoich > 0)[0])
         return reactants, products

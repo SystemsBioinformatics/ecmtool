@@ -174,6 +174,9 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     extended_external_metabolites = np.append(external_metabolites, added_virtual_metabolites, axis=0)
     in_out_indices = [external_metabolites.index(index) for index in in_out_metabolites]
 
+    if len(external_metabolites) == 0:
+        return to_fractions(np.ndarray(shape=(0, N.shape[0])))
+
     # Compose G of the columns of N
     G = np.transpose(N)
 
@@ -216,8 +219,8 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
          print('Calculating extreme rays H of inequalities system G')
 
     # Calculate generating set of the dual of our initial conversion cone C0, C0*
-    # rays = np.asarray(list(get_extreme_rays(np.append(linearities, G_rev, axis=0), G_irrev, verbose=verbose, symbolic=symbolic)))
-    rays = np.asarray(list(get_extreme_rays(None, G_exp, verbose=verbose, symbolic=symbolic)))
+    rays = np.asarray(list(get_extreme_rays(np.append(linearities, G_rev, axis=0), G_irrev, verbose=verbose, symbolic=symbolic)))
+    # rays = np.asarray(list(get_extreme_rays(None, G_exp, verbose=verbose, symbolic=symbolic)))
 
     if rays.shape[0] == 0:
         print('Warning: given system has no nonzero inequalities H. Returning empty conversion cone.')
@@ -349,7 +352,7 @@ def iterative_conversion_cone(network, max_metabolites=30, verbose=True):
         print_network_information('N', network)
 
     # Hide biomass function
-    network.remove_objective_reaction()
+    # network.remove_objective_reaction()
 
     adjacency = get_metabolite_adjacency(network.N)
     metabolite_indices = range(len(network.metabolites))
@@ -445,46 +448,10 @@ def iterative_conversion_cone(network, max_metabolites=30, verbose=True):
                                           temp_network.reversible_reaction_indices(),
                                           temp_network.input_metabolite_indices(),
                                           temp_network.output_metabolite_indices(),
-                                          verbose=False, symbolic=True)
+                                          verbose=verbose, symbolic=True)
 
-        if conversions.shape[0] == 0:
-            print('The following metabolites have no viable conversion:',
-                  ', '.join([met.id for met in temp_network.metabolites]))
-            continue
+        add_conversions_to_network(network, temp_network, conversions, all_active_reactions, verbose=verbose)
 
-        if verbose:
-            print('Got %d conversions' % conversions.shape[0])
-
-        if conversions.shape[0] > 400:
-            print('Running redund on conversions')
-            conversions = redund(conversions)
-
-        if verbose:
-            print('Removing %d reactions used in conversions from network, and nullified %d metabolites' %
-                  (len(all_active_reactions), len(temp_network.metabolites) - len(temp_network.external_metabolite_indices())))
-
-        keep_reactions = np.setdiff1d(range(len(network.reactions)), all_active_reactions)
-        network.N = network.N[:, keep_reactions]
-        network.reactions = list(np.asarray(network.reactions)[keep_reactions])
-
-        if verbose:
-            print('Adding %d uncompressed conversions to network' % conversions.shape[0])
-        network.N = np.append(network.N, np.transpose(temp_network.uncompress(conversions)), axis=1)
-
-        for _ in conversions:
-            network.reactions.append(Reaction('conversion', 'conversion', reversible=False))
-
-        if verbose:
-            print('Running redund on conversions in full network stoichiometry')
-        conversion_indices = np.where([r.id == 'conversion' for r in network.reactions])[0]
-        natural_indices = np.setdiff1d(range(network.N.shape[1]), conversion_indices)
-        all_conversions = network.N[:, conversion_indices]
-        all_naturals = network.N[:, natural_indices]
-        reduced_conversions = np.transpose(redund(np.transpose(all_conversions)))
-        network.N = np.append(all_naturals, reduced_conversions, axis=1)
-        network.reactions = [r for index, r in enumerate(network.reactions) if index in natural_indices] + \
-                            [Reaction('conversion', 'conversion', reversible=False) for _ in
-                             range(reduced_conversions.shape[1])]
         if verbose:
             print_network_information('N', network, only_count=True)
             print('Done with modifying network reactions, recalculating adjacency')
@@ -505,15 +472,69 @@ def iterative_conversion_cone(network, max_metabolites=30, verbose=True):
     # TODO: another conversion enumeration is only necessary if there are remaining internal metabolites,
     # e.g. when there were internal ones with high connectivity
 
+    # Compress and restore the biomass reaction in the network
     network.compress(verbose=verbose)
-    network.restore_objective_reaction()
+    # network.restore_objective_reaction()
 
+    # if verbose:
+    #     print('Calculating biomass conversions')
+
+    # Calculate conversions to biomass
+    # iterative_biomass_conversions(network, verbose=verbose)
+
+    if verbose:
+        print('Calculating any remaining conversions')
+
+    # Calculate conversions left by internal metabolites skipped because of the connectivity threshold above
     conversion_cone = get_conversion_cone(network.N, network.external_metabolite_indices(),
                                           network.reversible_reaction_indices(),
                                           network.input_metabolite_indices(),
                                           network.output_metabolite_indices(),
                                           verbose=verbose, symbolic=True)
     return network.uncompress(conversion_cone)
+
+
+def add_conversions_to_network(network, temp_network, conversions, active_reactions, verbose=False):
+    if conversions.shape[0] == 0:
+        print('The following metabolites have no viable conversion:',
+              ', '.join([met.id for met in temp_network.metabolites]))
+        return
+
+    if verbose:
+        print('Got %d conversions' % conversions.shape[0])
+
+    if conversions.shape[0] > 400:
+        print('Running redund on conversions')
+        conversions = redund(conversions)
+
+    if verbose:
+        print('Removing %d reactions used in conversions from network, and nullified %d metabolites' %
+              (len(active_reactions),
+               len(temp_network.metabolites) - len(temp_network.external_metabolite_indices())))
+
+    keep_reactions = np.setdiff1d(range(len(network.reactions)), active_reactions)
+    network.N = network.N[:, keep_reactions]
+    network.reactions = list(np.asarray(network.reactions)[keep_reactions])
+
+    if verbose:
+        print('Adding %d uncompressed conversions to network' % conversions.shape[0])
+    network.N = np.append(network.N, np.transpose(temp_network.uncompress(conversions)), axis=1)
+
+    for _ in conversions:
+        network.reactions.append(Reaction('conversion', 'conversion', reversible=False))
+
+    if verbose:
+        print('Running redund on conversions in full network stoichiometry')
+    conversion_indices = np.where([r.id == 'conversion' for r in network.reactions])[0]
+    natural_reaction_indices = np.setdiff1d(range(network.N.shape[1]), conversion_indices)
+    all_conversions = network.N[:, conversion_indices]
+    all_naturals = network.N[:, natural_reaction_indices]
+    reduced_conversions = np.transpose(redund(np.transpose(all_conversions)))
+    network.N = np.append(all_naturals, reduced_conversions, axis=1)
+    network.reactions = [r for index, r in enumerate(network.reactions) if index in natural_reaction_indices] + \
+                        [Reaction('conversion', 'conversion', reversible=False) for _ in
+                         range(reduced_conversions.shape[1])]
+    return
 
 
 def subnetwork(network, metabolite_indices, reaction_indices):
@@ -530,57 +551,153 @@ def subnetwork(network, metabolite_indices, reaction_indices):
                                            network.metabolites[index].direction) for index in metabolite_indices]
     return temp_network
 
-def add_conversions_to_network(network, conversions):
+
+def subnetwork_with_metabolites(network, metabolite_indices):
+    active_reactions = []
+    selected_metabolites = []
+    adjacency = get_metabolite_adjacency(network.N)
+
+    for index in metabolite_indices:
+        reactions = list(np.where(network.N[index, :] != 0)[0])
+        active_reactions = list(np.unique(active_reactions + reactions))
+
+        adjacents = list(get_adjacent_metabolites(adjacency, index))
+        selected_metabolites = list(np.unique(selected_metabolites + [index] + adjacents))
+
+    return subnetwork(network, selected_metabolites, active_reactions)
 
 
-def iterative_biomass_conversions(network):
-    reactants, products = network.get_objective_reagents()
+def iterative_biomass_conversions(network, verbose=False):
+    """
+    Turns X1 + X2 + X3 + X4 > biomass + X9 + X10 into
+    X1 + X2 > A
+    A + X3 > B
+    B + X4 > C
+    C > biomass + X9 + X10
 
-    stoich = network.N[:, -1]
+    This reduces the problem size of enumerating conversions.
+    Has to be called directly after network.restore_objective_reaction().
+
+    :param network:
+    :return:
+    """
+    substrate_indices, product_indices = network.get_objective_reagents()
+
+    biomass_stoich = network.N[:, -1]
     orig_shape = network.N.shape
 
     # Hide biomass reaction again
-    network.N = network.N[:, :-1]
+    # network.N = network.N[:, :-1]
+    network.drop_reactions([network.N.shape[1] - 1])
 
     # Add virtual metabolites
     zeroes = to_fractions(np.zeros(shape=(1, 1)))
-    virtual_stoich_metabolites = np.repeat(np.repeat(zeroes, len(reactants) - 1, axis=0), network.N.shape[1], axis=1)
+    number_virtual_metabolites = len(substrate_indices) - 1
+    virtual_metabolite_indices = [i + orig_shape[0] for i in range(number_virtual_metabolites)]
+    virtual_stoich_metabolites = np.repeat(np.repeat(zeroes, number_virtual_metabolites, axis=0), network.N.shape[1], axis=1)
     network.N = np.append(network.N, virtual_stoich_metabolites, axis=0)
+    network.metabolites.extend([Metabolite('virtual %d' % i, 'virtual %d' % i, 'e', True) for i in range(1, number_virtual_metabolites + 1)])
 
-    pair = (reactants[0], reactants[1])
+    initial = (substrate_indices[0], substrate_indices[1])
+    pairs = [initial]
+    stoichs = [(biomass_stoich[substrate_indices[0]], biomass_stoich[substrate_indices[1]])]
 
-    # Mark reactants as internal
-    network.metabolites[pair[0]].is_external = False
-    network.metabolites[pair[1]].is_external = False
+    for i in range(number_virtual_metabolites - 1):
+        substrate = substrate_indices[i+2]
+        stoichiometry = biomass_stoich[substrate]
+        virtual_metabolite = virtual_metabolite_indices[i]
+        pairs.append((virtual_metabolite, substrate))
+        stoichs.append((Fraction(-1), stoichiometry))
+
+    # Compute conversions up to and including the last virtual metabolite (C in the function description)
+    for i, pair in enumerate(pairs):
+        print('\n======== Eliminating biomass substrate %d/%d ========\n' % (i+1, len(pairs)))
+        # Mark substrates as internal
+        network.metabolites[pair[0]].is_external = False
+        network.metabolites[pair[1]].is_external = False
+
+        # Add virtual reaction
+        column = np.repeat(zeroes, network.N.shape[0], axis=0)
+        column[pair[0]] = stoichs[i][0]
+        column[pair[1]] = stoichs[i][1]
+        column[virtual_metabolite_indices[i]] = Fraction(1)
+        network.N = np.append(network.N, column, axis=1)
+        network.reactions.extend([Reaction('virtual interim', 'virtual interim', False)])
+
+        # Create subnetwork with pair in it
+        active_reactions = list(np.unique(list(np.where(network.N[pair[0], :] != 0)[0]) + list(np.where(network.N[pair[1], :] != 0)[0])))
+        adjacency = get_metabolite_adjacency(network.N)
+        selection = list(np.unique(list(get_adjacent_metabolites(adjacency, pair[0])) + list(get_adjacent_metabolites(adjacency, pair[1])) + [pair[0], pair[1]]))
+        temp_network = subnetwork(network, selection, active_reactions)
+
+        # Mark all other substrates as external
+        other_ids = [network.metabolites[index].id for index in selection if index not in pair]
+        for metabolite in temp_network.metabolites:
+            if metabolite.id in other_ids:
+                metabolite.is_external = True
+
+        if verbose:
+            print_network_information('T', temp_network)
+
+        # Calculate conversions
+        conversions = get_conversion_cone(temp_network.N, temp_network.external_metabolite_indices(),
+                                              temp_network.reversible_reaction_indices(),
+                                              temp_network.input_metabolite_indices(),
+                                              temp_network.output_metabolite_indices(),
+                                              verbose=verbose, symbolic=True)
+        add_conversions_to_network(network, temp_network, conversions, active_reactions, verbose=verbose)
+
+        if verbose:
+            print_network_information('N', network, only_count=True)
 
     # Add virtual reaction
     column = np.repeat(zeroes, network.N.shape[0], axis=0)
-    column[pair[0]] = stoich[pair[0]]
-    column[pair[1]] = stoich[pair[1]]
-    column[orig_shape[0] + 0] = 1
+    column[virtual_metabolite_indices[i]] = Fraction(-1)
+    for index in product_indices:
+        column[index] = biomass_stoich[index]
+    network.N = np.append(network.N, column, axis=1)
+    network.reactions.extend([Reaction('objective', 'Objective reaction', False)])
 
-    # Create subnetwork with pair in it
-    active_reactions = np.where(network.N[pair[0], :] != 0)[0] + np.where(network.N[pair[1], :] != 0)[0]
+    # Mark last virtual metabolites as internal
+    network.metabolites[-1].is_external = False
+
+    # Find all adjacents to the last virtual metabolite
+    last_metabolite_index = virtual_metabolite_indices[-1]
+    last_metabolite_id = network.metabolites[last_metabolite_index].id
     adjacency = get_metabolite_adjacency(network.N)
-    selection = np.unique(get_adjacent_metabolites(adjacency, pair[0]), get_adjacent_metabolites(adjacency, pair[1]) + [pair[0], pair[1]])
-    temp_network = subnetwork(network, selection, active_reactions)
+    adjacents = list(get_adjacent_metabolites(adjacency, last_metabolite_index))
 
-    # Calculate conversions
-    conversions = temp_network.uncompress(get_conversion_cone(temp_network.N, temp_network.external_metabolite_indices(),
-                                          temp_network.reversible_reaction_indices(),
-                                          temp_network.input_metabolite_indices(),
-                                          temp_network.output_metabolite_indices(),
-                                          verbose=True, symbolic=True))
-    network
+    # Collect all product indices, plus the index of the last virtual metabolite
+    relevant_metabolites = adjacents + [last_metabolite_index]
+    active_reactions = list(np.where(network.N[last_metabolite_index, :] != 0)[0])
+    temp_network = subnetwork(network, relevant_metabolites, active_reactions)
 
-    # Mark all other reactants as external
-    for reactant in reactants:
-        if reactant not in pair:
-            network.metabolites[reactant].is_external = True
+    # Mark all adjacents to last virtual metabolite as external
+    for metabolite in temp_network.metabolites:
+        if metabolite.id != last_metabolite_id:
+            metabolite.is_external = True
 
+    if verbose:
+        print('Computing final conversion to biomass')
 
-    for i, reactant in enumerate(reactants[2:]):
+    # Compute final conversion to biomass
+    conversions = get_conversion_cone(temp_network.N, temp_network.external_metabolite_indices(),
+                            temp_network.reversible_reaction_indices(),
+                            temp_network.input_metabolite_indices(),
+                            temp_network.output_metabolite_indices(),
+                            verbose=verbose, symbolic=True)
+    add_conversions_to_network(network, temp_network, conversions, active_reactions, verbose=verbose)
 
+    # Set products to their original status
+    for index in product_indices:
+        metabolite = network.metabolites[index]
+        metabolite.is_external = metabolite.orig_external
+        metabolite.direction = metabolite.orig_direction
+
+    # Remove virtual metabolites
+    network.drop_metabolites(virtual_metabolite_indices)
+
+    return
 
 
 
