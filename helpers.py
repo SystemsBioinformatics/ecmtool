@@ -159,7 +159,7 @@ def nullspace_polco(A, verbose=False):
     B = np.append(B_neg, B_pos, axis=0)
     A = np.append(A, np.zeros(shape=(A.shape[0], 1)), axis=1)
 
-    result = np.asarray(list(get_extreme_rays(A, B, verbose=verbose)), dtype='object')
+    result = get_extreme_rays(A, B, verbose=verbose)
 
     for row in range(result.shape[0]):
         result[row, :] /= 1 if result[row, -1] == 0 else result[row, -1]
@@ -308,12 +308,21 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True
         print('Parsing computed rays')
     with open('tmp/generators_%d.txt' % rand, 'r') as file:
         lines = file.readlines()
+        rays = np.ndarray(shape=(0, inequality_matrix.shape[1]))
 
-        for index, line in enumerate(lines):
-            result = []
-            for value in line.replace('\n', '').split('\t'):
-                result.append(Fraction(str(value)))
-            yield np.transpose(result)
+        if len(lines) > 0:
+            number_lines = len(lines)
+            number_entries = len(lines[0].replace('\n', '').split('\t'))
+            rays = np.repeat(np.repeat(to_fractions(np.zeros(shape=(1,1))), number_entries, axis=1), number_lines, axis=0)
+
+            for row, line in enumerate(lines):
+                # print('line %d/%d' % (row+1, number_lines))
+                for column, value in enumerate(line.replace('\n', '').split('\t')):
+                    if value != '0':
+                        rays[row, column] = Fraction(str(value))
+
+    if verbose:
+        print('Done parsing rays')
 
     # Clean up the files created above
     if equality_matrix is not None:
@@ -321,6 +330,8 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True
 
     remove('tmp/iq_%d.txt' % rand)
     remove('tmp/generators_%d.txt' % rand)
+
+    return rays
 
 def binary_exists(binary_file):
     return any(

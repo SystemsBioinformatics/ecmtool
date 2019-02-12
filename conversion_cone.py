@@ -17,13 +17,10 @@ def get_rownames(A):
 
 
 def deflate_matrix(A, columns_to_keep):
-    B = np.ndarray(shape=(0, len(columns_to_keep)), dtype=A.dtype)
+    reduced_A = A[:, columns_to_keep]
 
     # Return rows that are nonzero after removing unwanted columns
-    for row_index in range(A.shape[0]):
-        row = A[row_index, columns_to_keep]
-        if np.count_nonzero(row) > 0:
-            B = np.append(B, [row], axis=0)
+    B = reduced_A[np.where(np.count_nonzero(reduced_A, axis=1) > 0)[0], :]
 
     return B
 
@@ -158,12 +155,17 @@ def unique(matrix):
 
 
 def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], input_metabolites=[], output_metabolites=[],
-                        symbolic=True, verbose=False):
+                        only_rays=False, symbolic=True, verbose=False):
     """
     Calculates the conversion cone as described in (Urbanczik, 2005).
     :param N: stoichiometry matrix
-    :param external_metabolites: list of row numbers (0-based) of metabolites that are tagged as in/outputs ("conversions")
+    :param external_metabolites: list of row numbers (0-based) of metabolites that are tagged as in/outputs
     :param reversible_reactions: list of booleans stating whether the reaction at this column is reversible
+    :param input_metabolites: list of row numbers (0-based) of metabolites that are taggede as inputs
+    :param output_metabolites: list of row numbers (0-based) of metabolites that are taggede as outputs
+    :param only_rays: return only the extreme rays of the conversion cone, and not the elementary vectors (ECMs instead of ECVs)
+    :param symbolic: use fractional numbers with symbolic algebra instead of floating point
+    :param verbose: print status messages during enumeration
     :return: matrix with conversion cone "c" as row vectors
     """
     amount_metabolites, amount_reactions = N.shape[0], N.shape[1]
@@ -219,28 +221,21 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
          print('Calculating extreme rays H of inequalities system G')
 
     # Calculate generating set of the dual of our initial conversion cone C0, C0*
-    rays = np.asarray(list(get_extreme_rays(np.append(linearities, G_rev, axis=0), G_irrev, verbose=verbose, symbolic=symbolic)))
-    # rays = np.asarray(list(get_extreme_rays(None, G_exp, verbose=verbose, symbolic=symbolic)))
+    rays = get_extreme_rays(np.append(linearities, G_rev, axis=0), G_irrev, verbose=verbose, symbolic=symbolic)
 
     if rays.shape[0] == 0:
         print('Warning: given system has no nonzero inequalities H. Returning empty conversion cone.')
         return to_fractions(np.ndarray(shape=(0, G.shape[1])))
 
+    if verbose:
+        print('Deflating H')
     rays_deflated = deflate_matrix(rays, external_metabolites)
 
     if verbose:
-        print('Reducing rows in H with redund')
-
-    count_before = len(rays_deflated)
-    rays_deflated = redund(rays_deflated)
-    count_after = len(rays_deflated)
-
-    if verbose:
-        print('Removed %d rows from H' % (count_before - count_after))
-
+        print('Expanding H with metabolite direction constraints')
     # Add bidirectional (in- and output) metabolites in reverse direction
-    rays_split = split_columns(rays_deflated, in_out_indices)
-    linearities_split = split_columns(linearities_deflated, in_out_indices)
+    rays_split = split_columns(rays_deflated, in_out_indices) if not only_rays else rays_deflated
+    linearities_split = split_columns(linearities_deflated, in_out_indices) if not only_rays else linearities_deflated
 
     H_ineq = rays_split
     H_eq = linearities_split
@@ -252,11 +247,13 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     identity = to_fractions(np.identity(H_ineq.shape[1]))
 
     # Bidirectional (in- and output) metabolites
-    for list_index, inout_metabolite_index in enumerate(in_out_indices):
-        index = inout_metabolite_index
-        H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
-        index = len(external_metabolites) + list_index
-        H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
+    # for list_index, inout_metabolite_index in enumerate(in_out_indices):
+    #     index = inout_metabolite_index
+    #     H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
+    #
+    #     if not only_rays:
+    #         index = len(external_metabolites) + list_index
+    #         H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
 
     # Inputs
     for input_metabolite in input_metabolites:
@@ -268,6 +265,20 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
         index = external_metabolites.index(output_metabolite)
         H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
 
+    if verbose:
+        print('Reducing rows in H with redund')
+
+    count_before_ineq = len(H_ineq)
+    H_ineq = redund(H_ineq)
+    count_after_ineq = len(H_ineq)
+
+    count_before_eq = len(H_eq)
+    H_eq = redund(H_eq)
+    count_after_eq = len(H_eq)
+
+    if verbose:
+        print('Removed %d rows from H' % (count_before_eq + count_before_ineq - count_after_eq - count_after_ineq))
+
     # Calculate the extreme rays of the cone C represented by inequalities H_total, resulting in
     # the elementary conversion modes of the input system.
     if verbose:
@@ -275,23 +286,38 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
 
     # rays = np.asarray(list(get_extreme_rays_efmtool(H_total)))
     # rays = np.asarray(list(get_extreme_rays(None, H_total, verbose=verbose)))
-    rays = np.asarray(list(get_extreme_rays(H_eq if len(H_eq) else None, H_ineq, verbose=verbose, symbolic=symbolic)))
+    # rays = np.asarray(list(get_extreme_rays(H_eq if len(H_eq) else None, H_ineq, verbose=verbose, symbolic=symbolic)))
     # rays = get_extreme_rays_cdd(H_total)
+
+    rays = get_extreme_rays(H_eq if len(H_eq) else None, H_ineq, verbose=verbose, symbolic=symbolic)
 
     if rays.shape[0] == 0:
         print('Warning: no feasible Elementary Conversion Modes found')
         return rays
 
+    if only_rays and len(in_out_metabolites) > 0:
+        linearities = np.transpose(iterative_nullspace(np.append(H_eq, H_ineq, axis=0), verbose=verbose))
+        if linearities.shape[0] > 0:
+            if verbose:
+                print('Appending linearities')
+            rays = np.append(rays, linearities, axis=0)
+
     if verbose:
         print('Inflating rays')
-    rays_inflated = inflate_matrix(rays, extended_external_metabolites, amount_metabolites + len(in_out_metabolites))
+
+    if only_rays:
+        rays_inflated = inflate_matrix(rays, external_metabolites, amount_metabolites)
+    else:
+        rays_inflated = inflate_matrix(rays, extended_external_metabolites, amount_metabolites + len(in_out_metabolites))
 
     if verbose:
         print('Removing non-unique rays')
 
+
     # Merge bidirectional metabolites again, and drop duplicate rows
     # np.unique() requires non-object matrices, so here we cast our results into float64.
-    rays_inflated[:, in_out_metabolites] = np.subtract(rays_inflated[:, in_out_metabolites], rays_inflated[:, G.shape[1]:])
+    if not only_rays:
+        rays_inflated[:, in_out_metabolites] = np.subtract(rays_inflated[:, in_out_metabolites], rays_inflated[:, G.shape[1]:])
     rays_merged = np.asarray(rays_inflated[:, :G.shape[1]], dtype='object')
     rays_unique = unique(rays_merged)
     # rays_unique = redund(rays_merged)
@@ -352,7 +378,7 @@ def iterative_conversion_cone(network, max_metabolites=30, verbose=True):
         print_network_information('N', network)
 
     # Hide biomass function
-    # network.remove_objective_reaction()
+    network.remove_objective_reaction()
 
     adjacency = get_metabolite_adjacency(network.N)
     metabolite_indices = range(len(network.metabolites))
@@ -384,7 +410,7 @@ def iterative_conversion_cone(network, max_metabolites=30, verbose=True):
         print('Adding initial metabolite %s with %d adjacent metabolites' %
               (network.metabolites[initial].id, connectivity))
 
-        while len(selection) + len(bordering) < max_metabolites:
+        while len(selection) + len(bordering) <= max_metabolites:
             current_round = []
             for metabolite_index in last_round:
                 active_reactions = np.where(network.N[metabolite_index, :] != 0)[0]
@@ -406,8 +432,11 @@ def iterative_conversion_cone(network, max_metabolites=30, verbose=True):
                         internal_indices = list(np.setdiff1d(internal_indices, selection))
                         bordering.extend(inner_adjacent)
                         bordering = list(np.unique(np.setdiff1d(bordering, selection)))
-                        print('Adding metabolite %s with %d adjacent metabolites (total: %d)' %
-                              (network.metabolites[adjacent_index].id, connectivity, len(selection) + len(current_round) + connectivity))
+                        active_reactions = np.where(network.N[adjacent_index, :] != 0)[0]
+                        all_active_reactions.extend(active_reactions)
+                        all_active_reactions = list(np.unique(all_active_reactions))
+                        print('Added metabolite %s with %d adjacent metabolites (total: %d)' %
+                              (network.metabolites[adjacent_index].id, connectivity, len(selection) + len(bordering)))
                     else:
                         print('Skipping metabolite %s with %d adjacent metabolites' % (network.metabolites[adjacent_index].id, connectivity))
 
@@ -448,7 +477,7 @@ def iterative_conversion_cone(network, max_metabolites=30, verbose=True):
                                           temp_network.reversible_reaction_indices(),
                                           temp_network.input_metabolite_indices(),
                                           temp_network.output_metabolite_indices(),
-                                          verbose=verbose, symbolic=True)
+                                          only_rays=True, verbose=verbose, symbolic=True)
 
         add_conversions_to_network(network, temp_network, conversions, all_active_reactions, verbose=verbose)
 
@@ -469,21 +498,21 @@ def iterative_conversion_cone(network, max_metabolites=30, verbose=True):
 
         adjacency = get_metabolite_adjacency(network.N)
 
-    # TODO: another conversion enumeration is only necessary if there are remaining internal metabolites,
-    # e.g. when there were internal ones with high connectivity
-
     # Compress and restore the biomass reaction in the network
-    network.compress(verbose=verbose)
-    # network.restore_objective_reaction()
+    # network.compress(verbose=verbose)
+    network.restore_objective_reaction()
 
-    # if verbose:
-    #     print('Calculating biomass conversions')
+    if verbose:
+        print('Calculating biomass conversions')
 
     # Calculate conversions to biomass
-    # iterative_biomass_conversions(network, verbose=verbose)
+    iterative_biomass_conversions(network, verbose=verbose)
 
     if verbose:
         print('Calculating any remaining conversions')
+
+    # TODO: another conversion enumeration is only necessary if there are remaining internal metabolites,
+    # e.g. when there were internal ones with high connectivity
 
     # Calculate conversions left by internal metabolites skipped because of the connectivity threshold above
     conversion_cone = get_conversion_cone(network.N, network.external_metabolite_indices(),
@@ -644,7 +673,7 @@ def iterative_biomass_conversions(network, verbose=False):
                                               temp_network.reversible_reaction_indices(),
                                               temp_network.input_metabolite_indices(),
                                               temp_network.output_metabolite_indices(),
-                                              verbose=verbose, symbolic=True)
+                                              only_rays=True, verbose=verbose, symbolic=True)
         add_conversions_to_network(network, temp_network, conversions, active_reactions, verbose=verbose)
 
         if verbose:
@@ -685,7 +714,7 @@ def iterative_biomass_conversions(network, verbose=False):
                             temp_network.reversible_reaction_indices(),
                             temp_network.input_metabolite_indices(),
                             temp_network.output_metabolite_indices(),
-                            verbose=verbose, symbolic=True)
+                            only_rays=True, verbose=verbose, symbolic=True)
     add_conversions_to_network(network, temp_network, conversions, active_reactions, verbose=verbose)
 
     # Set products to their original status

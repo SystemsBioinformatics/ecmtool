@@ -171,10 +171,9 @@ if __name__ == '__main__':
     if args.iterative:
         cone = iterative_conversion_cone(network)
     else:
-        cone = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
-                                   # verbose=True, symbolic=symbolic)
+        cone = network.uncompress(get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
                                    input_metabolites=network.input_metabolite_indices(),
-                                   output_metabolites=network.output_metabolite_indices(), verbose=True, symbolic=symbolic)
+                                   output_metabolites=network.output_metabolite_indices(), verbose=True, symbolic=symbolic))
 
     # Undo compression so we have results in the same dimensionality as original data
     expanded_cone = network.uncompress(cone)
