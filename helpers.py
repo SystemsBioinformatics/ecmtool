@@ -370,11 +370,13 @@ def get_redund_binary():
 def redund(matrix, verbose=False):
     matrix = to_fractions(matrix)
     binary = get_redund_binary()
+    matrix_path = relative_path('tmp' + os.sep + 'matrix.ine')
+    matrix_nonredundant_path = relative_path('tmp' + os.sep + 'matrix_nored.ine')
 
     if matrix.shape[0] <= 1:
         return matrix
 
-    with open_relative('tmp' + os.sep + 'matrix.ine', 'w') as file:
+    with open_relative(matrix_path, 'w') as file:
         file.write('V-representation\n')
         file.write('begin\n')
         file.write('%d %d rational\n' % (matrix.shape[0], matrix.shape[1] + 1))
@@ -385,11 +387,11 @@ def redund(matrix, verbose=False):
             file.write('\n')
         file.write('end\n')
 
-    system('%s tmp' % binary + os.sep + 'matrix.ine > tmp' + os.sep + 'matrix_nored.ine')
+    system('%s %s > %s' % (binary, matrix_path, matrix_nonredundant_path))
 
     matrix_nored = np.ndarray(shape=(0, matrix.shape[1] + 1), dtype='object')
 
-    with open_relative('tmp' + os.sep + 'matrix_nored.ine') as file:
+    with open_relative(matrix_nonredundant_path) as file:
         lines = file.readlines()
         for line in [line for line in lines if line not in ['\n', '']]:
             # Skip comment and INE format lines
@@ -398,8 +400,8 @@ def redund(matrix, verbose=False):
             row = [Fraction(x) for x in line.replace('\n', '').split(' ') if x != '']
             matrix_nored = np.append(matrix_nored, [row], axis=0)
 
-    remove_relative('tmp' + os.sep + 'matrix.ine')
-    remove_relative('tmp' + os.sep + 'matrix_nored.ine')
+    remove_relative(matrix_path)
+    remove_relative(matrix_nonredundant_path)
 
     if verbose:
         print('Removed %d redundant rows' % (matrix.shape[0] - matrix_nored.shape[0]))
