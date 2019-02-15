@@ -291,14 +291,14 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True
     if verbose:
         print('Writing equalities to file')
     if equality_matrix is not None:
-        with open_relative('tmp/eq_%d.txt' % rand, 'w') as file:
+        with open_relative('tmp' + os.sep + 'eq_%d.txt' % rand, 'w') as file:
             for row in range(equality_matrix.shape[0]):
                 file.write(' '.join([str(val) for val in equality_matrix[row, :]]) + '\r\n')
 
     # Write inequalities system to disk as space separated file
     if verbose:
         print('Writing inequalities to file')
-    with open_relative('tmp/iq_%d.txt' % rand, 'w') as file:
+    with open_relative('tmp' + os.sep + 'iq_%d.txt' % rand, 'w') as file:
         for row in range(inequality_matrix.shape[0]):
             file.write(' '.join([str(val) for val in inequality_matrix[row, :]]) + '\r\n')
 
@@ -307,20 +307,20 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True
     if verbose:
         print('Running polco (%d-%d GiB java VM memory)' % (min_mem, max_mem))
     with open(os_devnull, 'w') as devnull:
-        polco_path = relative_path('polco/polco.jar')
+        polco_path = relative_path('polco' + os.sep + 'polco.jar')
         check_call(('java -Xms%dg -Xmx%dg ' % (min_mem, max_mem) +
                     '-jar %s -kind text -sortinput AbsLexMin ' % polco_path +
                     '-arithmetic %s ' % (' '.join(['fractional' if symbolic else 'double'] * 3)) +
                     '-zero %s ' % (' '.join(['NaN' if symbolic else '1e-10'] * 3)) +
-                    ('' if equality_matrix is None else '-eq tmp/eq_%d.txt ' % (rand)) +
-                    ('' if inequality_matrix is None else '-iq tmp/iq_%d.txt ' % (rand)) +
-                    '-out text tmp/generators_%d.txt' % rand).split(' '),
+                    ('' if equality_matrix is None else '-eq tmp' + os.sep + 'eq_%d.txt ' % (rand)) +
+                    ('' if inequality_matrix is None else '-iq tmp' + os.sep + 'iq_%d.txt ' % (rand)) +
+                    '-out text tmp' + os.sep + 'generators_%d.txt' % rand).split(' '),
             stdout=(devnull if not verbose else None), stderr=(devnull if not verbose else None))
 
     # Read resulting extreme rays
     if verbose:
         print('Parsing computed rays')
-    with open_relative('tmp/generators_%d.txt' % rand, 'r') as file:
+    with open_relative('tmp' + os.sep + 'generators_%d.txt' % rand, 'r') as file:
         lines = file.readlines()
         rays = np.ndarray(shape=(0, inequality_matrix.shape[1]))
 
@@ -340,10 +340,10 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True
 
     # Clean up the files created above
     if equality_matrix is not None:
-        remove_relative('tmp/eq_%d.txt' % rand)
+        remove_relative('tmp' + os.sep + 'eq_%d.txt' % rand)
 
-    remove_relative('tmp/iq_%d.txt' % rand)
-    remove_relative('tmp/generators_%d.txt' % rand)
+    remove_relative('tmp' + os.sep + 'iq_%d.txt' % rand)
+    remove_relative('tmp' + os.sep + 'generators_%d.txt' % rand)
 
     return rays
 
@@ -360,7 +360,7 @@ def get_redund_binary():
             raise EnvironmentError('Executable "redund" was not found in your path. Please install package lrslib (e.g. apt install lrslib)')
         return 'redund'
     elif sys.platform.startswith('win32'):
-        return 'redund/redund_win.exe'
+        return 'redund\\redund_win.exe'
     elif sys.platform.startswith('darwin'):
         return 'redund/redund_mac'
     else:
@@ -374,7 +374,7 @@ def redund(matrix, verbose=False):
     if matrix.shape[0] <= 1:
         return matrix
 
-    with open_relative('tmp/matrix.ine', 'w') as file:
+    with open_relative('tmp' + os.sep + 'matrix.ine', 'w') as file:
         file.write('V-representation\n')
         file.write('begin\n')
         file.write('%d %d rational\n' % (matrix.shape[0], matrix.shape[1] + 1))
@@ -385,11 +385,11 @@ def redund(matrix, verbose=False):
             file.write('\n')
         file.write('end\n')
 
-    system('%s tmp/matrix.ine > tmp/matrix_nored.ine' % binary)
+    system('%s tmp' % binary + os.sep + 'matrix.ine > tmp' + os.sep + 'matrix_nored.ine')
 
     matrix_nored = np.ndarray(shape=(0, matrix.shape[1] + 1), dtype='object')
 
-    with open_relative('tmp/matrix_nored.ine') as file:
+    with open_relative('tmp' + os.sep + 'matrix_nored.ine') as file:
         lines = file.readlines()
         for line in [line for line in lines if line not in ['\n', '']]:
             # Skip comment and INE format lines
@@ -398,8 +398,8 @@ def redund(matrix, verbose=False):
             row = [Fraction(x) for x in line.replace('\n', '').split(' ') if x != '']
             matrix_nored = np.append(matrix_nored, [row], axis=0)
 
-    remove_relative('tmp/matrix.ine')
-    remove_relative('tmp/matrix_nored.ine')
+    remove_relative('tmp' + os.sep + 'matrix.ine')
+    remove_relative('tmp' + os.sep + 'matrix_nored.ine')
 
     if verbose:
         print('Removed %d redundant rows' % (matrix.shape[0] - matrix_nored.shape[0]))
