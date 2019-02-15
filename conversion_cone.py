@@ -9,6 +9,7 @@ def normalize_rows(M):
     row_max = M.max(axis=1)
     return M / np.transpose(np.asarray(np.asmatrix(row_max, dtype='object'), dtype='object'))
 
+
 def get_rownames(A):
     rownames = []
     for row_index in range(A.shape[0]):
