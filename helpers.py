@@ -369,7 +369,7 @@ def get_redund_binary():
 
 def redund(matrix, verbose=False):
     matrix = to_fractions(matrix)
-    binary = get_redund_binary()
+    binary = relative_path(get_redund_binary())
     matrix_path = relative_path('tmp' + os.sep + 'matrix.ine')
     matrix_nonredundant_path = relative_path('tmp' + os.sep + 'matrix_nored.ine')
 
