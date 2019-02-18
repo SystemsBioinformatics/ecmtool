@@ -1,11 +1,11 @@
-from scipy.optimize import linprog
-
-from helpers import *
+import numpy as np
 from time import time
-from conversion_cone import get_conversion_cone, iterative_conversion_cone
+from scipy.optimize import linprog
 from argparse import ArgumentParser, ArgumentTypeError
 
-from network import extract_sbml_stoichiometry
+from ecmtool.helpers import get_efms, get_metabolite_adjacency
+from ecmtool.network import extract_sbml_stoichiometry
+from ecmtool.conversion_cone import get_conversion_cone, iterative_conversion_cone
 
 
 def str2bool(v):

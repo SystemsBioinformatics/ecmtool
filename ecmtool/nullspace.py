@@ -1,6 +1,6 @@
 from scipy import linalg
 import numpy as np
-from helpers import nullspace, to_fractions
+from .helpers import nullspace, to_fractions
 
 
 def amount_nonzero_diagonals(R):

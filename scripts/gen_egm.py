@@ -3,10 +3,8 @@ from multiprocessing import Process, Queue, cpu_count
 import matplotlib.pyplot as plt
 from matplotlib import interactive
 
-from helpers import *
+from ecmtool.helpers import *
 from models.model6 import *
-import libsbml
-
 
 # Build P and M matrices (eq. 10)
 P, M = get_P_M(metabolites, metabolic_reactions, enzyme_reactions)

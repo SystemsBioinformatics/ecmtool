@@ -5,7 +5,7 @@ import cbmpy
 from scipy.optimize import linprog
 import numpy as np
 
-from helpers import to_fractions, redund
+from .helpers import to_fractions, redund
 
 
 def clementine_equality_compression(N, external_metabolites=[], reversible_reactions=[], input_metabolites=[], output_metabolites=[],

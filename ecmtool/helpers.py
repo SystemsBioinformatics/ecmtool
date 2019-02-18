@@ -306,21 +306,25 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True
     min_mem, max_mem = get_min_max_java_memory()
     if verbose:
         print('Running polco (%d-%d GiB java VM memory)' % (min_mem, max_mem))
+
+    equality_path = relative_path('tmp' + os.sep + 'eq_%d.txt' % rand)
+    inequality_path = relative_path('tmp' + os.sep + 'iq_%d.txt' % rand)
+    generators_path = relative_path('tmp' + os.sep + 'generators_%d.txt' % rand)
     with open(os_devnull, 'w') as devnull:
         polco_path = relative_path('polco' + os.sep + 'polco.jar')
         check_call(('java -Xms%dg -Xmx%dg ' % (min_mem, max_mem) +
                     '-jar %s -kind text -sortinput AbsLexMin ' % polco_path +
                     '-arithmetic %s ' % (' '.join(['fractional' if symbolic else 'double'] * 3)) +
                     '-zero %s ' % (' '.join(['NaN' if symbolic else '1e-10'] * 3)) +
-                    ('' if equality_matrix is None else '-eq tmp' + os.sep + 'eq_%d.txt ' % (rand)) +
-                    ('' if inequality_matrix is None else '-iq tmp' + os.sep + 'iq_%d.txt ' % (rand)) +
-                    '-out text tmp' + os.sep + 'generators_%d.txt' % rand).split(' '),
+                    ('' if equality_matrix is None else '-eq %s ' % equality_path) +
+                    ('' if inequality_matrix is None else '-iq %s ' % inequality_path) +
+                    '-out text %s' % generators_path).split(' '),
             stdout=(devnull if not verbose else None), stderr=(devnull if not verbose else None))
 
     # Read resulting extreme rays
     if verbose:
         print('Parsing computed rays')
-    with open_relative('tmp' + os.sep + 'generators_%d.txt' % rand, 'r') as file:
+    with open(generators_path, 'r') as file:
         lines = file.readlines()
         rays = np.ndarray(shape=(0, inequality_matrix.shape[1]))
 
@@ -340,12 +344,13 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True
 
     # Clean up the files created above
     if equality_matrix is not None:
-        remove_relative('tmp' + os.sep + 'eq_%d.txt' % rand)
+        remove(equality_path)
 
-    remove_relative('tmp' + os.sep + 'iq_%d.txt' % rand)
-    remove_relative('tmp' + os.sep + 'generators_%d.txt' % rand)
+    remove(inequality_path)
+    remove(generators_path)
 
     return rays
+
 
 def binary_exists(binary_file):
     return any(
@@ -376,7 +381,7 @@ def redund(matrix, verbose=False):
     if matrix.shape[0] <= 1:
         return matrix
 
-    with open_relative(matrix_path, 'w') as file:
+    with open(matrix_path, 'w') as file:
         file.write('V-representation\n')
         file.write('begin\n')
         file.write('%d %d rational\n' % (matrix.shape[0], matrix.shape[1] + 1))
@@ -391,7 +396,7 @@ def redund(matrix, verbose=False):
 
     matrix_nored = np.ndarray(shape=(0, matrix.shape[1] + 1), dtype='object')
 
-    with open_relative(matrix_nonredundant_path) as file:
+    with open(matrix_nonredundant_path) as file:
         lines = file.readlines()
         for line in [line for line in lines if line not in ['\n', '']]:
             # Skip comment and INE format lines
@@ -400,8 +405,8 @@ def redund(matrix, verbose=False):
             row = [Fraction(x) for x in line.replace('\n', '').split(' ') if x != '']
             matrix_nored = np.append(matrix_nored, [row], axis=0)
 
-    remove_relative(matrix_path)
-    remove_relative(matrix_nonredundant_path)
+    remove(matrix_path)
+    remove(matrix_nonredundant_path)
 
     if verbose:
         print('Removed %d redundant rows' % (matrix.shape[0] - matrix_nored.shape[0]))

@@ -1,8 +1,8 @@
-from helpers import *
 from time import time
 
-from network import Network, Reaction, Metabolite
-from nullspace import iterative_nullspace
+from .helpers import *
+from .network import Network, Reaction, Metabolite
+from .nullspace import iterative_nullspace
 
 
 def normalize_rows(M):
