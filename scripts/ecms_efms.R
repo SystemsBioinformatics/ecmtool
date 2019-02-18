@@ -45,6 +45,7 @@ colnames(ecms) <- metabolite_names
 ecms_growth <- ecms[ecms$`Virtual objective metabolite` > 10^-6,]
 ecms_normalised <- ecms_growth / ecms_growth$`Virtual objective metabolite`
 ecm_squared_dist_normalised <- as.matrix(pdist(ecms_normalised, closest_ecm_calc_normalised))
+View(sort(ecm_squared_dist_normalised))
 ecms_diff <- sweep(as.matrix(ecms_normalised), 1, as.matrix(closest_ecm_calc_normalised), '-')
 
 # Difference between conversion cone and ECMs calculated from efmtool's EFM matching with FBA result

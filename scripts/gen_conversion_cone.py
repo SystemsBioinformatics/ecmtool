@@ -1,7 +1,4 @@
-import numpy as np
-from numpy.linalg import svd
-from scipy.linalg import lu
-from helpers import *
+from ecmtool.helpers import *
 from sympy import *
 from time import time
 
@@ -57,8 +54,12 @@ def get_conversion_cone(N, tagged_rows=[], reversible_rows=[], verbose=False):
 
     if verbose:
         print('Calculating extreme rays H of inequalities system G')
-    H_cone = np.asarray(list(get_extreme_rays(None, G, verbose=verbose)))
-    H = np.append(G_linealities, H_cone, axis=0)
+    H = G_linealities
+    rays = get_extreme_rays(None, G, verbose=verbose)
+    if verbose:
+        print('Adding found rays to matrix H')
+    for ray in rays:
+        H = np.append(H, ray, axis=0)
 
     if verbose:
         print('Appending constraint B == 0')
@@ -76,7 +77,7 @@ def get_conversion_cone(N, tagged_rows=[], reversible_rows=[], verbose=False):
 
     if verbose:
         print('Calculating extreme rays C of inequalities system H')
-    rays = np.asarray(list(get_extreme_rays(None, H_mod, verbose=verbose)))
+    rays = get_extreme_rays(None, H_mod, verbose=verbose)
 
     if rays.shape[0] == 0:
         print('Warning: no feasible Elementary Conversion Modes found')

@@ -1,5 +1,5 @@
 import numpy as np
-from helpers import extract_sbml_stoichiometry, to_fractions
+from ecmtool.helpers import extract_sbml_stoichiometry, to_fractions
 
 if __name__ == '__main__':
     model_path = 'models/e_coli_core.xml'
