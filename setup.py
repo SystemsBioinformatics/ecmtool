@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='ecmtool',
-    version='0.1.1',
+    version='0.1.3',
     packages=['ecmtool'],
     install_requires=['numpy',
                       'scipy',
