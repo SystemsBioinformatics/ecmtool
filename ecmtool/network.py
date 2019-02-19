@@ -117,15 +117,12 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     :param skip_external_reactions: Ignore external reactions, as identified by '_EX_' in their ID
     :return: Network
     """
-    model = get_sbml_model(path)
-    species = list(model.species)
-    species_index = {item.id: index for index, item in enumerate(species)}
-    reactions = model.reactions
-    objective_reaction_column = None
-
-
-    # TODO: parse stoichiometry, reactions, and metabolites using CBMPy too
     cbmpy_model = cbmpy.readSBML3FBC(path)
+
+    species = list(cbmpy_model.species)
+    species_index = {item.id: index for index, item in enumerate(species)}
+    reactions = cbmpy_model.reactions
+    objective_reaction_column = None
     pairs = cbmpy.CBTools.findDeadEndReactions(cbmpy_model)
     external_metabolites, external_reactions = zip(*pairs) if len(pairs) else (zip(*cbmpy.CBTools.findDeadEndMetabolites(cbmpy_model))[0], [])
 
@@ -134,11 +131,9 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
 
     network = Network()
     network.metabolites = [Metabolite(item.id, item.name, item.compartment, item.id in external_metabolites) for item in species]
-    # network.metabolites = [Metabolite(item.id, item.name, item.compartment, item.compartment == 'e') for item in species]
 
     if add_objective:
-        plugin = model.getPlugin('fbc')
-        objective_name = plugin.getObjective(0).flux_objectives[0].reaction
+        objective_name = cbmpy_model.getActiveObjective().fluxObjectives[0].reaction
         network.objective_reaction_id = objective_name
 
     if skip_external_reactions:
@@ -170,10 +165,9 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
                     # e.g. https://github.com/SBRG/bigg_models/issues/324
                     print('Swapping direction of reversible reaction %s that can only run in reverse direction.' % reaction_id)
                     stoichiometry *= -1
-                    for met in model.getReaction(reaction_id).reactants:
-                        met.setStoichiometry(-met.getStoichiometry())
-                    for met in model.getReaction(reaction_id).products:
-                        met.setStoichiometry(-met.getStoichiometry())
+                    reagents = cbmpy_model.getReaction(reaction_id).reagents
+                    for met in reagents:
+                        met.coefficient *= -1
 
             metabolite.direction = 'input' if stoichiometry >= 0 else 'output'
 
@@ -185,12 +179,10 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
         if add_objective and reaction.id == objective_name:
             objective_reaction_column = column
 
-        for metabolite in reaction.reactants:
-            row = species_index[metabolite.species]
-            N[row, column] = Fraction(str(-metabolite.stoichiometry))
-        for metabolite in reaction.products:
-            row = species_index[metabolite.species]
-            N[row, column] = Fraction(str(metabolite.stoichiometry))
+        reagents = reaction.reagents
+        for metabolite in reagents:
+            row = species_index[metabolite.species_ref]
+            N[row, column] = Fraction(str(metabolite.coefficient))
 
     # Add objective metabolite from objective reaction
     if add_objective and objective_reaction_column is not None:
