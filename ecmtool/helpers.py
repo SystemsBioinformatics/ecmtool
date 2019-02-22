@@ -365,16 +365,16 @@ def get_redund_binary():
             raise EnvironmentError('Executable "redund" was not found in your path. Please install package lrslib (e.g. apt install lrslib)')
         return 'redund'
     elif sys.platform.startswith('win32'):
-        return 'redund\\redund_win.exe'
+        return relative_path('redund\\redund_win.exe')
     elif sys.platform.startswith('darwin'):
-        return 'redund/redund_mac'
+        return relative_path('redund/redund_mac')
     else:
         raise OSError('Unsupported operating system platform: %s' % sys.platform)
 
 
 def redund(matrix, verbose=False):
     matrix = to_fractions(matrix)
-    binary = relative_path(get_redund_binary())
+    binary = get_redund_binary()
     matrix_path = relative_path('tmp' + os.sep + 'matrix.ine')
     matrix_nonredundant_path = relative_path('tmp' + os.sep + 'matrix_nored.ine')
 
