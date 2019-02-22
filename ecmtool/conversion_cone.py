@@ -248,13 +248,13 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     identity = to_fractions(np.identity(H_ineq.shape[1]))
 
     # Bidirectional (in- and output) metabolites
-    # for list_index, inout_metabolite_index in enumerate(in_out_indices):
-    #     index = inout_metabolite_index
-    #     H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
-    #
-    #     if not only_rays:
-    #         index = len(external_metabolites) + list_index
-    #         H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
+    for list_index, inout_metabolite_index in enumerate(in_out_indices):
+        index = inout_metabolite_index
+        H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
+
+        if not only_rays:
+            index = len(external_metabolites) + list_index
+            H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
 
     # Inputs
     for input_metabolite in input_metabolites:
