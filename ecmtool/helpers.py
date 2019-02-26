@@ -248,7 +248,7 @@ def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
 def get_efms(N, reversibility):
     import matlab.engine
     engine = matlab.engine.start_matlab()
-    engine.cd('efmtool')
+    engine.cd(relative_path('efmtool'))
     result = engine.CalculateFluxModes(matlab.double([list(row) for row in N]), matlab.logical(reversibility))
     v = result['efms']
     x = np.transpose(np.asarray(v))
