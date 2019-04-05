@@ -220,7 +220,7 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
 
             H_eq = np.append(H_eq, linearities, axis=0)
 
-    rays = get_extreme_rays(H_eq if len(H_eq) else None, H_ineq, verbose=verbose, symbolic=symbolic)
+    rays = get_extreme_rays(H_eq if len(H_eq) else None, H_ineq, verbose=verbose)
 
     # When calculating only extreme rays, we need to add linealities in both directions
     if only_rays and len(in_out_metabolites) > 0:
@@ -361,7 +361,7 @@ def iterative_conversion_cone(network, max_metabolites=30, verbose=True):
                                           temp_network.reversible_reaction_indices(),
                                           temp_network.input_metabolite_indices(),
                                           temp_network.output_metabolite_indices(),
-                                          only_rays=True, verbose=verbose, symbolic=True)
+                                          only_rays=True, verbose=verbose)
 
         replace_conversions_into_network(network, temp_network, conversions, all_active_reactions, verbose=verbose)
 
@@ -403,7 +403,7 @@ def iterative_conversion_cone(network, max_metabolites=30, verbose=True):
                                           network.reversible_reaction_indices(),
                                           network.input_metabolite_indices(),
                                           network.output_metabolite_indices(),
-                                          verbose=verbose, symbolic=True)
+                                          verbose=verbose)
     return network.uncompress(conversion_cone)
 
 
@@ -670,7 +670,7 @@ def iterative_biomass_conversions(network, verbose=False):
                                           temp_network.reversible_reaction_indices(),
                                           temp_network.input_metabolite_indices(),
                                           temp_network.output_metabolite_indices(),
-                                          only_rays=True, verbose=verbose, symbolic=True)
+                                          only_rays=True, verbose=verbose)
         replace_conversions_into_network(network, temp_network, conversions, active_reactions, verbose=verbose)
 
         if verbose:
@@ -711,7 +711,7 @@ def iterative_biomass_conversions(network, verbose=False):
                                       temp_network.reversible_reaction_indices(),
                                       temp_network.input_metabolite_indices(),
                                       temp_network.output_metabolite_indices(),
-                                      only_rays=True, verbose=verbose, symbolic=True)
+                                      only_rays=True, verbose=verbose)
     replace_conversions_into_network(network, temp_network, conversions, active_reactions, verbose=verbose)
 
     # Set products to their original status
