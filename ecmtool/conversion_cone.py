@@ -64,75 +64,6 @@ def drop_nonextreme(G, zero_set, verbose=False):
     return G[keep_rows, :]
 
 
-def get_clementine_conversion_cone(N, external_metabolites=[], reversible_reactions=[], input_metabolites=[], output_metabolites=[],
-                                   verbose=True):
-    """
-    Calculates the conversion cone using Superior Clementine Equality Intersection (all rights reserved).
-    Follows the general Double Description method by Motzkin, using G as initial basis and intersecting
-    hyperplanes of internal metabolites = 0.
-    :param N:
-    :param external_metabolites:
-    :param reversible_reactions:
-    :param input_metabolites:
-    :param output_metabolites:
-    :return:
-    """
-    amount_metabolites, amount_reactions = N.shape[0], N.shape[1]
-    internal_metabolites = np.setdiff1d(range(amount_metabolites), external_metabolites)
-
-    identity = np.identity(amount_metabolites)
-    equalities = [identity[:, index] for index in internal_metabolites]
-
-    # Compose G of the columns of N
-    G = np.transpose(N)
-
-    # Add reversible reactions (columns) of N to G in the negative direction as well
-    for reaction_index in range(G.shape[0]):
-        if reaction_index in reversible_reactions:
-            G = np.append(G, [-G[reaction_index, :]], axis=0)
-
-    # For each internal metabolite, intersect the intermediary cone with an equality to 0 for that metabolite
-    for index, internal_metabolite in enumerate(internal_metabolites):
-        if verbose:
-            print('Iteration %d/%d' % (index, len(internal_metabolites)))
-
-        # Find conversions that use this metabolite
-        active_conversions = np.asarray([conversion_index for conversion_index in range(G.shape[0])
-                              if G[conversion_index, internal_metabolite] != 0])
-
-        # Skip internal metabolites that aren't used anywhere
-        if len(active_conversions) == 0:
-            if verbose:
-                print('Skipping internal metabolite #%d, since it is not used by any reaction\n' % internal_metabolite)
-            continue
-
-        # Project conversions that use this metabolite onto the hyperplane internal_metabolite = 0
-        projections = np.dot(G[active_conversions, :], equalities[index])
-        positive = active_conversions[np.argwhere(projections > 0)[:, 0]]
-        negative = active_conversions[np.argwhere(projections < 0)[:, 0]]
-        candidates = np.ndarray(shape=(0, amount_metabolites))
-
-        if verbose:
-            print('Adding %d candidates' % (len(positive) * len(negative)))
-
-        # Make convex combinations of all pairs (positive, negative) such that their internal_metabolite = 0
-        for pos in positive:
-            for neg in negative:
-                candidate = np.add(G[pos, :], G[neg, :] * (G[pos, internal_metabolite] / -G[neg, internal_metabolite]))
-                candidates = np.append(candidates, [candidate], axis=0)
-
-        # Keep only rays that satisfy internal_metabolite = 0
-        keep = np.setdiff1d(range(G.shape[0]), np.append(positive, negative, axis=0))
-        if verbose:
-            print('Removing %d rays\n' % (G.shape[0] - len(keep)))
-        G = G[keep, :]
-        G = np.append(G, candidates, axis=0)
-        # G = drop_nonextreme(G, get_zero_set(G, equalities), verbose=verbose)
-        G = redund(G, verbose=verbose)
-
-    return G
-
-
 def split_columns_semipositively(matrix, columns):
     orig_column_count = matrix.shape[1]
     matrix = split_columns(matrix, columns)
@@ -156,16 +87,15 @@ def unique(matrix):
 
 
 def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], input_metabolites=[], output_metabolites=[],
-                        only_rays=False, symbolic=True, verbose=False):
+                        only_rays=False, verbose=False):
     """
     Calculates the conversion cone as described in (Urbanczik, 2005).
     :param N: stoichiometry matrix
     :param external_metabolites: list of row numbers (0-based) of metabolites that are tagged as in/outputs
     :param reversible_reactions: list of booleans stating whether the reaction at this column is reversible
-    :param input_metabolites: list of row numbers (0-based) of metabolites that are taggede as inputs
-    :param output_metabolites: list of row numbers (0-based) of metabolites that are taggede as outputs
+    :param input_metabolites: list of row numbers (0-based) of metabolites that are tagged as inputs
+    :param output_metabolites: list of row numbers (0-based) of metabolites that are tagged as outputs
     :param only_rays: return only the extreme rays of the conversion cone, and not the elementary vectors (ECMs instead of ECVs)
-    :param symbolic: use fractional numbers with symbolic algebra instead of floating point
     :param verbose: print status messages during enumeration
     :return: matrix with conversion cone "c" as row vectors
     """
@@ -202,19 +132,11 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     # Calculate H as the union of our linearities and the extreme rays of matrix G (all as row vectors)
     if verbose:
          print('Calculating null space of inequalities system G')
-    # linearities = np.transpose(nullspace_polco(G, verbose=verbose))
     linearities = np.transpose(iterative_nullspace(G, verbose=verbose))
-    # linearities = to_fractions(np.transpose(nullspace(np.asarray(G, dtype='float64'), symbolic=False)))
-    # linearities = np.transpose(nullspace_terzer(G, verbose=verbose))
-    # linearities = np.loadtxt("/tmp/lin_ecoli2.csv", delimiter=',', dtype='int')
+
     if linearities.shape[0] == 0:
         linearities = np.ndarray(shape=(0, G.shape[1]))
 
-    # if symbolic and linearities.shape[0] > 0:
-    #     assert np.sum(np.sum(np.dot(G, np.transpose(linearities)), axis=0)) == 0
-    # elif linearities.shape[0] > 0:
-    #     sum = np.sum(np.sum(np.dot(G, np.transpose(linearities)), axis=0))
-    #     assert -10 ** -6 <= sum <= 10 ** -6
     linearities_deflated = deflate_matrix(linearities, external_metabolites)
 
     # Calculate H as the union of our linearities and the extreme rays of matrix G (all as row vectors)
@@ -222,7 +144,7 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
          print('Calculating extreme rays H of inequalities system G')
 
     # Calculate generating set of the dual of our initial conversion cone C0, C0*
-    rays = get_extreme_rays(np.append(linearities, G_rev, axis=0), G_irrev, verbose=verbose, symbolic=symbolic)
+    rays = get_extreme_rays(np.append(linearities, G_rev, axis=0), G_irrev, verbose=verbose)
 
     if rays.shape[0] == 0:
         print('Warning: given system has no nonzero inequalities H. Returning empty conversion cone.')
@@ -247,12 +169,14 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
 
     identity = to_fractions(np.identity(H_ineq.shape[1]))
 
-    # Bidirectional (in- and output) metabolites
-    for list_index, inout_metabolite_index in enumerate(in_out_indices):
-        index = inout_metabolite_index
-        H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
+    # Bidirectional (in- and output) metabolites.
+    # When enumerating only extreme rays, no splitting is done, and
+    # thus no other dimensions need to have directionality specified.
+    if not only_rays:
+        for list_index, inout_metabolite_index in enumerate(in_out_indices):
+            index = inout_metabolite_index
+            H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
 
-        if not only_rays:
             index = len(external_metabolites) + list_index
             H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
 
@@ -285,23 +209,26 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     if verbose:
         print('Calculating extreme rays C of inequalities system H_eq, H_ineq')
 
-    # rays = np.asarray(list(get_extreme_rays_efmtool(H_total)))
-    # rays = np.asarray(list(get_extreme_rays(None, H_total, verbose=verbose)))
-    # rays = np.asarray(list(get_extreme_rays(H_eq if len(H_eq) else None, H_ineq, verbose=verbose, symbolic=symbolic)))
-    # rays = get_extreme_rays_cdd(H_total)
-
-    rays = get_extreme_rays(H_eq if len(H_eq) else None, H_ineq, verbose=verbose, symbolic=symbolic)
-
-    if rays.shape[0] == 0:
-        print('Warning: no feasible Elementary Conversion Modes found')
-        return rays
-
+    linearity_rays = np.ndarray(shape=(0, H_eq.shape[1]))
     if only_rays and len(in_out_metabolites) > 0:
         linearities = np.transpose(iterative_nullspace(np.append(H_eq, H_ineq, axis=0), verbose=verbose))
         if linearities.shape[0] > 0:
             if verbose:
                 print('Appending linearities')
-            rays = np.append(rays, linearities, axis=0)
+            linearity_rays = np.append(linearity_rays, linearities, axis=0)
+            linearity_rays = np.append(linearity_rays, -linearities, axis=0)
+
+            H_eq = np.append(H_eq, linearities, axis=0)
+
+    rays = get_extreme_rays(H_eq if len(H_eq) else None, H_ineq, verbose=verbose, symbolic=symbolic)
+
+    # When calculating only extreme rays, we need to add linealities in both directions
+    if only_rays and len(in_out_metabolites) > 0:
+        rays = np.append(rays, linearity_rays, axis=0)
+
+    if rays.shape[0] == 0:
+        print('Warning: no feasible Elementary Conversion Modes found')
+        return rays
 
     if verbose:
         print('Inflating rays')
@@ -327,50 +254,6 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
         print('Enumerated %d rays' % len(rays_unique))
 
     return rays_unique
-
-
-def get_pseudo_external_direction(network, metabolite_index):
-    number_pos = 0
-    number_neg = 0
-
-    involved_reactions = np.where(network.N[metabolite_index, :] != 0)[0]
-
-    for reaction_index in involved_reactions:
-        reaction = network.reactions[reaction_index]
-        if reaction.reversible:
-            return 'both'
-
-        stoich = network.N[metabolite_index, reaction_index]
-        if stoich > 0:
-            number_pos += 1
-        elif stoich < 0:
-            number_neg += 1
-
-    return 'output' if number_neg == 0 else ('input' if number_pos == 0 else 'both')
-
-
-def get_adjacent_metabolites(adjacency_matrix, metabolite_index):
-    return np.where(adjacency_matrix[metabolite_index, :] != 0)[0]
-
-
-def get_matrix_information(matrix):
-    total_cells = matrix.shape[0] * matrix.shape[1]
-    total_nonzero = np.count_nonzero(matrix)
-    density = float(total_nonzero) / total_cells
-    max = np.max(matrix)
-
-    return density, max
-
-
-def print_network_information(name, network, only_count=False):
-    density, max = get_matrix_information(network.N)
-    metabolites, reactions = network.N.shape
-    number_external = len(network.external_metabolite_indices())
-    print('%s: density %.2f, %d metabolites (%d ext), %d reactions, max %.2f' %
-          (name, density, metabolites, number_external, reactions, max))
-
-    if not only_count:
-        print('metabolites: %s' % ', '.join(['%s (%s)' % (met.id, 'ext' if met.is_external else 'int') for met in network.metabolites]))
 
 
 def iterative_conversion_cone(network, max_metabolites=30, verbose=True):
@@ -480,7 +363,7 @@ def iterative_conversion_cone(network, max_metabolites=30, verbose=True):
                                           temp_network.output_metabolite_indices(),
                                           only_rays=True, verbose=verbose, symbolic=True)
 
-        add_conversions_to_network(network, temp_network, conversions, all_active_reactions, verbose=verbose)
+        replace_conversions_into_network(network, temp_network, conversions, all_active_reactions, verbose=verbose)
 
         if verbose:
             print_network_information('N', network, only_count=True)
@@ -507,7 +390,7 @@ def iterative_conversion_cone(network, max_metabolites=30, verbose=True):
         print('Calculating biomass conversions')
 
     # Calculate conversions to biomass
-    iterative_biomass_conversions(network, verbose=verbose)
+    # iterative_biomass_conversions(network, verbose=verbose)
 
     if verbose:
         print('Calculating any remaining conversions')
@@ -524,7 +407,120 @@ def iterative_conversion_cone(network, max_metabolites=30, verbose=True):
     return network.uncompress(conversion_cone)
 
 
-def add_conversions_to_network(network, temp_network, conversions, active_reactions, verbose=False):
+def get_clementine_conversion_cone(N, external_metabolites=[], reversible_reactions=[], input_metabolites=[], output_metabolites=[],
+                                   verbose=True):
+    """
+    Calculates the conversion cone using Superior Clementine Equality Intersection (all rights reserved).
+    Follows the general Double Description method by Motzkin, using G as initial basis and intersecting
+    hyperplanes of internal metabolites = 0.
+    :param N:
+    :param external_metabolites:
+    :param reversible_reactions:
+    :param input_metabolites:
+    :param output_metabolites:
+    :return:
+    """
+    amount_metabolites, amount_reactions = N.shape[0], N.shape[1]
+    internal_metabolites = np.setdiff1d(range(amount_metabolites), external_metabolites)
+
+    identity = np.identity(amount_metabolites)
+    equalities = [identity[:, index] for index in internal_metabolites]
+
+    # Compose G of the columns of N
+    G = np.transpose(N)
+
+    # Add reversible reactions (columns) of N to G in the negative direction as well
+    for reaction_index in range(G.shape[0]):
+        if reaction_index in reversible_reactions:
+            G = np.append(G, [-G[reaction_index, :]], axis=0)
+
+    # For each internal metabolite, intersect the intermediary cone with an equality to 0 for that metabolite
+    for index, internal_metabolite in enumerate(internal_metabolites):
+        if verbose:
+            print('Iteration %d/%d' % (index, len(internal_metabolites)))
+
+        # Find conversions that use this metabolite
+        active_conversions = np.asarray([conversion_index for conversion_index in range(G.shape[0])
+                              if G[conversion_index, internal_metabolite] != 0])
+
+        # Skip internal metabolites that aren't used anywhere
+        if len(active_conversions) == 0:
+            if verbose:
+                print('Skipping internal metabolite #%d, since it is not used by any reaction\n' % internal_metabolite)
+            continue
+
+        # Project conversions that use this metabolite onto the hyperplane internal_metabolite = 0
+        projections = np.dot(G[active_conversions, :], equalities[index])
+        positive = active_conversions[np.argwhere(projections > 0)[:, 0]]
+        negative = active_conversions[np.argwhere(projections < 0)[:, 0]]
+        candidates = np.ndarray(shape=(0, amount_metabolites))
+
+        if verbose:
+            print('Adding %d candidates' % (len(positive) * len(negative)))
+
+        # Make convex combinations of all pairs (positive, negative) such that their internal_metabolite = 0
+        for pos in positive:
+            for neg in negative:
+                candidate = np.add(G[pos, :], G[neg, :] * (G[pos, internal_metabolite] / -G[neg, internal_metabolite]))
+                candidates = np.append(candidates, [candidate], axis=0)
+
+        # Keep only rays that satisfy internal_metabolite = 0
+        keep = np.setdiff1d(range(G.shape[0]), np.append(positive, negative, axis=0))
+        if verbose:
+            print('Removing %d rays\n' % (G.shape[0] - len(keep)))
+        G = G[keep, :]
+        G = np.append(G, candidates, axis=0)
+        # G = drop_nonextreme(G, get_zero_set(G, equalities), verbose=verbose)
+        G = redund(G, verbose=verbose)
+
+    return G
+
+
+def get_pseudo_external_direction(network, metabolite_index):
+    number_pos = 0
+    number_neg = 0
+
+    involved_reactions = np.where(network.N[metabolite_index, :] != 0)[0]
+
+    for reaction_index in involved_reactions:
+        reaction = network.reactions[reaction_index]
+        if reaction.reversible:
+            return 'both'
+
+        stoich = network.N[metabolite_index, reaction_index]
+        if stoich > 0:
+            number_pos += 1
+        elif stoich < 0:
+            number_neg += 1
+
+    return 'output' if number_neg == 0 else ('input' if number_pos == 0 else 'both')
+
+
+def get_adjacent_metabolites(adjacency_matrix, metabolite_index):
+    return np.where(adjacency_matrix[metabolite_index, :] != 0)[0]
+
+
+def get_matrix_information(matrix):
+    total_cells = matrix.shape[0] * matrix.shape[1]
+    total_nonzero = np.count_nonzero(matrix)
+    density = float(total_nonzero) / total_cells
+    max = np.max(matrix)
+
+    return density, max
+
+
+def print_network_information(name, network, only_count=False):
+    density, max = get_matrix_information(network.N)
+    metabolites, reactions = network.N.shape
+    number_external = len(network.external_metabolite_indices())
+    print('%s: density %.2f, %d metabolites (%d ext), %d reactions, max %.2f' %
+          (name, density, metabolites, number_external, reactions, max))
+
+    if not only_count:
+        print('metabolites: %s' % ', '.join(['%s (%s)' % (met.id, 'ext' if met.is_external else 'int') for met in network.metabolites]))
+
+
+def replace_conversions_into_network(network, temp_network, conversions, active_reactions, verbose=False):
     if conversions.shape[0] == 0:
         print('The following metabolites have no viable conversion:',
               ', '.join([met.id for met in temp_network.metabolites]))
@@ -571,7 +567,7 @@ def subnetwork(network, metabolite_indices, reaction_indices):
     temp_network = Network()
     temp_network.N = network.N[:, reaction_indices]
     temp_network.N = temp_network.N[metabolite_indices, :]
-    temp_network.N = np.transpose(redund(np.transpose(temp_network.N)))
+    # temp_network.N = np.transpose(redund(np.transpose(temp_network.N)))
     temp_network.reactions = list(np.asarray(network.reactions)[reaction_indices])
     temp_network.compressed = True
     temp_network.uncompressed_metabolite_ids = [met.id for met in network.metabolites]
@@ -671,11 +667,11 @@ def iterative_biomass_conversions(network, verbose=False):
 
         # Calculate conversions
         conversions = get_conversion_cone(temp_network.N, temp_network.external_metabolite_indices(),
-                                              temp_network.reversible_reaction_indices(),
-                                              temp_network.input_metabolite_indices(),
-                                              temp_network.output_metabolite_indices(),
-                                              only_rays=True, verbose=verbose, symbolic=True)
-        add_conversions_to_network(network, temp_network, conversions, active_reactions, verbose=verbose)
+                                          temp_network.reversible_reaction_indices(),
+                                          temp_network.input_metabolite_indices(),
+                                          temp_network.output_metabolite_indices(),
+                                          only_rays=True, verbose=verbose, symbolic=True)
+        replace_conversions_into_network(network, temp_network, conversions, active_reactions, verbose=verbose)
 
         if verbose:
             print_network_information('N', network, only_count=True)
@@ -712,11 +708,11 @@ def iterative_biomass_conversions(network, verbose=False):
 
     # Compute final conversion to biomass
     conversions = get_conversion_cone(temp_network.N, temp_network.external_metabolite_indices(),
-                            temp_network.reversible_reaction_indices(),
-                            temp_network.input_metabolite_indices(),
-                            temp_network.output_metabolite_indices(),
-                            only_rays=True, verbose=verbose, symbolic=True)
-    add_conversions_to_network(network, temp_network, conversions, active_reactions, verbose=verbose)
+                                      temp_network.reversible_reaction_indices(),
+                                      temp_network.input_metabolite_indices(),
+                                      temp_network.output_metabolite_indices(),
+                                      only_rays=True, verbose=verbose, symbolic=True)
+    replace_conversions_into_network(network, temp_network, conversions, active_reactions, verbose=verbose)
 
     # Set products to their original status
     for index in product_indices:
@@ -725,7 +721,14 @@ def iterative_biomass_conversions(network, verbose=False):
         metabolite.direction = metabolite.orig_direction
 
     # Remove virtual metabolites
-    network.drop_metabolites(virtual_metabolite_indices)
+    drop_indices = virtual_metabolite_indices
+    internal_ids = [met.id for met in temp_network.metabolites if not met.is_external]
+
+    for index, met in enumerate(network.metabolites):
+        if met.id in internal_ids:
+            drop_indices += [index]
+
+    network.drop_metabolites(drop_indices)
 
     return
 
