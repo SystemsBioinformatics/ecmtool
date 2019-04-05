@@ -403,7 +403,7 @@ def iterative_conversion_cone(network, max_metabolites=30, only_rays=False, verb
                                           network.reversible_reaction_indices(),
                                           network.input_metabolite_indices(),
                                           network.output_metabolite_indices(),
-                                          verbose=verbose)
+                                          verbose=verbose, only_rays=only_rays)
     return network.uncompress(conversion_cone)
 
 
