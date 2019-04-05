@@ -256,7 +256,7 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     return rays_unique
 
 
-def iterative_conversion_cone(network, max_metabolites=30, verbose=True):
+def iterative_conversion_cone(network, max_metabolites=30, only_rays=False, verbose=True):
 
     if verbose:
         print_network_information('N', network)

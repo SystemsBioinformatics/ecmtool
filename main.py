@@ -172,6 +172,8 @@ if __name__ == '__main__':
     parser.add_argument('--outputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be produced')
     parser.add_argument('--hide', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that are transformed into internal metabolites by adding bidirectional exchange reactions')
     parser.add_argument('--iterative', type=str2bool, default=False, help='Enable iterative conversion mode enumeration (helps on large, dense networks) (default: false)')
+    parser.add_argument('--only_rays', type=str2bool, default=False, help='Enable to only return extreme rays, and not elementary modes. This describes the full conversion space, but not all biologically relevant minimal conversions. See (Urbanczik, 2005) (default: false)')
+    parser.add_argument('--verbose', type=str2bool, default=True, help='Enable to show detailed console output (default: true)')
     args = parser.parse_args()
 
     if args.model_path == '':
@@ -219,7 +221,7 @@ if __name__ == '__main__':
     orig_N = network.N
 
     if args.compress:
-        network.compress(verbose=True)
+        network.compress(verbose=args.verbose)
 
     if args.print_reactions and args.compress:
         print('Reactions (after compression):')
@@ -232,13 +234,11 @@ if __name__ == '__main__':
             print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
 
     if args.iterative:
-        cone = network.uncompress(iterative_conversion_cone(network))
+        cone = network.uncompress(iterative_conversion_cone(network, only_rays=args.only_rays, verbose=args.verbose))
     else:
         cone = network.uncompress(get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
                                    input_metabolites=network.input_metabolite_indices(),
-                                   output_metabolites=network.output_metabolite_indices(), verbose=True, only_rays=True))
-
-    print('Compressed cone: %dx%d, uncompressed: %dx%d' % (cone.shape[0], cone.shape[1], cone.shape[0], cone.shape[1]))
+                                   output_metabolites=network.output_metabolite_indices(), verbose=args.verbose, only_rays=args.only_rays))
 
     np.savetxt(args.out_path, cone, delimiter=',')
 
