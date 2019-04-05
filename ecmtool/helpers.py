@@ -245,14 +245,22 @@ def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
 #     x = np.transpose(np.asarray(v)[r:, :])
 #     return x
 
-def get_efms(N, reversibility):
+def get_efms(N, reversibility, verbose=True):
     import matlab.engine
     engine = matlab.engine.start_matlab()
     engine.cd(relative_path('efmtool'))
     result = engine.CalculateFluxModes(matlab.double([list(row) for row in N]), matlab.logical(reversibility))
-    v = result['efms']
-    x = np.transpose(np.asarray(v))
-    return x
+    if verbose:
+        print('Fetching calculated EFMs')
+    size = result['efms'].size
+    efms_T = np.reshape(np.array(result['efms']._data), size)
+    if verbose:
+        print('Turning calculated EFMs into fractions')
+    # efms = to_fractions(np.transpose(efms_T))
+    efms = np.transpose(efms_T)
+    if verbose:
+        print('Finishing fetching calculated EFMs')
+    return efms
 
 
 def get_extreme_rays_cdd(inequality_matrix):
