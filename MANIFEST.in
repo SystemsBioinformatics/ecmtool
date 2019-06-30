@@ -1,0 +1,4 @@
+include ecmtool/efmtool/*
+include ecmtool/polco/*
+include ecmtool/redund/*
+include ecmtool/tmp/.empty

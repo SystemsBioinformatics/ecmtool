@@ -1,0 +1,820 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SBML created with CBMPy (0.7.21.660) on Fri, 28 Jun 2019 13:33:16 -->
+<sbml xmlns="http://www.sbml.org/sbml/level3/version1/core" xmlns:fbc="http://www.sbml.org/sbml/level3/version1/fbc/version1" xmlns:html="http://www.w3.org/1999/xhtml" level="3" version="1" fbc:required="false">
+  <model metaid="meta_core_model_1" id="core_model_1" substanceUnits="mmol_per_gdw" timeUnits="hour" extentUnits="mmol_per_gdw">
+    <notes>
+      <html:p>
+        <html:br/>
+        <html:span size="small">Model &quot;<html:strong>core_model_1</html:strong>&quot; (cbmpy_fbc_model) generated with <html:a href="http://cbmpy.sourceforge.net">CBMPy</html:a> (0.7.21.660) on Fri, 28 Jun 2019 13:33:16.</html:span>
+      </html:p>
+    </notes>
+    <listOfUnitDefinitions>
+      <unitDefinition id="hour" name="hour">
+        <listOfUnits>
+          <unit kind="second" exponent="1" scale="0" multiplier="3600"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="per_hour" name="per_hour">
+        <listOfUnits>
+          <unit kind="second" exponent="-1" scale="0" multiplier="3600"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="mmol_per_hour" name="mmol_per_hour">
+        <listOfUnits>
+          <unit kind="mole" exponent="1" scale="-3" multiplier="1"/>
+          <unit kind="second" exponent="-1" scale="0" multiplier="3600"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="mmol_per_gdw" name="mmol_per_gdw">
+        <listOfUnits>
+          <unit kind="mole" exponent="1" scale="-3" multiplier="1"/>
+          <unit kind="gram" exponent="-1" scale="0" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+    </listOfUnitDefinitions>
+    <listOfCompartments>
+      <compartment metaid="meta_c" id="c" name="c" spatialDimensions="3" size="1" units="dimensionless" constant="true">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="CBMPy_info" value="created by SBML writer"/>
+          </listOfKeyValueData>
+        </annotation>
+      </compartment>
+      <compartment metaid="meta_e" id="e" name="e" spatialDimensions="3" size="1" units="dimensionless" constant="true">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="CBMPy_info" value="created by SBML writer"/>
+          </listOfKeyValueData>
+        </annotation>
+      </compartment>
+    </listOfCompartments>
+    <listOfSpecies>
+      <species metaid="meta__13dpg_c" id="_13dpg_c" name="_13dpg_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta__2pg_c" id="_2pg_c" name="_2pg_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta__3pg_c" id="_3pg_c" name="_3pg_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta__6pgc_c" id="_6pgc_c" name="_6pgc_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta__6pgl_c" id="_6pgl_c" name="_6pgl_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_ac_c" id="ac_c" name="ac_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_ac_e" id="ac_e" name="ac_e" compartment="e" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_acald_c" id="acald_c" name="acald_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_acald_e" id="acald_e" name="acald_e" compartment="e" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_accoa_c" id="accoa_c" name="accoa_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_acon_C_c" id="acon_C_c" name="acon_C_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_actp_c" id="actp_c" name="actp_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_adp_c" id="adp_c" name="adp_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_akg_c" id="akg_c" name="akg_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_akg_e" id="akg_e" name="akg_e" compartment="e" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_amp_c" id="amp_c" name="amp_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_atp_c" id="atp_c" name="atp_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_cit_c" id="cit_c" name="cit_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_co2_c" id="co2_c" name="co2_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_co2_e" id="co2_e" name="co2_e" compartment="e" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_coa_c" id="coa_c" name="coa_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_dhap_c" id="dhap_c" name="dhap_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_e4p_c" id="e4p_c" name="e4p_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_etoh_c" id="etoh_c" name="etoh_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_etoh_e" id="etoh_e" name="etoh_e" compartment="e" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_f6p_c" id="f6p_c" name="f6p_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_fdp_c" id="fdp_c" name="fdp_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_for_c" id="for_c" name="for_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_for_e" id="for_e" name="for_e" compartment="e" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_fru_e" id="fru_e" name="fru_e" compartment="e" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_fum_c" id="fum_c" name="fum_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_fum_e" id="fum_e" name="fum_e" compartment="e" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_g3p_c" id="g3p_c" name="g3p_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_g6p_c" id="g6p_c" name="g6p_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_glc__D_e" id="glc__D_e" name="glc__D_e" compartment="e" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_gln__L_c" id="gln__L_c" name="gln__L_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_gln__L_e" id="gln__L_e" name="gln__L_e" compartment="e" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_glu__L_c" id="glu__L_c" name="glu__L_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_glu__L_e" id="glu__L_e" name="glu__L_e" compartment="e" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_glx_c" id="glx_c" name="glx_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_h2o_c" id="h2o_c" name="h2o_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_h2o_e" id="h2o_e" name="h2o_e" compartment="e" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_h_c" id="h_c" name="h_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_h_e" id="h_e" name="h_e" compartment="e" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_icit_c" id="icit_c" name="icit_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_lac__D_c" id="lac__D_c" name="lac__D_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_lac__D_e" id="lac__D_e" name="lac__D_e" compartment="e" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_mal__L_c" id="mal__L_c" name="mal__L_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_mal__L_e" id="mal__L_e" name="mal__L_e" compartment="e" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_nad_c" id="nad_c" name="nad_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_nadh_c" id="nadh_c" name="nadh_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_nadp_c" id="nadp_c" name="nadp_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_nadph_c" id="nadph_c" name="nadph_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_nh4_c" id="nh4_c" name="nh4_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_nh4_e" id="nh4_e" name="nh4_e" compartment="e" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_o2_c" id="o2_c" name="o2_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_o2_e" id="o2_e" name="o2_e" compartment="e" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_oaa_c" id="oaa_c" name="oaa_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_pep_c" id="pep_c" name="pep_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_pi_c" id="pi_c" name="pi_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_pi_e" id="pi_e" name="pi_e" compartment="e" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_pyr_c" id="pyr_c" name="pyr_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_pyr_e" id="pyr_e" name="pyr_e" compartment="e" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_q8_c" id="q8_c" name="q8_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_q8h2_c" id="q8h2_c" name="q8h2_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_r5p_c" id="r5p_c" name="r5p_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_ru5p__D_c" id="ru5p__D_c" name="ru5p__D_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_s7p_c" id="s7p_c" name="s7p_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_succ_c" id="succ_c" name="succ_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_succ_e" id="succ_e" name="succ_e" compartment="e" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_succoa_c" id="succoa_c" name="succoa_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_xu5p__D_c" id="xu5p__D_c" name="xu5p__D_c" compartment="c" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+    </listOfSpecies>
+    <listOfReactions>
+      <reaction metaid="meta_PFK" id="PFK" name="PFK" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="f6p_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="atp_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="adp_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="h_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="fdp_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_D_LACt2" id="D_LACt2" name="D_LACt2" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="lac__D_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="h_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="h_e" stoichiometry="1" constant="true"/>
+          <speciesReference species="lac__D_e" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_PGM" id="PGM" name="PGM" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="_3pg_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="_2pg_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_SUCOAS" id="SUCOAS" name="SUCOAS" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="atp_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="succ_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="coa_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="succoa_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="adp_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="pi_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_PYRt2" id="PYRt2" name="PYRt2" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="pyr_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="h_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="h_e" stoichiometry="1" constant="true"/>
+          <speciesReference species="pyr_e" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_GLUt2r" id="GLUt2r" name="GLUt2r" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="h_e" stoichiometry="1" constant="true"/>
+          <speciesReference species="glu__L_e" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="h_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="glu__L_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_TALA" id="TALA" name="TALA" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="s7p_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="g3p_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="e4p_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="f6p_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_ICL" id="ICL" name="ICL" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="icit_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="glx_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="succ_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_NADTRHD" id="NADTRHD" name="NADTRHD" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="nadph_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nad_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="nadp_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nadh_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_FRUpts2" id="FRUpts2" name="FRUpts2" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="fru_e" stoichiometry="1" constant="true"/>
+          <speciesReference species="pep_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="pyr_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="f6p_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_LDH_D" id="LDH_D" name="LDH_D" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="pyr_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nadh_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="h_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="nad_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="lac__D_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_MALS" id="MALS" name="MALS" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="glx_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="h2o_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="accoa_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="h_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="coa_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="mal__L_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_TK2" id="TK2" name="TK2" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="xu5p__D_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="e4p_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="f6p_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="g3p_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_THD2" id="THD2" name="THD2" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="h_e" stoichiometry="2" constant="true"/>
+          <speciesReference species="nadh_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nadp_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="nad_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="h_c" stoichiometry="2" constant="true"/>
+          <speciesReference species="nadph_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_FORt2" id="FORt2" name="FORt2" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="for_e" stoichiometry="1" constant="true"/>
+          <speciesReference species="h_e" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="for_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="h_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_ACONTa" id="ACONTa" name="ACONTa" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="cit_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="h2o_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="acon_C_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_FBP" id="FBP" name="FBP" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="fdp_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="h2o_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="pi_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="f6p_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_FBA" id="FBA" name="FBA" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="fdp_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="g3p_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="dhap_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_GLCpts" id="GLCpts" name="GLCpts" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="glc__D_e" stoichiometry="1" constant="true"/>
+          <speciesReference species="pep_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="pyr_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="g6p_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_ACt2r" id="ACt2r" name="ACt2r" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="ac_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="h_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="h_e" stoichiometry="1" constant="true"/>
+          <speciesReference species="ac_e" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_H2Ot" id="H2Ot" name="H2Ot" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="h2o_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="h2o_e" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_ETOHt2r" id="ETOHt2r" name="ETOHt2r" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="etoh_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="h_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="h_e" stoichiometry="1" constant="true"/>
+          <speciesReference species="etoh_e" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_FUM" id="FUM" name="FUM" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="fum_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="h2o_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="mal__L_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_PGL" id="PGL" name="PGL" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="_6pgl_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="h2o_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="h_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="_6pgc_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_NH4t" id="NH4t" name="NH4t" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="nh4_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="nh4_e" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_TPI" id="TPI" name="TPI" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="g3p_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="dhap_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_PDH" id="PDH" name="PDH" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="pyr_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="coa_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nad_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="co2_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nadh_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="accoa_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_PYK" id="PYK" name="PYK" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="pep_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="adp_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="h_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="atp_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="pyr_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_MALt2_2" id="MALt2_2" name="MALt2_2" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="mal__L_e" stoichiometry="1" constant="true"/>
+          <speciesReference species="h_e" stoichiometry="2" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="h_c" stoichiometry="2" constant="true"/>
+          <speciesReference species="mal__L_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_GLNabc" id="GLNabc" name="GLNabc" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="gln__L_e" stoichiometry="1" constant="true"/>
+          <speciesReference species="atp_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="h2o_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="adp_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="glu__L_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="h_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="pi_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_PIt2r" id="PIt2r" name="PIt2r" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="pi_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="h_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="h_e" stoichiometry="1" constant="true"/>
+          <speciesReference species="pi_e" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_TK1" id="TK1" name="TK1" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="xu5p__D_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="r5p_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="s7p_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="g3p_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_ACONTb" id="ACONTb" name="ACONTb" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="icit_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="h2o_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="acon_C_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_CO2t" id="CO2t" name="CO2t" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="h2o_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="h2o_e" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_GLUSy" id="GLUSy" name="GLUSy" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="akg_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="gln__L_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nadph_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="h_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="glu__L_c" stoichiometry="2" constant="true"/>
+          <speciesReference species="nadp_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_fumt2_2" id="fumt2_2" name="fumt2_2" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="fum_e" stoichiometry="1" constant="true"/>
+          <speciesReference species="h_e" stoichiometry="2" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="h_c" stoichiometry="2" constant="true"/>
+          <speciesReference species="fum_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_GLUN" id="GLUN" name="GLUN" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="h2o_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="gln__L_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="glu__L_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nh4_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_GAPD" id="GAPD" name="GAPD" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="g3p_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nad_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="pi_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="h_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nadh_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="_13dpg_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_RPI" id="RPI" name="RPI" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="ru5p__D_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="r5p_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_PTAr" id="PTAr" name="PTAr" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="accoa_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="pi_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="actp_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="coa_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_ENO" id="ENO" name="ENO" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="_2pg_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="h2o_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="pep_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_PFL" id="PFL" name="PFL" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="pyr_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="coa_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="for_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="accoa_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_ACKr" id="ACKr" name="ACKr" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="actp_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="adp_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="atp_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="ac_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_MDH" id="MDH" name="MDH" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="mal__L_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nad_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="h_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nadh_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="oaa_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_RPE" id="RPE" name="RPE" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="ru5p__D_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="xu5p__D_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_PPS" id="PPS" name="PPS" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="pyr_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="h2o_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="atp_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="h_c" stoichiometry="2" constant="true"/>
+          <speciesReference species="amp_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="pi_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="pep_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_G6PDH2r" id="G6PDH2r" name="G6PDH2r" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="g6p_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nadp_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="h_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nadph_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="_6pgl_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_PGI" id="PGI" name="PGI" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="g6p_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="f6p_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_ICDHyr" id="ICDHyr" name="ICDHyr" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="icit_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nadp_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="co2_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nadph_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="akg_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_AKGDH" id="AKGDH" name="AKGDH" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="akg_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nad_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="coa_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="succoa_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nadh_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="co2_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_GLUDy" id="GLUDy" name="GLUDy" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="glu__L_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="h2o_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nadp_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="h_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="akg_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nadph_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nh4_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_PGK" id="PGK" name="PGK" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="_13dpg_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="adp_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="atp_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="_3pg_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_GND" id="GND" name="GND" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="_6pgc_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nadp_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="co2_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nadph_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="ru5p__D_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_GLNS" id="GLNS" name="GLNS" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="atp_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="glu__L_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="nh4_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="gln__L_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="adp_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="h_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="pi_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_SUCDI" id="SUCDI" name="SUCDI" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="succ_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="q8_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="fum_c" stoichiometry="1" constant="true"/>
+          <speciesReference species="q8h2_c" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_FORt" id="FORt" name="FORt" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="for_c" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="for_e" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+    </listOfReactions>
+    <fbc:listOfFluxBounds>
+      <fbc:fluxBound fbc:id="PFK_lb" fbc:reaction="PFK" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="PFK_ub" fbc:reaction="PFK" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="D_LACt2_lb" fbc:reaction="D_LACt2" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="D_LACt2_ub" fbc:reaction="D_LACt2" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="PGM_lb" fbc:reaction="PGM" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="PGM_ub" fbc:reaction="PGM" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="SUCOAS_lb" fbc:reaction="SUCOAS" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="SUCOAS_ub" fbc:reaction="SUCOAS" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="PYRt2_lb" fbc:reaction="PYRt2" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="PYRt2_ub" fbc:reaction="PYRt2" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="GLUt2r_lb" fbc:reaction="GLUt2r" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="GLUt2r_ub" fbc:reaction="GLUt2r" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="TALA_lb" fbc:reaction="TALA" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="TALA_ub" fbc:reaction="TALA" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="ICL_lb" fbc:reaction="ICL" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="ICL_ub" fbc:reaction="ICL" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="MALt2_2_lb" fbc:reaction="MALt2_2" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="MALt2_2_ub" fbc:reaction="MALt2_2" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="GLUDy_lb" fbc:reaction="GLUDy" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="GLUDy_ub" fbc:reaction="GLUDy" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="FRUpts2_lb" fbc:reaction="FRUpts2" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="FRUpts2_ub" fbc:reaction="FRUpts2" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="LDH_D_lb" fbc:reaction="LDH_D" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="LDH_D_ub" fbc:reaction="LDH_D" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="MALS_lb" fbc:reaction="MALS" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="MALS_ub" fbc:reaction="MALS" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="TK2_lb" fbc:reaction="TK2" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="TK2_ub" fbc:reaction="TK2" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="THD2_lb" fbc:reaction="THD2" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="THD2_ub" fbc:reaction="THD2" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="FORt2_lb" fbc:reaction="FORt2" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="FORt2_ub" fbc:reaction="FORt2" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="ACONTa_lb" fbc:reaction="ACONTa" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="ACONTa_ub" fbc:reaction="ACONTa" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="R00_lb" fbc:reaction="R00" fbc:operation="greaterEqual" fbc:value="-1"/>
+      <fbc:fluxBound fbc:id="R00_ub" fbc:reaction="R00" fbc:operation="lessEqual" fbc:value="1"/>
+      <fbc:fluxBound fbc:id="H2Ot_lb" fbc:reaction="H2Ot" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="H2Ot_ub" fbc:reaction="H2Ot" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="FBA_lb" fbc:reaction="FBA" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="FBA_ub" fbc:reaction="FBA" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="GLCpts_lb" fbc:reaction="GLCpts" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="GLCpts_ub" fbc:reaction="GLCpts" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="ACt2r_lb" fbc:reaction="ACt2r" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="ACt2r_ub" fbc:reaction="ACt2r" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="FBP_lb" fbc:reaction="FBP" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="FBP_ub" fbc:reaction="FBP" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="ETOHt2r_lb" fbc:reaction="ETOHt2r" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="ETOHt2r_ub" fbc:reaction="ETOHt2r" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="FUM_lb" fbc:reaction="FUM" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="FUM_ub" fbc:reaction="FUM" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="PGL_lb" fbc:reaction="PGL" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="PGL_ub" fbc:reaction="PGL" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="CO2t_lb" fbc:reaction="CO2t" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="CO2t_ub" fbc:reaction="CO2t" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="TPI_lb" fbc:reaction="TPI" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="TPI_ub" fbc:reaction="TPI" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="fumt2_2_lb" fbc:reaction="fumt2_2" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="fumt2_2_ub" fbc:reaction="fumt2_2" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="PFL_lb" fbc:reaction="PFL" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="PFL_ub" fbc:reaction="PFL" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="NADTRHD_lb" fbc:reaction="NADTRHD" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="NADTRHD_ub" fbc:reaction="NADTRHD" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="GLNabc_lb" fbc:reaction="GLNabc" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="GLNabc_ub" fbc:reaction="GLNabc" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="PIt2r_lb" fbc:reaction="PIt2r" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="PIt2r_ub" fbc:reaction="PIt2r" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="TK1_lb" fbc:reaction="TK1" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="TK1_ub" fbc:reaction="TK1" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="ACONTb_lb" fbc:reaction="ACONTb" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="ACONTb_ub" fbc:reaction="ACONTb" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="NH4t_lb" fbc:reaction="NH4t" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="NH4t_ub" fbc:reaction="NH4t" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="GLUSy_lb" fbc:reaction="GLUSy" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="GLUSy_ub" fbc:reaction="GLUSy" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="GLUN_lb" fbc:reaction="GLUN" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="GLUN_ub" fbc:reaction="GLUN" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="GLNS_lb" fbc:reaction="GLNS" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="GLNS_ub" fbc:reaction="GLNS" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="PDH_lb" fbc:reaction="PDH" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="PDH_ub" fbc:reaction="PDH" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="PTAr_lb" fbc:reaction="PTAr" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="PTAr_ub" fbc:reaction="PTAr" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="FORt_lb" fbc:reaction="FORt" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="FORt_ub" fbc:reaction="FORt" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="PYK_lb" fbc:reaction="PYK" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="PYK_ub" fbc:reaction="PYK" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="ACKr_lb" fbc:reaction="ACKr" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="ACKr_ub" fbc:reaction="ACKr" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="MDH_lb" fbc:reaction="MDH" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="MDH_ub" fbc:reaction="MDH" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="RPE_lb" fbc:reaction="RPE" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="RPE_ub" fbc:reaction="RPE" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="PPS_lb" fbc:reaction="PPS" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="PPS_ub" fbc:reaction="PPS" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="G6PDH2r_lb" fbc:reaction="G6PDH2r" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="G6PDH2r_ub" fbc:reaction="G6PDH2r" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="PGI_lb" fbc:reaction="PGI" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="PGI_ub" fbc:reaction="PGI" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="ICDHyr_lb" fbc:reaction="ICDHyr" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="ICDHyr_ub" fbc:reaction="ICDHyr" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="AKGDH_lb" fbc:reaction="AKGDH" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="AKGDH_ub" fbc:reaction="AKGDH" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="RPI_lb" fbc:reaction="RPI" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="RPI_ub" fbc:reaction="RPI" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="PGK_lb" fbc:reaction="PGK" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="PGK_ub" fbc:reaction="PGK" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="GND_lb" fbc:reaction="GND" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="GND_ub" fbc:reaction="GND" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="GAPD_lb" fbc:reaction="GAPD" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="GAPD_ub" fbc:reaction="GAPD" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="SUCDI_lb" fbc:reaction="SUCDI" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="SUCDI_ub" fbc:reaction="SUCDI" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="ENO_lb" fbc:reaction="ENO" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="ENO_ub" fbc:reaction="ENO" fbc:operation="lessEqual" fbc:value="INF"/>
+    </fbc:listOfFluxBounds>
+    <fbc:listOfObjectives fbc:activeObjective="objMaxJ25">
+      <fbc:objective fbc:id="objMaxJ25" fbc:type="maximize">
+        <fbc:listOfFluxObjectives>
+          <fbc:fluxObjective fbc:reaction="R00" fbc:coefficient="1"/>
+        </fbc:listOfFluxObjectives>
+      </fbc:objective>
+    </fbc:listOfObjectives>
+  </model>
+</sbml>
