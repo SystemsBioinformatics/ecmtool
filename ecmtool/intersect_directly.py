@@ -404,18 +404,18 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-8, verbose=True, re
             x0[j] = 0.5
 
 
-            disable_lp = True
+            #disable_lp = True
             # KKT
-            ext_basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [i, j])
-            KKT, status = kkt_check(c, np.asarray(A_eq, dtype='float'), x0, ext_basis)
+            #ext_basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [i, j])
+            #KKT, status = kkt_check(c, np.asarray(A_eq, dtype='float'), x0, ext_basis)
 
             # DEBUG
-            status = 0
-            if status == 0:
-                if KKT:
-                    adjacency[i, j] = 1
-                    adjacency[j, i] = 1
-                continue
+            #status = 0
+            #if status == 0:
+            #    if KKT:
+            #        adjacency[i, j] = 1
+            #        adjacency[j, i] = 1
+            #    continue
 
             #print("\t\t\tKKT had non-zero exit status...")
             #disable_lp = False
