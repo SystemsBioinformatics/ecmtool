@@ -176,7 +176,7 @@ if __name__ == '__main__':
     parser.add_argument('--iterative', type=str2bool, default=False, help='Enable iterative conversion mode enumeration (helps on large, dense networks) (default: false)')
     parser.add_argument('--only_rays', type=str2bool, default=False, help='Enable to only return extreme rays, and not elementary modes. This describes the full conversion space, but not all biologically relevant minimal conversions. See (Urbanczik, 2005) (default: false)')
     parser.add_argument('--verbose', type=str2bool, default=True, help='Enable to show detailed console output (default: true)')
-    parser.add_argument('--scei', type=str2bool, default=False, help='Enable to use SCEI compression (default: true)')
+    parser.add_argument('--scei', type=str2bool, default=True, help='Enable to use SCEI compression (default: true)')
     args = parser.parse_args()
 
     if args.model_path == '':
