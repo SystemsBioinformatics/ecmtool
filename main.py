@@ -167,7 +167,7 @@ if __name__ == '__main__':
     parser.add_argument('--add_objective_metabolite', type=str2bool, default=True, help='Add a virtual metabolite containing the stoichiometry of the objective function of the model (default: true)')
     parser.add_argument('--check_feasibility', type=str2bool, default=False, help='For each found ECM, verify that a feasible flux exists that produces it (default: false)')
     parser.add_argument('--check_bijection', type=str2bool, default=False, help='Verify completeness of found ECMs by calculating ECMs from EFMs and proving bijection (don\'t use on large networks) (default: false)')
-    parser.add_argument('--print_metabolites', type=str2bool, default=True, help='Print the names and IDs of metabolites in the (compressed) metabolic network (default: true)')
+    parser.add_argument('--print_metabolites', type=str2bool, default=False, help='Print the names and IDs of metabolites in the (compressed) metabolic network (default: true)')
     parser.add_argument('--print_reactions', type=str2bool, default=False, help='Print the names and IDs of reactions in the (compressed) metabolic network (default: true)')
     parser.add_argument('--auto_direction', type=str2bool, default=True, help='Automatically determine external metabolites that can only be consumed or produced (default: true)')
     parser.add_argument('--inputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be consumed')

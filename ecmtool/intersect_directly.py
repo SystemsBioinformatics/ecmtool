@@ -382,6 +382,10 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-8, verbose=True, re
 
     disable_lp = not remove_cycles
     total = len(plus) * len(minus)
+
+    A_ub = -np.identity(number_rays)
+    b_ub = np.zeros(number_rays)
+    A_eq = R_indep
     for ind1, i in enumerate(plus):
         for ind2, j in enumerate(minus):
             it = ind2 + ind1 * len(minus)
@@ -395,14 +399,10 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-8, verbose=True, re
             c = -np.ones(number_rays)
             c[i] = 0
             c[j] = 0
-            A_ub = -np.identity(number_rays)
-            b_ub = np.zeros(number_rays)
-            A_eq = R_indep
             b_eq = target
             x0 = np.zeros(number_rays)
             x0[i] = 0.5
             x0[j] = 0.5
-
 
             #disable_lp = True
             # KKT
