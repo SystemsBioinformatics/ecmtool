@@ -5,7 +5,7 @@ from argparse import ArgumentParser, ArgumentTypeError
 from sklearn.preprocessing import normalize
 
 from ecmtool.helpers import get_efms, get_metabolite_adjacency, redund
-from ecmtool.intersect_directly import intersect_directly, print_ecms_direct, remove_cycles
+from ecmtool.intersect_directly import intersect_directly, print_ecms_direct, remove_cycles, reduce_column_norms
 from ecmtool.network import extract_sbml_stoichiometry
 from ecmtool.conversion_cone import get_conversion_cone, iterative_conversion_cone, unique
 
@@ -160,7 +160,7 @@ if __name__ == '__main__':
     start = time()
 
     parser = ArgumentParser(description='Calculate Elementary Conversion Modes from an SBML model. For medium-to large networks, be sure to define --inputs and --outputs. This reduces the enumeration problem complexity considerably.')
-    parser.add_argument('--model_path', type=str, default='models/e_coli_core.xml', help='Relative or absolute path to an SBML model .xml file')
+    parser.add_argument('--model_path', type=str, default='models/active_subnetwork_KO_4.xml', help='Relative or absolute path to an SBML model .xml file')
     parser.add_argument('--direct', type=str2bool, default=True, help='Enable to intersect with equalities directly')
     parser.add_argument('--compress', type=str2bool, default=True, help='Perform compression to which the conversions are invariant, and reduce the network size considerably (default: True)')
     parser.add_argument('--out_path', default='conversion_cone.csv', help='Relative or absolute path to the .csv file you want to save the calculated conversions to (default: conversion_cone.csv)')
@@ -177,6 +177,7 @@ if __name__ == '__main__':
     parser.add_argument('--only_rays', type=str2bool, default=False, help='Enable to only return extreme rays, and not elementary modes. This describes the full conversion space, but not all biologically relevant minimal conversions. See (Urbanczik, 2005) (default: false)')
     parser.add_argument('--verbose', type=str2bool, default=True, help='Enable to show detailed console output (default: true)')
     parser.add_argument('--scei', type=str2bool, default=True, help='Enable to use SCEI compression (default: true)')
+    parser.add_argument('--fracred', type=str2bool, default=False, help='Enable to divide rays to make them smaller when possible (default: true)')
     args = parser.parse_args()
 
     if args.model_path == '':
@@ -242,17 +243,14 @@ if __name__ == '__main__':
             network.drop_metabolites([i], force_external=True)
 
     if args.direct:
-        # DEBUG try floats everywhere
-        #network.N = np.array(network.N, dtype='float')
-
+        if args.fracred:
+            network.N = reduce_column_norms(network.N)
         network.split_reversible()
-        #if not args.only_rays:
-        #    network.split_in_out()
         R, deleted = remove_cycles(network.N, network)
 
         external = np.asarray(network.external_metabolite_indices())
         internal = np.setdiff1d(range(R.shape[0]), external)
-        T_intersected = intersect_directly(R, internal, network, verbose=args.verbose)
+        T_intersected = intersect_directly(R, internal, network, verbose=args.verbose, fracred=args.fracred)
 
         print_ecms_direct(T_intersected, network.external_metabolite_indices(), network.metabolites)
         end = time()

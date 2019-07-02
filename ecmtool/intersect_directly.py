@@ -252,6 +252,8 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, v
         print("\tDimensions after redund: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
         print("\t\tRows removed by redund: %d" % (rows_before - next_matrix.shape[0]))
         print("\tRedund took %f seconds" % (end - start))
+        #if rows_before - next_matrix.shape[0] != 0:
+        #   input("Waiting...")
 
     next_matrix = np.transpose(next_matrix)
 
@@ -303,7 +305,8 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
                 print("Found an unbounded LP, augmenting reaction %d through metabolite %d" % (augment_reaction, met))
             R = eliminate_metabolite(R, met, network, calculate_adjacency=False)
 
-        res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12}, x0=x0)
+        res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12},
+                      x0=x0)
         if res.status == 4:
             print("Numerical difficulties with revised simplex, trying interior point method instead")
             res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
@@ -355,6 +358,13 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
     return R, deleted
 
 
+def normalize_columns(R):
+    result = R.copy()
+    for i in range(result.shape[1]):
+        result[:, i] /= np.linalg.norm(np.array(R[:, i], dtype='float'))
+    return result
+
+
 def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-8, verbose=True, remove_cycles=True):
     """
     Returns r by r adjacency matrix of rays, given
@@ -368,7 +378,12 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-8, verbose=True, re
     """
 
     start = time()
-    R_indep = independent_rows(R)
+
+    # with normalization
+    R_normalized = normalize_columns(np.array(R, dtype='float'))
+    R_indep = independent_rows(R_normalized)
+    # without normalization
+    #R_indep = independent_rows(R)
 
     LPs_done = 0
     # set default plus and minus
@@ -386,10 +401,13 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-8, verbose=True, re
     A_ub = -np.identity(number_rays)
     b_ub = np.zeros(number_rays)
     A_eq = R_indep
+    print("\n\tLargest non-LP ray: %.2f" % max(
+        [np.linalg.norm(np.array(R[:, i], dtype='float')) for i in range(R.shape[1])]))
+    print("\n\tLargest LP ray: %.2f" % max([np.linalg.norm(np.array(A_eq[:, i], dtype='float')) for i in range(A_eq.shape[1])]))
     for ind1, i in enumerate(plus):
         for ind2, j in enumerate(minus):
             it = ind2 + ind1 * len(minus)
-            if verbose:
+            if verbose and it % 25 == 0:
                 print("Doing KKT test %d of %d (%.2f percent done)" % (it, total, it * 100 / total))
             ray1 = R_indep[:, i]
             ray2 = R_indep[:, j]
@@ -421,27 +439,29 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-8, verbose=True, re
             #disable_lp = False
             if not disable_lp:
                 LPs_done += 1
-                res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12}, x0=x0)
-
-                if res.status == 4:
-                    print("Numerical difficulties with revised simplex, trying interior point method instead")
-                    res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
+                res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex',
+                              options={'tol': 1e-10, 'maxiter': 500}, x0=x0)
 
                 if res.status == 1:
                     print("Iteration limit %d reached, trying Blands pivot rule" % (res.nit))
                     #input("Waiting...")
-                    res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12, 'bland': True})
-                #if res.status == 1:
-                #   print("Iteration limit %d still reached, trying higher limit" % (res.nit))
+                    res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex',
+                                  options={'tol': 1e-10, 'bland': True})
+                if res.status == 1:
+                    print("Iteration limit %d still reached, trying higher limit" % (res.nit))
                     #input("Waiting...")
-                #    res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point',
-                #                  options={'tol': 1e-12, 'maxiter': 20000, 'bland': True})
+                    res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex',
+                                  options={'tol': 1e-12, 'maxiter': 20000, 'bland': True})
+
+                if res.status == 4:
+                    print("Numerical difficulties with revised simplex, trying interior point method instead")
+                    res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-10})
 
                 if res.status != 0:
-                    print("Status %d - %s" % (res.status, res.message))
-                    #input("Waiting...")
+                    print("Status %d" % res.status)
+                    # input("Waiting...")
 
-                if res.status != 0 or res.fun == 0:
+                if res.status != 0 or abs(res.fun) < tol:
                     adjacency[i, j] = 1
                     adjacency[j, i] = 1
 
@@ -450,17 +470,27 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-8, verbose=True, re
     return adjacency
 
 
-def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12):
+def reduce_column_norms(matrix):
+    for i in range(matrix.shape[1]):
+        norm = np.linalg.norm(np.array(matrix[:, i], dtype='float'))
+        if norm > 2:
+            matrix[:, i] /= int(np.floor(norm))
+    return matrix
+
+
+def intersect_directly(R, internal_metabolites, network, verbose=True, fracred=True, tol=1e-12):
     # rows are rays
     deleted = 0
-    iter = 1
+    it = 1
     internal = list(internal_metabolites)
     internal.sort()
 
     for i in np.flip(internal, 0):
         if verbose:
-            print("\nIteration %d (internal metabolite = %d) of %d" % (iter, i, len(internal_metabolites)))
-            iter += 1
+            print("\nIteration %d (internal metabolite = %d) of %d" % (it, i, len(internal_metabolites)))
+            it += 1
+        if fracred:
+            R = reduce_column_norms(R)
         R = eliminate_metabolite(R, i, network, calculate_adjacency=True)
 
     return R
