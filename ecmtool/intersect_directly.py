@@ -70,7 +70,7 @@ def get_more_basis_columns(A, basis):
     return new_basis
 
 
-def kkt_check(c, A, x, basis, tol=1e-12, verbose=True):
+def kkt_check(c, A, x, basis, tol=1e-5, verbose=True):
     """
     Determine whether KKT conditions hold for x0.
     Take size 0 steps if available.
@@ -101,8 +101,8 @@ def kkt_check(c, A, x, basis, tol=1e-12, verbose=True):
         sn = c[n] - np.dot(np.transpose(N), l)
 
         if np.all(sn >= -tol):
-            #if verbose:
-                #print("Did %d steps in kkt_check2" % (it-1))
+            if verbose:
+                print("Did %d steps in kkt_check2" % (it-1))
             return True, 0
 
         j = a[~bl][np.argmin(sn)]
@@ -191,7 +191,7 @@ def independent_rows(A):
     return A[basis]
 
 
-def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, verbose=True):
+def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, perturbed=False, verbose=True):
     # determine +/0/-
     plus = []
     zero = []
@@ -218,7 +218,7 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, v
         next_matrix.append(col)
 
     if calculate_adjacency:
-        adj = geometric_ray_adjacency(R, plus=plus, minus=minus, verbose=verbose, remove_cycles=True)
+        adj = geometric_ray_adjacency(R, plus=plus, minus=minus, perturbed=perturbed, verbose=verbose, remove_cycles=True)
 
     # combine + and - if adjacent
     nr_adjacent = 0
@@ -252,8 +252,8 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, v
         print("\tDimensions after redund: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
         print("\t\tRows removed by redund: %d" % (rows_before - next_matrix.shape[0]))
         print("\tRedund took %f seconds" % (end - start))
-        #if rows_before - next_matrix.shape[0] != 0:
-        #   input("Waiting...")
+        if rows_before - next_matrix.shape[0] != 0:
+           input("Waiting...")
 
     next_matrix = np.transpose(next_matrix)
 
@@ -365,7 +365,43 @@ def normalize_columns(R):
     return result
 
 
-def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-8, verbose=True, remove_cycles=True):
+def setup_LP_perturbed(R, i, j, epsilon):
+    n, m = R.shape
+
+    A_ub = -np.identity(m + 2*n)
+    b_ub = np.zeros(m + 2*n)
+    A_eq = np.concatenate((np.concatenate((R, -R)), np.identity(2*n)), axis=1)
+    ray1 = R[:, i]
+    ray2 = R[:, j]
+    tar = 0.5 * ray1 + 0.5 * ray2
+    b_eq = np.concatenate((tar + epsilon, -tar + epsilon))
+    c = np.concatenate((-np.ones(m), np.zeros(2 * n)))
+    c[i] = 0
+    c[j] = 0
+
+    return A_ub, b_ub, A_eq, b_eq, c
+
+
+def setup_LP(R_indep, i, j):
+    number_rays = R_indep.shape[1]
+
+    A_ub = -np.identity(number_rays)
+    b_ub = np.zeros(number_rays)
+    A_eq = R_indep
+    ray1 = R_indep[:, i]
+    ray2 = R_indep[:, j]
+    b_eq = 0.5 * ray1 + 0.5 * ray2
+    c = -np.ones(number_rays)
+    c[i] = 0
+    c[j] = 0
+    x0 = np.zeros(number_rays)
+    x0[i] = 0.5
+    x0[j] = 0.5
+
+    return A_ub, b_ub, A_eq, b_eq, c, x0
+
+
+def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False, verbose=True, remove_cycles=True):
     """
     Returns r by r adjacency matrix of rays, given
     ray matrix R. Diagonal is 0, not 1.
@@ -398,69 +434,65 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-8, verbose=True, re
     disable_lp = not remove_cycles
     total = len(plus) * len(minus)
 
-    A_ub = -np.identity(number_rays)
-    b_ub = np.zeros(number_rays)
-    A_eq = R_indep
     print("\n\tLargest non-LP ray: %.2f" % max(
         [np.linalg.norm(np.array(R[:, i], dtype='float')) for i in range(R.shape[1])]))
-    print("\n\tLargest LP ray: %.2f" % max([np.linalg.norm(np.array(A_eq[:, i], dtype='float')) for i in range(A_eq.shape[1])]))
+    print("\tMax/min: %.3f" % max(
+        [abs(abs(np.array(R[:, i], dtype='float')).max() / np.min(abs(np.array(R[:, i], dtype='float'))[np.nonzero(R[:, i])])) for i in range(R.shape[1])]))
+    print("\tLargest LP ray: %.2f" % max(
+        [np.linalg.norm(np.array(R_indep[:, i], dtype='float')) for i in range(R_indep.shape[1])]))
     for ind1, i in enumerate(plus):
         for ind2, j in enumerate(minus):
             it = ind2 + ind1 * len(minus)
-            if verbose and it % 25 == 0:
+            if verbose:
                 print("Doing KKT test %d of %d (%.2f percent done)" % (it, total, it * 100 / total))
-            ray1 = R_indep[:, i]
-            ray2 = R_indep[:, j]
-            target = 0.5 * ray1 + 0.5 * ray2
 
-            # set up LP
-            c = -np.ones(number_rays)
-            c[i] = 0
-            c[j] = 0
-            b_eq = target
-            x0 = np.zeros(number_rays)
-            x0[i] = 0.5
-            x0[j] = 0.5
+            if perturbed:
+                A_ub, b_ub, A_eq, b_eq, c = setup_LP_perturbed(R_indep, i, j, 1e-10)
+            else:
+                A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP(R_indep, i, j)
 
-            #disable_lp = True
-            # KKT
-            #ext_basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [i, j])
-            #KKT, status = kkt_check(c, np.asarray(A_eq, dtype='float'), x0, ext_basis)
+            disable_lp = False
+            if not perturbed:
+                disable_lp = True
+                # KKT
+                ext_basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [i, j])
+                KKT, status = kkt_check(c, np.asarray(A_eq, dtype='float'), x0, ext_basis)
 
-            # DEBUG
-            #status = 0
-            #if status == 0:
-            #    if KKT:
-            #        adjacency[i, j] = 1
-            #        adjacency[j, i] = 1
-            #    continue
+                # DEBUG
+                #status = 0
+                if status == 0:
+                    if KKT:
+                        adjacency[i, j] = 1
+                        adjacency[j, i] = 1
+                    continue
 
-            #print("\t\t\tKKT had non-zero exit status...")
-            #disable_lp = False
+                print("\t\t\tKKT had non-zero exit status...")
+                input("Waiting...")
+
             if not disable_lp:
                 LPs_done += 1
                 res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex',
-                              options={'tol': 1e-10, 'maxiter': 500}, x0=x0)
+                              options={'tol': 1e-12, 'maxiter': 500})
 
                 if res.status == 1:
                     print("Iteration limit %d reached, trying Blands pivot rule" % (res.nit))
-                    #input("Waiting...")
                     res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex',
-                                  options={'tol': 1e-10, 'bland': True})
-                if res.status == 1:
-                    print("Iteration limit %d still reached, trying higher limit" % (res.nit))
-                    #input("Waiting...")
-                    res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex',
-                                  options={'tol': 1e-12, 'maxiter': 20000, 'bland': True})
+                                  options={'tol': 1e-12, 'pivot': "Bland", 'maxiter': 20000})
+                # if res.status == 1:
+                #     print("Iteration limit %d still reached, trying higher limit" % (res.nit))
+                #     res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex',
+                #                   options={'tol': 1e-12, 'maxiter': 20000, 'bland': True})
 
                 if res.status == 4:
                     print("Numerical difficulties with revised simplex, trying interior point method instead")
-                    res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-10})
+                    res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point',
+                                  options={'tol': 1e-12})
 
                 if res.status != 0:
                     print("Status %d" % res.status)
-                    # input("Waiting...")
+                    input("Waiting...")
 
+                print("res.fun: %.2e res.nit: %d" % (abs(res.fun), res.nit))
                 if res.status != 0 or abs(res.fun) < tol:
                     adjacency[i, j] = 1
                     adjacency[j, i] = 1
@@ -478,7 +510,7 @@ def reduce_column_norms(matrix):
     return matrix
 
 
-def intersect_directly(R, internal_metabolites, network, verbose=True, fracred=True, tol=1e-12):
+def intersect_directly(R, internal_metabolites, network, perturbed=False, verbose=True, fracred=True, tol=1e-12):
     # rows are rays
     deleted = 0
     it = 1
@@ -491,6 +523,8 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, fracred=T
             it += 1
         if fracred:
             R = reduce_column_norms(R)
-        R = eliminate_metabolite(R, i, network, calculate_adjacency=True)
+        R = eliminate_metabolite(R, i, network, calculate_adjacency=True, perturbed=perturbed)
+        if fracred:
+            R = reduce_column_norms(R)
 
     return R

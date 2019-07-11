@@ -190,7 +190,7 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
         N = np.append(N, to_fractions(np.zeros(shape=(1, N.shape[1]))), axis=0)
         N[-1, objective_reaction_column] = 1
 
-    network.N = to_fractions(N)
+    network.N = N
     network.objective_reaction_column = objective_reaction_column
 
     return network
