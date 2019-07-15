@@ -168,7 +168,7 @@ def get_nonsingular_pair(A, basis, entering, leaving, basis_hashes):
 
 def independent_rows(A):
     m, n = A.shape
-    basis = np.asarray([0])
+    basis = np.asarray([], dtype='int')
     A_float = np.asarray(A, dtype='float')
     rank = np.linalg.matrix_rank(A_float)
     original_rank = rank
@@ -176,8 +176,8 @@ def independent_rows(A):
     if rank == m:
         return A
 
-    rank = np.linalg.matrix_rank(A_float[basis])
-    for i in range(1, m):
+    rank = 0
+    for i in range(m):
         prev_rank = rank
         prev_basis = basis
         basis = np.append(basis, i)
@@ -242,12 +242,13 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, p
     next_matrix = np.asarray(next_matrix)
 
     # redund in case we have too many rows
+    rows_before = next_matrix.shape[0]
     if verbose:
-        rows_before = next_matrix.shape[0]
         print("\tDimensions before redund: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
     start = time()
     next_matrix = redund(next_matrix)
     end = time()
+    rows_removed_redund = rows_before - next_matrix.shape[0]
     if verbose:
         print("\tDimensions after redund: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
         print("\t\tRows removed by redund: %d" % (rows_before - next_matrix.shape[0]))
@@ -262,7 +263,7 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, p
     network.drop_metabolites([met])
     print("\tDimensions after deleting row: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
 
-    return next_matrix
+    return next_matrix, rows_removed_redund
 
 
 def get_remove_metabolite(R, network, reaction, verbose=True):
@@ -366,16 +367,16 @@ def normalize_columns(R):
 
 
 def setup_LP_perturbed(R, i, j, epsilon):
-    n, m = R.shape
+    m, n = R.shape
 
-    A_ub = -np.identity(m + 2*n)
-    b_ub = np.zeros(m + 2*n)
-    A_eq = np.concatenate((np.concatenate((R, -R)), np.identity(2*n)), axis=1)
+    A_ub = -np.identity(n + 2*m)
+    b_ub = np.zeros(n + 2*m)
+    A_eq = np.concatenate((np.concatenate((R, -R)), np.identity(2*m)), axis=1)
     ray1 = R[:, i]
     ray2 = R[:, j]
     tar = 0.5 * ray1 + 0.5 * ray2
-    b_eq = np.concatenate((tar + epsilon, -tar + epsilon))
-    c = np.concatenate((-np.ones(m), np.zeros(2 * n)))
+    b_eq = np.concatenate((tar + epsilon, -tar + epsilon)) + np.random.uniform(-epsilon/2, epsilon/2, 2*m)
+    c = np.concatenate((-np.ones(n), np.zeros(2 * m)))
     c[i] = 0
     c[j] = 0
 
@@ -512,19 +513,28 @@ def reduce_column_norms(matrix):
 
 def intersect_directly(R, internal_metabolites, network, perturbed=False, verbose=True, fracred=True, tol=1e-12):
     # rows are rays
-    deleted = 0
+    deleted = np.array([])
     it = 1
     internal = list(internal_metabolites)
     internal.sort()
 
-    for i in np.flip(internal, 0):
+    while len(internal) > 0:
+        i = internal[np.argmin([np.sum(R[j - len(deleted[deleted<j]), :] > 0) * np.sum(R[j - len(deleted[deleted<j]), :] < 0) for j in internal])]
+        #i = internal[len(internal)-1]
         if verbose:
             print("\nIteration %d (internal metabolite = %d) of %d" % (it, i, len(internal_metabolites)))
             it += 1
         if fracred:
             R = reduce_column_norms(R)
-        R = eliminate_metabolite(R, i, network, calculate_adjacency=True, perturbed=perturbed)
+        R = eliminate_metabolite(R, i - len(deleted[deleted<i]), network, calculate_adjacency=True, perturbed=perturbed)
         if fracred:
             R = reduce_column_norms(R)
+        deleted = np.append(deleted, i)
+        internal.remove(i)
+
+    if verbose:
+        print("\n\tRows removed by redund overall: %d\n" % rows_removed_redund)
+        if rows_removed_redund != 0:
+            input("Waiting...")
 
     return R
