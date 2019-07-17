@@ -16,9 +16,7 @@ def fake_ecm(reaction, metabolite_ids, tol=1e-12):
     return True
 
 
-def print_ecms_direct(R, external_metabolites, metabolites):
-    metabolite_ids = [metabolites[i].id for i in external_metabolites]
-
+def print_ecms_direct(R, metabolite_ids):
     # obj_id = 0
     # for i in range(len(metabolite_ids)):
     #     if metabolite_ids[i] == "objective" or metabolite_ids[i] == "objective_out":
@@ -97,6 +95,8 @@ def kkt_check(c, A, x, basis, tol=1e-5, verbose=True):
         if np.linalg.matrix_rank(B) < min(B.shape):
             print("\nB became singular!\n")
             return True, 1
+        if B.shape[0] != len(basis):
+            print("bla")
         l = np.linalg.solve(np.transpose(B), c[basis])
         sn = c[n] - np.dot(np.transpose(N), l)
 
@@ -111,16 +111,16 @@ def kkt_check(c, A, x, basis, tol=1e-5, verbose=True):
         i = u > tol  # if none of the u are positive, unbounded
         if not np.any(i):
             print("Warning: unbounded problem in KKT_check")
-            #if verbose:
-            #    print("Did %d steps in kkt_check2" % it - 1)
+            if verbose:
+                print("Did %d steps in kkt_check2" % it - 1)
             return True, 1
 
         th = xb[i] / u[i]
         l = np.argmin(th)  # implicitly selects smallest subscript
         th_star = th[l]  # step size
         if th_star > tol:
-            #if verbose:
-            #    print("Did %d steps in kkt_check2" % (it - 1))
+            if verbose:
+                print("Did %d steps in kkt_check2" % (it - 1))
             return False, 0
 
         original = basis[ab[i][l]]
@@ -279,27 +279,17 @@ def get_remove_metabolite(R, network, reaction, verbose=True):
 def remove_cycles(R, network, tol=1e-12, verbose=True):
     deleted = []
     for k in range(2):
+        R_normalized = normalize_columns(np.array(R, dtype='float'))
+        R_indep = independent_rows(R_normalized)
+
         number_rays = R.shape[1]
         i = 0 + 2 * k
         j = 1 + 2 * k
         if j > R.shape[1] - 1:
             return R, deleted
-        ray1 = R[:, i]
-        ray2 = R[:, j]
-        target = 0.5 * ray1 + 0.5 * ray2
+        A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP(R_indep, i, j)
 
-        c = -np.ones(number_rays)
-        c[i] = 0
-        c[j] = 0
-        A_ub = -np.identity(number_rays)
-        b_ub = np.zeros(number_rays)
-        A_eq = R
-        b_eq = target
-        x0 = np.zeros(number_rays)
-        x0[i] = 0.5
-        x0[j] = 0.5
-
-        if sum(abs(target)) < tol:
+        if sum(abs(b_eq)) < tol:
             augment_reaction = i;
             met = get_remove_metabolite(R, network, augment_reaction)
             if verbose:
@@ -325,7 +315,6 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
             if abs(res2.fun) < tol: # res is 'unbounded' but res2 has optimum 0
                 break
 
-
             augment_reaction = [i for i, val in enumerate(res2.x) if val > 90][0]
             met = get_remove_metabolite(R, network, augment_reaction)
             deleted.append(met)
@@ -336,20 +325,7 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
             number_rays = R.shape[1]
             i = 0 + 2 * k
             j = 1 + 2 * k
-            ray1 = R[:, i]
-            ray2 = R[:, j]
-            target = 0.5 * ray1 + 0.5 * ray2
-
-            c = -np.ones(number_rays)
-            c[i] = 0
-            c[j] = 0
-            A_ub = -np.identity(number_rays)
-            b_ub = np.zeros(number_rays)
-            A_eq = R
-            b_eq = target
-            x0 = np.zeros(number_rays)
-            x0[i] = 0.5
-            x0[j] = 0.5
+            A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP(R_indep, i, j)
 
             res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12}, x0=x0)
             if res.status == 4:
@@ -366,6 +342,36 @@ def normalize_columns(R):
     return result
 
 
+def smallest_positive(arr):
+    a = np.where(np.isfinite(arr), arr, -1)
+    return min(np.where(a < 0, max(a)*2, a)), np.argmin(np.where(a < 0, max(a)*2, a))
+
+
+def generate_BFS(R, i, j, eps):
+    ray1 = np.concatenate((R[:, i], -R[:, i]))
+    ray2 = np.concatenate((R[:, j], -R[:, j]))
+    with np.errstate(divide='ignore', invalid='ignore'):
+        alpha, k = smallest_positive(eps / ray1)
+        beta = ray2[k] / ray1[k]
+        arr = (eps - alpha*ray1) / (ray2 - beta*ray1)
+        arr[k] = -1 # ignore place k, because it should always be divide by 0
+        delta2, _ = smallest_positive(arr)
+        delta1 = -beta*delta2
+    sbar = eps - (alpha + delta1)*ray1 - delta2*ray2
+    l = np.zeros(R.shape[1])
+    l[i] = 0.5 + alpha + delta1
+    l[j] = 0.5 + delta2
+
+    res = np.concatenate((l, sbar))
+    # round to 0 when a rounding error made it non-zero
+    res = np.where(abs(res) < 1e-20, 0, res)
+
+    if len(res[res!=0]) != R.shape[0]*2:
+        print("problem in generate_BFS")
+
+    return res
+
+
 def setup_LP_perturbed(R, i, j, epsilon):
     m, n = R.shape
 
@@ -375,12 +381,14 @@ def setup_LP_perturbed(R, i, j, epsilon):
     ray1 = R[:, i]
     ray2 = R[:, j]
     tar = 0.5 * ray1 + 0.5 * ray2
-    b_eq = np.concatenate((tar + epsilon, -tar + epsilon)) + np.random.uniform(-epsilon/2, epsilon/2, 2*m)
+    eps_vector = np.array([epsilon] * (2*m)) + np.random.uniform(-epsilon/2, epsilon/2, 2*m)
+    b_eq = np.concatenate((tar, -tar)) + eps_vector
+    x0 = generate_BFS(R, i, j, eps_vector)
     c = np.concatenate((-np.ones(n), np.zeros(2 * m)))
     c[i] = 0
     c[j] = 0
 
-    return A_ub, b_ub, A_eq, b_eq, c
+    return A_ub, b_ub, A_eq, b_eq, c, x0
 
 
 def setup_LP(R_indep, i, j):
@@ -441,6 +449,7 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
         [abs(abs(np.array(R[:, i], dtype='float')).max() / np.min(abs(np.array(R[:, i], dtype='float'))[np.nonzero(R[:, i])])) for i in range(R.shape[1])]))
     print("\tLargest LP ray: %.2f" % max(
         [np.linalg.norm(np.array(R_indep[:, i], dtype='float')) for i in range(R_indep.shape[1])]))
+
     for ind1, i in enumerate(plus):
         for ind2, j in enumerate(minus):
             it = ind2 + ind1 * len(minus)
@@ -448,27 +457,29 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
                 print("Doing KKT test %d of %d (%.2f percent done)" % (it, total, it * 100 / total))
 
             if perturbed:
-                A_ub, b_ub, A_eq, b_eq, c = setup_LP_perturbed(R_indep, i, j, 1e-10)
+                A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP_perturbed(R_indep, i, j, 1e-10)
             else:
                 A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP(R_indep, i, j)
 
-            disable_lp = False
-            if not perturbed:
-                disable_lp = True
-                # KKT
+            disable_lp = True
+            # KKT
+            if perturbed:
+                ext_basis = np.nonzero(x0)[0]
+            else:
                 ext_basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [i, j])
-                KKT, status = kkt_check(c, np.asarray(A_eq, dtype='float'), x0, ext_basis)
+            KKT, status = kkt_check(c, np.asarray(A_eq, dtype='float'), x0, ext_basis)
 
-                # DEBUG
-                #status = 0
-                if status == 0:
-                    if KKT:
-                        adjacency[i, j] = 1
-                        adjacency[j, i] = 1
-                    continue
+            # DEBUG
+            #status = 0
+            if status == 0:
+                if KKT:
+                    adjacency[i, j] = 1
+                    adjacency[j, i] = 1
+                continue
 
-                print("\t\t\tKKT had non-zero exit status...")
-                input("Waiting...")
+            print("\t\t\tKKT had non-zero exit status...")
+            input("Waiting...")
+            disable_lp = False
 
             if not disable_lp:
                 LPs_done += 1
@@ -511,12 +522,38 @@ def reduce_column_norms(matrix):
     return matrix
 
 
+def remove_fake_ecms(R, network):
+    metabolite_ids = [network.metabolites[i].id for i in network.external_metabolite_indices()]
+    real_ecms = np.array([not fake_ecm(R[:, i], metabolite_ids) for i in range(R.shape[1])])
+    return R[:, real_ecms]
+
+
+def unsplit_metabolites(R, network):
+    metabolite_ids = [network.metabolites[i].id for i in network.external_metabolite_indices()]
+    res = []
+    ids = []
+
+    processed = {}
+    for i in range(R.shape[0]):
+        metabolite = metabolite_ids[i].replace("_in", "").replace("_out", "")
+        if metabolite in processed:
+            row = processed[metabolite]
+            res[row] += R[i, :]
+        else:
+            res.append(R[i, :].tolist())
+            processed[metabolite] = len(res) - 1
+            ids.append(metabolite)
+
+    return np.asarray(res), ids
+
+
 def intersect_directly(R, internal_metabolites, network, perturbed=False, verbose=True, fracred=True, tol=1e-12):
     # rows are rays
     deleted = np.array([])
     it = 1
     internal = list(internal_metabolites)
     internal.sort()
+    rows_removed_redund = 0
 
     while len(internal) > 0:
         i = internal[np.argmin([np.sum(R[j - len(deleted[deleted<j]), :] > 0) * np.sum(R[j - len(deleted[deleted<j]), :] < 0) for j in internal])]
@@ -526,15 +563,20 @@ def intersect_directly(R, internal_metabolites, network, perturbed=False, verbos
             it += 1
         if fracred:
             R = reduce_column_norms(R)
-        R = eliminate_metabolite(R, i - len(deleted[deleted<i]), network, calculate_adjacency=True, perturbed=perturbed)
+        R, removed = eliminate_metabolite(R, i - len(deleted[deleted<i]), network, calculate_adjacency=True, perturbed=perturbed)
+        rows_removed_redund += removed
         if fracred:
             R = reduce_column_norms(R)
         deleted = np.append(deleted, i)
         internal.remove(i)
+
+    # remove artificial rays introduced by splitting metabolites
+    R = remove_fake_ecms(R, network)
+    R, ids = unsplit_metabolites(R, network)
 
     if verbose:
         print("\n\tRows removed by redund overall: %d\n" % rows_removed_redund)
         if rows_removed_redund != 0:
             input("Waiting...")
 
-    return R
+    return R, ids

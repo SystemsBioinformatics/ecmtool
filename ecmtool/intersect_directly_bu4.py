@@ -19,11 +19,11 @@ def fake_ecm(reaction, metabolite_ids, tol=1e-12):
 def print_ecms_direct(R, external_metabolites, metabolites):
     metabolite_ids = [metabolites[i].id for i in external_metabolites]
 
-    #obj_id = 0
-    #for m in external_metabolites:
-    #    if metabolites[m].id == "objective":
-    #        break
-    #    obj_id += 1
+    # obj_id = 0
+    # for i in range(len(metabolite_ids)):
+    #     if metabolite_ids[i] == "objective" or metabolite_ids[i] == "objective_out":
+    #         break
+    #     obj_id += 1
 
 
     print("\n--ECMs found by intersecting directly--\n")
@@ -32,12 +32,12 @@ def print_ecms_direct(R, external_metabolites, metabolites):
         if not fake_ecm(R[:,i], metabolite_ids):
             print("ECM #%d:" % count)
             count += 1
-    #    div = 1
-    #    if R[obj_id][i] != 0:
-    #        div = R[obj_id][i]
+            div = 1
+            # if R[obj_id][i] != 0:
+            #     div = R[obj_id][i]
             for j in range(R.shape[0]):
                 if R[j][i] != 0:
-                    print("%s: %f" % (metabolite_ids[j].replace("_in","").replace("_out",""), float(R[j][i])))
+                    print("%s: %f" % (metabolite_ids[j].replace("_in","").replace("_out",""), float(R[j][i]) / div))
             print("")
 
 
@@ -70,7 +70,7 @@ def get_more_basis_columns(A, basis):
     return new_basis
 
 
-def kkt_check(c, A, x, basis, tol=1e-12, verbose=False):
+def kkt_check(c, A, x, basis, tol=1e-5, verbose=True):
     """
     Determine whether KKT conditions hold for x0.
     Take size 0 steps if available.
@@ -81,11 +81,13 @@ def kkt_check(c, A, x, basis, tol=1e-12, verbose=False):
 
     th_star = 0
     it = 0
+    basis = np.sort(basis)
+    basis_hashes = {hash(basis.tostring())} # store hashes of bases used before to prevent cycling
     while th_star < tol:
         it += 1
         if it > 1000:
             print("Cycling?")
-            return True
+            return True, 1
         bl = np.zeros(len(a), dtype=bool)
         bl[basis] = 1
         xb = x[basis]
@@ -94,14 +96,14 @@ def kkt_check(c, A, x, basis, tol=1e-12, verbose=False):
         N = A[:, n]
         if np.linalg.matrix_rank(B) < min(B.shape):
             print("\nB became singular!\n")
-            return False
+            return True, 1
         l = np.linalg.solve(np.transpose(B), c[basis])
         sn = c[n] - np.dot(np.transpose(N), l)
 
         if np.all(sn >= -tol):
             if verbose:
                 print("Did %d steps in kkt_check2" % (it-1))
-            return True
+            return True, 0
 
         j = a[~bl][np.argmin(sn)]
         u = np.linalg.solve(B, A[:, j])
@@ -109,39 +111,64 @@ def kkt_check(c, A, x, basis, tol=1e-12, verbose=False):
         i = u > tol  # if none of the u are positive, unbounded
         if not np.any(i):
             print("Warning: unbounded problem in KKT_check")
-            if verbose:
-                print("Did %d steps in kkt_check2" % it - 1)
-            return True
+            #if verbose:
+            #    print("Did %d steps in kkt_check2" % it - 1)
+            return True, 1
 
         th = xb[i] / u[i]
         l = np.argmin(th)  # implicitly selects smallest subscript
         th_star = th[l]  # step size
         if th_star > tol:
-            if verbose:
-                print("Did %d steps in kkt_check2" % (it - 1))
-            return False
+            #if verbose:
+            #    print("Did %d steps in kkt_check2" % (it - 1))
+            return False, 0
 
         original = basis[ab[i][l]]
         basis[ab[i][l]] = j
+        #if np.linalg.matrix_rank(A[:, basis]) < min(A[:, basis].shape):
+        #    basis[ab[i][l]] = original
+            #entering_options = a[~bl][sn < -tol]
+            #leaving_options = ab[i][th > -tol]
+            #temporary debug: only the original entering/leaving option
+            #entering_options = [j]
+            #leaving_options = [ab[i][l]]
+
+            #basis = get_nonsingular_pair(A, basis, entering_options, leaving_options, basis_hashes)
+        #basis = np.sort(basis)
+        #basis_hashes.add(hash(basis.tostring()))
+
+        # Old method for anti-singular
         while np.linalg.matrix_rank(A[:, basis]) < min(A[:, basis].shape):
-            if (l+1 < len(th)) and th[l+1] < tol:
+            if (l + 1 < len(th)) and th[l + 1] < tol:
                 # try changing leaving index
                 basis[ab[i][l]] = original
                 l += 1
                 original = basis[ab[i][l]]
                 basis[ab[i][l]] = j
-
-                # try changing entering index
-                #TODO try changing entering index, or try all pairs of leaving/entering
             else:
                 print("unable to fix singular B...")
-                break;
+                break
 
+
+def get_nonsingular_pair(A, basis, entering, leaving, basis_hashes):
+   for enter in entering:
+       for leave in leaving:
+           original = basis[leave]
+           basis[leave] = enter
+           if np.linalg.matrix_rank(A[:, basis]) >= min(A[:, basis].shape):
+               if hash(np.sort(basis).tostring()) in basis_hashes:
+                   basis[leave] = original
+                   continue
+               return basis
+           basis[leave] = original
+   print("Did not find non-singular entering+leaving index...")
+   basis[leaving[0]] = entering[0]
+   return basis
 
 
 def independent_rows(A):
     m, n = A.shape
-    basis = np.asarray([0])
+    basis = np.asarray([], dtype='int')
     A_float = np.asarray(A, dtype='float')
     rank = np.linalg.matrix_rank(A_float)
     original_rank = rank
@@ -149,8 +176,8 @@ def independent_rows(A):
     if rank == m:
         return A
 
-    rank = np.linalg.matrix_rank(A_float[basis])
-    for i in range(1, m):
+    rank = 0
+    for i in range(m):
         prev_rank = rank
         prev_basis = basis
         basis = np.append(basis, i)
@@ -164,7 +191,7 @@ def independent_rows(A):
     return A[basis]
 
 
-def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, verbose=True):
+def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, perturbed=False, verbose=True):
     # determine +/0/-
     plus = []
     zero = []
@@ -191,7 +218,7 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, v
         next_matrix.append(col)
 
     if calculate_adjacency:
-        adj = geometric_ray_adjacency(R, plus=plus, minus=minus, verbose=verbose, remove_cycles=True)
+        adj = geometric_ray_adjacency(R, plus=plus, minus=minus, perturbed=perturbed, verbose=verbose, remove_cycles=True)
 
     # combine + and - if adjacent
     nr_adjacent = 0
@@ -215,14 +242,19 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, v
     next_matrix = np.asarray(next_matrix)
 
     # redund in case we have too many rows
-    #if verbose:
-    #    print("\tDimensions before redund: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
-    #start = time()
-    #next_matrix = redund(next_matrix)
-    #end = time()
-    #if verbose:
-    #    print("\tDimensions after redund: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
-    #    print("\tRedund took %f seconds" % (end - start))
+    rows_before = next_matrix.shape[0]
+    if verbose:
+        print("\tDimensions before redund: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
+    start = time()
+    next_matrix = redund(next_matrix)
+    end = time()
+    rows_removed_redund = rows_before - next_matrix.shape[0]
+    if verbose:
+        print("\tDimensions after redund: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
+        print("\t\tRows removed by redund: %d" % (rows_before - next_matrix.shape[0]))
+        print("\tRedund took %f seconds" % (end - start))
+        if rows_before - next_matrix.shape[0] != 0:
+           input("Waiting...")
 
     next_matrix = np.transpose(next_matrix)
 
@@ -231,7 +263,7 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, v
     network.drop_metabolites([met])
     print("\tDimensions after deleting row: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
 
-    return next_matrix
+    return next_matrix, rows_removed_redund
 
 
 def get_remove_metabolite(R, network, reaction, verbose=True):
@@ -274,7 +306,8 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
                 print("Found an unbounded LP, augmenting reaction %d through metabolite %d" % (augment_reaction, met))
             R = eliminate_metabolite(R, met, network, calculate_adjacency=False)
 
-        res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12}, x0=x0)
+        res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12},
+                      x0=x0)
         if res.status == 4:
             print("Numerical difficulties with revised simplex, trying interior point method instead")
             res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
@@ -326,7 +359,50 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
     return R, deleted
 
 
-def geometric_ray_adjacency(R, plus=[-1], minus=[-1], quasi_zero_tolerance=1e-8, verbose=True, remove_cycles=True):
+def normalize_columns(R):
+    result = R.copy()
+    for i in range(result.shape[1]):
+        result[:, i] /= np.linalg.norm(np.array(R[:, i], dtype='float'))
+    return result
+
+
+def setup_LP_perturbed(R, i, j, epsilon):
+    m, n = R.shape
+
+    A_ub = -np.identity(n + 2*m)
+    b_ub = np.zeros(n + 2*m)
+    A_eq = np.concatenate((np.concatenate((R, -R)), np.identity(2*m)), axis=1)
+    ray1 = R[:, i]
+    ray2 = R[:, j]
+    tar = 0.5 * ray1 + 0.5 * ray2
+    b_eq = np.concatenate((tar + epsilon, -tar + epsilon)) + np.random.uniform(-epsilon/2, epsilon/2, 2*m)
+    c = np.concatenate((-np.ones(n), np.zeros(2 * m)))
+    c[i] = 0
+    c[j] = 0
+
+    return A_ub, b_ub, A_eq, b_eq, c
+
+
+def setup_LP(R_indep, i, j):
+    number_rays = R_indep.shape[1]
+
+    A_ub = -np.identity(number_rays)
+    b_ub = np.zeros(number_rays)
+    A_eq = R_indep
+    ray1 = R_indep[:, i]
+    ray2 = R_indep[:, j]
+    b_eq = 0.5 * ray1 + 0.5 * ray2
+    c = -np.ones(number_rays)
+    c[i] = 0
+    c[j] = 0
+    x0 = np.zeros(number_rays)
+    x0[i] = 0.5
+    x0[j] = 0.5
+
+    return A_ub, b_ub, A_eq, b_eq, c, x0
+
+
+def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False, verbose=True, remove_cycles=True):
     """
     Returns r by r adjacency matrix of rays, given
     ray matrix R. Diagonal is 0, not 1.
@@ -339,8 +415,12 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], quasi_zero_tolerance=1e-8,
     """
 
     start = time()
-    # TODO: find better (working) way to remove lin. dep. rows from R_indep
-    R_indep = independent_rows(R)
+
+    # with normalization
+    R_normalized = normalize_columns(np.array(R, dtype='float'))
+    R_indep = independent_rows(R_normalized)
+    # without normalization
+    #R_indep = independent_rows(R)
 
     LPs_done = 0
     # set default plus and minus
@@ -354,70 +434,109 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], quasi_zero_tolerance=1e-8,
 
     disable_lp = not remove_cycles
     total = len(plus) * len(minus)
+
+    print("\n\tLargest non-LP ray: %.2f" % max(
+        [np.linalg.norm(np.array(R[:, i], dtype='float')) for i in range(R.shape[1])]))
+    print("\tMax/min: %.3f" % max(
+        [abs(abs(np.array(R[:, i], dtype='float')).max() / np.min(abs(np.array(R[:, i], dtype='float'))[np.nonzero(R[:, i])])) for i in range(R.shape[1])]))
+    print("\tLargest LP ray: %.2f" % max(
+        [np.linalg.norm(np.array(R_indep[:, i], dtype='float')) for i in range(R_indep.shape[1])]))
     for ind1, i in enumerate(plus):
         for ind2, j in enumerate(minus):
             it = ind2 + ind1 * len(minus)
-            if verbose and it % 10 == 0:
-                print("Doing LP %d of %d (%.2f percent done)" % (it, total, it * 100 / total))
-            ray1 = R_indep[:, i]
-            ray2 = R_indep[:, j]
-            target = 0.5 * ray1 + 0.5 * ray2
+            if verbose:
+                print("Doing KKT test %d of %d (%.2f percent done)" % (it, total, it * 100 / total))
 
-            # set up LP
-            c = -np.ones(number_rays)
-            c[i] = 0
-            c[j] = 0
-            A_ub = -np.identity(number_rays)
-            b_ub = np.zeros(number_rays)
-            A_eq = R_indep
-            b_eq = target
-            x0 = np.zeros(number_rays)
-            x0[i] = 0.5
-            x0[j] = 0.5
+            if perturbed:
+                A_ub, b_ub, A_eq, b_eq, c = setup_LP_perturbed(R_indep, i, j, 1e-10)
+            else:
+                A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP(R_indep, i, j)
+
+            disable_lp = False
+            if not perturbed:
+                disable_lp = True
+                # KKT
+                ext_basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [i, j])
+                KKT, status = kkt_check(c, np.asarray(A_eq, dtype='float'), x0, ext_basis)
+
+                # DEBUG
+                #status = 0
+                if status == 0:
+                    if KKT:
+                        adjacency[i, j] = 1
+                        adjacency[j, i] = 1
+                    continue
+
+                print("\t\t\tKKT had non-zero exit status...")
+                input("Waiting...")
 
             if not disable_lp:
                 LPs_done += 1
-                res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12}, x0=x0)
+                res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex',
+                              options={'tol': 1e-12, 'maxiter': 500})
 
-            if not disable_lp and res.status == 4:
-                print("Numerical difficulties with revised simplex, trying interior point method instead")
-                res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
+                if res.status == 1:
+                    print("Iteration limit %d reached, trying Blands pivot rule" % (res.nit))
+                    res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex',
+                                  options={'tol': 1e-12, 'pivot': "Bland", 'maxiter': 20000})
+                # if res.status == 1:
+                #     print("Iteration limit %d still reached, trying higher limit" % (res.nit))
+                #     res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex',
+                #                   options={'tol': 1e-12, 'maxiter': 20000, 'bland': True})
 
-            disable_lp = True
+                if res.status == 4:
+                    print("Numerical difficulties with revised simplex, trying interior point method instead")
+                    res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point',
+                                  options={'tol': 1e-12})
 
-            ext_basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [i, j])
-            KKT = kkt_check(c, np.asarray(A_eq, dtype='float'), x0, ext_basis)
-            if not disable_lp and verbose and KKT != (abs(res.fun) < quasi_zero_tolerance):
-                print("\n\n!!! error !!!\n\n")
-                # print("res.status = %d" % (res.status))
-                # print("Adjacent: %s" % (abs(res.fun) < quasi_zero_tolerance))
-                # print("KKT (should equal adjacent): %s" % KKT)
+                if res.status != 0:
+                    print("Status %d" % res.status)
+                    input("Waiting...")
 
-            if KKT:
-                adjacency[i, j] = 1
-                adjacency[j, i] = 1
+                print("res.fun: %.2e res.nit: %d" % (abs(res.fun), res.nit))
+                if res.status != 0 or abs(res.fun) < tol:
+                    adjacency[i, j] = 1
+                    adjacency[j, i] = 1
 
     end = time()
     print("Did %d LPs in %f seconds" % (LPs_done, end - start))
     return adjacency
 
 
-def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12):
+def reduce_column_norms(matrix):
+    for i in range(matrix.shape[1]):
+        norm = np.linalg.norm(np.array(matrix[:, i], dtype='float'))
+        if norm > 2:
+            matrix[:, i] /= int(np.floor(norm))
+    return matrix
+
+
+def intersect_directly(R, internal_metabolites, network, perturbed=False, verbose=True, fracred=True, tol=1e-12):
     # rows are rays
-    deleted = 0
-    iter = 1
+    deleted = np.array([])
+    it = 1
     internal = list(internal_metabolites)
     internal.sort()
+    rows_removed_redund = 0
 
-    for i in np.flip(internal, 0):
+    while len(internal) > 0:
+        i = internal[np.argmin([np.sum(R[j - len(deleted[deleted<j]), :] > 0) * np.sum(R[j - len(deleted[deleted<j]), :] < 0) for j in internal])]
+        #i = internal[len(internal)-1]
         if verbose:
-            print("\nIteration %d (internal metabolite = %d) of %d" % (iter, i, len(internal_metabolites)))
-            iter += 1
-        R = eliminate_metabolite(R, i, network, calculate_adjacency=True)
+            print("\nIteration %d (internal metabolite = %d) of %d" % (it, i, len(internal_metabolites)))
+            it += 1
+        if fracred:
+            R = reduce_column_norms(R)
+        R, removed = eliminate_metabolite(R, i - len(deleted[deleted<i]), network, calculate_adjacency=True, perturbed=perturbed)
+        rows_removed_redund += removed
+        if fracred:
+            R = reduce_column_norms(R)
+        deleted = np.append(deleted, i)
+        internal.remove(i)
 
-    # remove artificial rays introduced by splitting metabolites
-    metabolite_ids = [network.metabolites[i].id for i in network.external_metabolite_indices()]
-    R = [R[:, i] for i in range(R.shape[1]) if not fake_ecm(R[:, i], metabolite_ids)]
+    if verbose:
+        print("\n\tRows removed by redund overall: %d\n" % rows_removed_redund)
+        if rows_removed_redund != 0:
+            input("Waiting...")
 
     return R
-#1

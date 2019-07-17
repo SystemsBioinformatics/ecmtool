@@ -8,6 +8,7 @@ from ecmtool.helpers import get_efms, get_metabolite_adjacency, redund
 from ecmtool.intersect_directly import intersect_directly, print_ecms_direct, remove_cycles, reduce_column_norms
 from ecmtool.network import extract_sbml_stoichiometry
 from ecmtool.conversion_cone import get_conversion_cone, iterative_conversion_cone, unique
+from ecmtool.functions_for_Erik import check_bijection_Erik
 
 
 def str2bool(v):
@@ -160,7 +161,7 @@ if __name__ == '__main__':
     start = time()
 
     parser = ArgumentParser(description='Calculate Elementary Conversion Modes from an SBML model. For medium-to large networks, be sure to define --inputs and --outputs. This reduces the enumeration problem complexity considerably.')
-    parser.add_argument('--model_path', type=str, default='models/e_coli_core_nobm.xml', help='Relative or absolute path to an SBML model .xml file')
+    parser.add_argument('--model_path', type=str, default='models/active_subnetwork_KO_3round.xml', help='Relative or absolute path to an SBML model .xml file')
     parser.add_argument('--direct', type=str2bool, default=True, help='Enable to intersect with equalities directly')
     parser.add_argument('--compress', type=str2bool, default=True, help='Perform compression to which the conversions are invariant, and reduce the network size considerably (default: True)')
     parser.add_argument('--out_path', default='conversion_cone.csv', help='Relative or absolute path to the .csv file you want to save the calculated conversions to (default: conversion_cone.csv)')
@@ -177,8 +178,9 @@ if __name__ == '__main__':
     parser.add_argument('--only_rays', type=str2bool, default=False, help='Enable to only return extreme rays, and not elementary modes. This describes the full conversion space, but not all biologically relevant minimal conversions. See (Urbanczik, 2005) (default: false)')
     parser.add_argument('--verbose', type=str2bool, default=True, help='Enable to show detailed console output (default: true)')
     parser.add_argument('--scei', type=str2bool, default=True, help='Enable to use SCEI compression (default: true)')
-    parser.add_argument('--fracred', type=str2bool, default=True, help='Enable to divide rays to make them smaller when possible (default: true)')
+    parser.add_argument('--fracred', type=str2bool, default=False, help='Enable to divide rays to make them smaller when possible (default: true)')
     parser.add_argument('--perturb', type=str2bool, default=False, help='Enable to perturb LPs to prevent degeneracy (default: false)')
+    parser.add_argument('--compare', type=str2bool, default=True, help='Enable to compare output of direct vs indirect')
     args = parser.parse_args()
 
     if args.model_path == '':
@@ -196,53 +198,53 @@ if __name__ == '__main__':
 
     model_path = args.model_path
 
-    network = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite,
-                                         determine_inputs_outputs=args.auto_direction,
-                                         skip_external_reactions=True)
+    if args.compare or args.direct:
+        network = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite,
+                                             determine_inputs_outputs=args.auto_direction,
+                                             skip_external_reactions=True)
 
-    debug_tags = []
-    # add_debug_tags(network)
+        debug_tags = []
+        # add_debug_tags(network)
 
-    adj = get_metabolite_adjacency(network.N)
+        adj = get_metabolite_adjacency(network.N)
 
-    if not args.auto_direction:
-        set_inoutputs(args.inputs, args.outputs, network)
+        if not args.auto_direction:
+            set_inoutputs(args.inputs, args.outputs, network)
 
-    if args.hide:
-        hide_indices = [int(index) for index in args.hide.split(',') if len(index)]
-        network.hide(hide_indices)
+        if args.hide:
+            hide_indices = [int(index) for index in args.hide.split(',') if len(index)]
+            network.hide(hide_indices)
 
-    if args.print_reactions:
-        print('Reactions%s:' % (' before compression' if args.compress else ''))
-        for index, item in enumerate(network.reactions):
-            print(index, item.id, item.name, 'reversible' if item.reversible else 'irreversible')
+        if args.print_reactions:
+            print('Reactions%s:' % (' before compression' if args.compress else ''))
+            for index, item in enumerate(network.reactions):
+                print(index, item.id, item.name, 'reversible' if item.reversible else 'irreversible')
 
-    if args.print_metabolites:
-        print('Metabolites%s:' % (' before compression' if args.compress else ''))
-        for index, item in enumerate(network.metabolites):
-            print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
+        if args.print_metabolites:
+            print('Metabolites%s:' % (' before compression' if args.compress else ''))
+            for index, item in enumerate(network.metabolites):
+                print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
 
-    orig_ids = [m.id for m in network.metabolites]
-    orig_N = network.N
+        orig_ids = [m.id for m in network.metabolites]
+        orig_N = network.N
 
-    if args.direct and not args.only_rays:
-        network.split_in_out()
+        # for i, r in enumerate(network.reactions):
+        #     print("\n%s:" % (r.id))
+        #     for j in range(len(network.N[:, i])):
+        #         nr = network.N[j, i];
+        #         if nr != 0:
+        #             print("%s: %d" % (network.metabolites[j].id, nr))
 
-    for i, r in enumerate(network.reactions):
-        print("\n%s:" % (r.id))
-        for j in range(len(network.N[:, i])):
-            nr = network.N[j, i];
-            if nr != 0:
-                print("%s: %d" % (network.metabolites[j].id, nr))
+        if args.compress:
+            network.compress(verbose=args.verbose, SCEI=args.scei)
 
-    if args.compress:
-        network.compress(verbose=args.verbose, SCEI=args.scei)
+        if not args.only_rays:
+            network.split_in_out()
 
-    for i in np.flip(range(network.N.shape[0]), 0):
-        if sum(abs(network.N[i])) == 0:
-            network.drop_metabolites([i], force_external=True)
+        for i in np.flip(range(network.N.shape[0]), 0):
+            if sum(abs(network.N[i])) == 0:
+                network.drop_metabolites([i], force_external=True)
 
-    if args.direct:
         network.N = np.transpose(redund(np.transpose(network.N)))
         if args.fracred:
             network.N = reduce_column_norms(network.N)
@@ -251,12 +253,52 @@ if __name__ == '__main__':
 
         external = np.asarray(network.external_metabolite_indices())
         internal = np.setdiff1d(range(R.shape[0]), external)
-        T_intersected = intersect_directly(R, internal, network, perturbed=args.perturb, verbose=args.verbose, fracred=args.fracred)
+        T_intersected, ids = intersect_directly(R, internal, network, perturbed=args.perturb, verbose=args.verbose, fracred=args.fracred)
 
-        print_ecms_direct(T_intersected, network.external_metabolite_indices(), network.metabolites)
+        print_ecms_direct(T_intersected, ids)
         end = time()
         print('Ran (direct) in %f seconds' % (end - start))
-    else:
+
+    if args.compare or not args.direct:
+        network = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite,
+                                             determine_inputs_outputs=args.auto_direction,
+                                             skip_external_reactions=True)
+
+        debug_tags = []
+        # add_debug_tags(network)
+
+        adj = get_metabolite_adjacency(network.N)
+
+        if not args.auto_direction:
+            set_inoutputs(args.inputs, args.outputs, network)
+
+        if args.hide:
+            hide_indices = [int(index) for index in args.hide.split(',') if len(index)]
+            network.hide(hide_indices)
+
+        if args.print_reactions:
+            print('Reactions%s:' % (' before compression' if args.compress else ''))
+            for index, item in enumerate(network.reactions):
+                print(index, item.id, item.name, 'reversible' if item.reversible else 'irreversible')
+
+        if args.print_metabolites:
+            print('Metabolites%s:' % (' before compression' if args.compress else ''))
+            for index, item in enumerate(network.metabolites):
+                print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
+
+        orig_ids = [m.id for m in network.metabolites]
+        orig_N = network.N
+
+        # for i, r in enumerate(network.reactions):
+        #     print("\n%s:" % (r.id))
+        #     for j in range(len(network.N[:, i])):
+        #         nr = network.N[j, i];
+        #         if nr != 0:
+        #             print("%s: %d" % (network.metabolites[j].id, nr))
+
+        if args.compress:
+            network.compress(verbose=args.verbose, SCEI=args.scei)
+
         if args.print_reactions and args.compress:
             print('Reactions (after compression):')
             for index, item in enumerate(network.reactions):
@@ -283,4 +325,20 @@ if __name__ == '__main__':
 
         end = time()
         print('Ran in %f seconds' % (end - start))
+
+    if args.compare:
+        metabolites = [m.id for m in network.metabolites]
+        for i in range(cone.shape[1]):
+            if sum(abs(cone[:, i])) == 0:
+                if network.uncompressed_metabolite_ids[i] in metabolites:
+                    network.drop_metabolites([metabolites.index(network.uncompressed_metabolite_ids[i])])
+        cone_without_zeroes = cone[:, [sum(abs(cone[:, i])) != 0 for i in range(cone.shape[1])]]
+
+        # align metabolites
+        metabolites = [m.id for m in network.metabolites]
+        aligned_R = T_intersected.copy()
+        for i in range(len(metabolites)):
+            aligned_R[i, :] = T_intersected[ids.index(metabolites[i]), :]
+
+        match, _, _ = check_bijection_Erik(aligned_R, np.transpose(cone_without_zeroes), network)
         pass
