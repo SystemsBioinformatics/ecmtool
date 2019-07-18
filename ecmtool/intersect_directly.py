@@ -253,8 +253,8 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, p
         print("\tDimensions after redund: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
         print("\t\tRows removed by redund: %d" % (rows_before - next_matrix.shape[0]))
         print("\tRedund took %f seconds" % (end - start))
-        if rows_before - next_matrix.shape[0] != 0:
-           input("Waiting...")
+        # if rows_before - next_matrix.shape[0] != 0:
+        #    input("Waiting...")
 
     next_matrix = np.transpose(next_matrix)
 
@@ -279,22 +279,19 @@ def get_remove_metabolite(R, network, reaction, verbose=True):
 def remove_cycles(R, network, tol=1e-12, verbose=True):
     deleted = []
     for k in range(2):
-        R_normalized = normalize_columns(np.array(R, dtype='float'))
-        R_indep = independent_rows(R_normalized)
-
-        number_rays = R.shape[1]
+        number_rays = independent_rows(normalize_columns(np.array(R, dtype='float'))).shape[1]
         i = 0 + 2 * k
         j = 1 + 2 * k
         if j > R.shape[1] - 1:
             return R, deleted
-        A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP(R_indep, i, j)
+        A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))), i, j)
 
         if sum(abs(b_eq)) < tol:
             augment_reaction = i;
             met = get_remove_metabolite(R, network, augment_reaction)
             if verbose:
                 print("Found an unbounded LP, augmenting reaction %d through metabolite %d" % (augment_reaction, met))
-            R = eliminate_metabolite(R, met, network, calculate_adjacency=False)
+            R, _ = eliminate_metabolite(R, met, network, calculate_adjacency=False)
 
         res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12},
                       x0=x0)
@@ -321,11 +318,11 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
             if verbose:
                 print("Found an unbounded LP, augmenting reaction %d through metabolite %d (%s)" % (augment_reaction, met, network.metabolites[met].id))
 
-            R = eliminate_metabolite(R, met, network, calculate_adjacency=False)
-            number_rays = R.shape[1]
+            R, _ = eliminate_metabolite(R, met, network, calculate_adjacency=False)
+            number_rays = independent_rows(normalize_columns(np.array(R, dtype='float'))).shape[1]
             i = 0 + 2 * k
             j = 1 + 2 * k
-            A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP(R_indep, i, j)
+            A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))), i, j)
 
             res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12}, x0=x0)
             if res.status == 4:
@@ -478,7 +475,7 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
                 continue
 
             print("\t\t\tKKT had non-zero exit status...")
-            input("Waiting...")
+            # input("Waiting...")
             disable_lp = False
 
             if not disable_lp:
@@ -502,7 +499,7 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
 
                 if res.status != 0:
                     print("Status %d" % res.status)
-                    input("Waiting...")
+                    # input("Waiting...")
 
                 print("res.fun: %.2e res.nit: %d" % (abs(res.fun), res.nit))
                 if res.status != 0 or abs(res.fun) < tol:
@@ -576,7 +573,7 @@ def intersect_directly(R, internal_metabolites, network, perturbed=False, verbos
 
     if verbose:
         print("\n\tRows removed by redund overall: %d\n" % rows_removed_redund)
-        if rows_removed_redund != 0:
-            input("Waiting...")
+        # if rows_removed_redund != 0:
+            # input("Waiting...")
 
     return R, ids

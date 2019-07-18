@@ -161,7 +161,7 @@ if __name__ == '__main__':
     start = time()
 
     parser = ArgumentParser(description='Calculate Elementary Conversion Modes from an SBML model. For medium-to large networks, be sure to define --inputs and --outputs. This reduces the enumeration problem complexity considerably.')
-    parser.add_argument('--model_path', type=str, default='models/active_subnetwork_KO_3round.xml', help='Relative or absolute path to an SBML model .xml file')
+    parser.add_argument('--model_path', type=str, default='models/e_coli_core_nobm.xml', help='Relative or absolute path to an SBML model .xml file')
     parser.add_argument('--direct', type=str2bool, default=True, help='Enable to intersect with equalities directly')
     parser.add_argument('--compress', type=str2bool, default=True, help='Perform compression to which the conversions are invariant, and reduce the network size considerably (default: True)')
     parser.add_argument('--out_path', default='conversion_cone.csv', help='Relative or absolute path to the .csv file you want to save the calculated conversions to (default: conversion_cone.csv)')
@@ -178,7 +178,7 @@ if __name__ == '__main__':
     parser.add_argument('--only_rays', type=str2bool, default=False, help='Enable to only return extreme rays, and not elementary modes. This describes the full conversion space, but not all biologically relevant minimal conversions. See (Urbanczik, 2005) (default: false)')
     parser.add_argument('--verbose', type=str2bool, default=True, help='Enable to show detailed console output (default: true)')
     parser.add_argument('--scei', type=str2bool, default=True, help='Enable to use SCEI compression (default: true)')
-    parser.add_argument('--fracred', type=str2bool, default=False, help='Enable to divide rays to make them smaller when possible (default: true)')
+    parser.add_argument('--fracred', type=str2bool, default=True, help='Enable to divide rays to make them smaller when possible (default: true)')
     parser.add_argument('--perturb', type=str2bool, default=False, help='Enable to perturb LPs to prevent degeneracy (default: false)')
     parser.add_argument('--compare', type=str2bool, default=True, help='Enable to compare output of direct vs indirect')
     args = parser.parse_args()
@@ -331,14 +331,20 @@ if __name__ == '__main__':
         for i in range(cone.shape[1]):
             if sum(abs(cone[:, i])) == 0:
                 if network.uncompressed_metabolite_ids[i] in metabolites:
-                    network.drop_metabolites([metabolites.index(network.uncompressed_metabolite_ids[i])])
+                    metabolite_nr = [m.id for m in network.metabolites].index(network.uncompressed_metabolite_ids[i])
+                    network.drop_metabolites([metabolite_nr], force_external=True)
         cone_without_zeroes = cone[:, [sum(abs(cone[:, i])) != 0 for i in range(cone.shape[1])]]
+        ids = list(np.array(ids)[[sum(abs(T_intersected[i, :])) != 0 for i in range(T_intersected.shape[0])]])
+        T_without_zeroes = T_intersected[[sum(abs(T_intersected[i, :])) != 0 for i in range(T_intersected.shape[0])], :]
 
         # align metabolites
         metabolites = [m.id for m in network.metabolites]
-        aligned_R = T_intersected.copy()
+        aligned_R = T_without_zeroes.copy()
         for i in range(len(metabolites)):
-            aligned_R[i, :] = T_intersected[ids.index(metabolites[i]), :]
+            aligned_R[i, :] = T_without_zeroes[ids.index(metabolites[i]), :]
 
         match, _, _ = check_bijection_Erik(aligned_R, np.transpose(cone_without_zeroes), network)
-        pass
+        if match:
+            print("\n\t\tMatch\n")
+        else:
+            print("\n\t\tNO match\n")
