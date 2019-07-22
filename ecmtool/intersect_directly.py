@@ -1,8 +1,10 @@
 import numpy as np
 from time import time
 from scipy.optimize import linprog
+from scipy.linalg import LinAlgError
 
 from ecmtool.helpers import redund
+from ecmtool._bglu_dense import BGLU
 
 
 def fake_ecm(reaction, metabolite_ids, tol=1e-12):
@@ -77,65 +79,86 @@ def kkt_check(c, A, x, basis, tol=1e-5, verbose=True):
     ab = np.arange(A.shape[0])
     a = np.arange(A.shape[1])
 
-    th_star = 0
-    it = 0
+    step_size = 0
+    iteration = 0
     basis = np.sort(basis)
-    basis_hashes = {hash(basis.tostring())} # store hashes of bases used before to prevent cycling
-    while th_star < tol:
-        it += 1
-        if it > 1000:
+    # basis_hashes = {hash(basis.tostring())} # store hashes of bases used before to prevent cycling
+
+    maxupdate = 10
+    B = BGLU(A, basis, maxupdate, False)
+    while step_size < tol:
+        iteration += 1
+
+        if iteration > 1000:
             print("Cycling?")
             return True, 1
+
         bl = np.zeros(len(a), dtype=bool)
         bl[basis] = 1
         xb = x[basis]
-        n = [i for i in range(len(c)) if i not in basis]
-        B = A[:, basis]
-        N = A[:, n]
-        if np.linalg.matrix_rank(B) < min(B.shape):
-            print("\nB became singular!\n")
-            return True, 1
-        if B.shape[0] != len(basis):
-            print("bla")
-        l = np.linalg.solve(np.transpose(B), c[basis])
-        sn = c[n] - np.dot(np.transpose(N), l)
 
-        if np.all(sn >= -tol):
+        # n = [i for i in range(len(c)) if i not in basis]
+        # B = A[:, basis]
+        # N = A[:, n]
+
+        # if np.linalg.matrix_rank(B) < min(B.shape):
+        #     print("\nB became singular!\n")
+        #     return True, 1
+
+        try:
+            l = B.solve(c[basis], transposed=True)    # similar to v = solve(B.T, cb)
+        except LinAlgError:
+            return True, 1
+        sn = c - l.dot(A)  # reduced cost
+        sn = sn[~bl]
+        # l = np.linalg.solve(np.transpose(B), c[basis])
+        # sn = c[n] - np.dot(np.transpose(N), l)
+
+        if np.all(sn >= -tol):  # in this case x is an optimal solution
             if verbose:
-                print("Did %d steps in kkt_check2" % (it-1))
+                print("Did %d steps in kkt_check, found True" % (iteration-1))
             return True, 0
 
-        j = a[~bl][np.argmin(sn)]
-        u = np.linalg.solve(B, A[:, j])
+        entering = a[~bl][np.argmin(sn)]
+        u = B.solve(A[:, entering])
+        # u = np.linalg.solve(B, A[:, entering])
 
         i = u > tol  # if none of the u are positive, unbounded
         if not np.any(i):
             print("Warning: unbounded problem in KKT_check")
             if verbose:
-                print("Did %d steps in kkt_check2" % it - 1)
+                print("Did %d steps in kkt_check2" % iteration - 1)
             return True, 1
 
         th = xb[i] / u[i]
         l = np.argmin(th)  # implicitly selects smallest subscript
-        th_star = th[l]  # step size
-        if th_star > tol:
+        step_size = th[l]  # step size
+        if step_size > tol or np.dot(c, x) < -tol:  # found a better solution, so not adjacent
             if verbose:
-                print("Did %d steps in kkt_check2" % (it - 1))
+                print("Did %d steps in kkt_check, found False" % (iteration - 1))
             return False, 0
 
+        # Do pivot
+        x[basis] = x[basis] - step_size * u
+        x[entering] = step_size
+        x[abs(x) < 10e-20] = 0
         original = basis[ab[i][l]]
-        basis[ab[i][l]] = j
-        #if np.linalg.matrix_rank(A[:, basis]) < min(A[:, basis].shape):
-        #    basis[ab[i][l]] = original
-            #entering_options = a[~bl][sn < -tol]
-            #leaving_options = ab[i][th > -tol]
-            #temporary debug: only the original entering/leaving option
-            #entering_options = [j]
-            #leaving_options = [ab[i][l]]
+        B.update(ab[i][l], entering)  # modify basis
+        basis = B.b
+        # basis[ab[i][l]] = entering
 
-            #basis = get_nonsingular_pair(A, basis, entering_options, leaving_options, basis_hashes)
-        #basis = np.sort(basis)
-        #basis_hashes.add(hash(basis.tostring()))
+        # Alternative approach to singular B - doesnt work
+        # if np.linalg.matrix_rank(A[:, basis]) < min(A[:, basis].shape):
+        #    basis[ab[i][l]] = original
+        #     entering_options = a[~bl][sn < -tol]
+        #     leaving_options = ab[i][th > -tol]
+        #     temporary debug: only the original entering/leaving option
+        #     entering_options = [j]
+        #     leaving_options = [ab[i][l]]
+        #
+        #     basis = get_nonsingular_pair(A, basis, entering_options, leaving_options, basis_hashes)
+        # basis = np.sort(basis)
+        # basis_hashes.add(hash(basis.tostring()))
 
         # Old method for anti-singular
         while np.linalg.matrix_rank(A[:, basis]) < min(A[:, basis].shape):
@@ -144,26 +167,26 @@ def kkt_check(c, A, x, basis, tol=1e-5, verbose=True):
                 basis[ab[i][l]] = original
                 l += 1
                 original = basis[ab[i][l]]
-                basis[ab[i][l]] = j
+                basis[ab[i][l]] = entering
             else:
                 print("unable to fix singular B...")
                 break
 
 
 def get_nonsingular_pair(A, basis, entering, leaving, basis_hashes):
-   for enter in entering:
-       for leave in leaving:
-           original = basis[leave]
-           basis[leave] = enter
-           if np.linalg.matrix_rank(A[:, basis]) >= min(A[:, basis].shape):
-               if hash(np.sort(basis).tostring()) in basis_hashes:
-                   basis[leave] = original
-                   continue
-               return basis
-           basis[leave] = original
-   print("Did not find non-singular entering+leaving index...")
-   basis[leaving[0]] = entering[0]
-   return basis
+    for enter in entering:
+        for leave in leaving:
+            original = basis[leave]
+            basis[leave] = enter
+            if np.linalg.matrix_rank(A[:, basis]) >= min(A[:, basis].shape):
+                if hash(np.sort(basis).tostring()) in basis_hashes:
+                    basis[leave] = original
+                    continue
+                return basis
+            basis[leave] = original
+    print("Did not find non-singular entering+leaving index...")
+    basis[leaving[0]] = entering[0]
+    return basis
 
 
 def independent_rows(A):
@@ -467,7 +490,8 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
             KKT, status = kkt_check(c, np.asarray(A_eq, dtype='float'), x0, ext_basis)
 
             # DEBUG
-            #status = 0
+            # status = 0
+
             if status == 0:
                 if KKT:
                     adjacency[i, j] = 1
