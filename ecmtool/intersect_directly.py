@@ -4,7 +4,7 @@ from scipy.optimize import linprog
 from scipy.linalg import LinAlgError
 
 from ecmtool.helpers import redund
-from ecmtool._bglu_dense import BGLU
+# from ecmtool._bglu_dense import BGLU
 
 
 def fake_ecm(reaction, metabolite_ids, tol=1e-12):
@@ -28,16 +28,15 @@ def print_ecms_direct(R, metabolite_ids):
     print("\n--ECMs found by intersecting directly--\n")
     count = 0
     for i in range(R.shape[1]):
-        if not fake_ecm(R[:, i], metabolite_ids):
-            print("ECM #%d:" % count)
-            count += 1
-            div = 1
-            # if R[obj_id][i] != 0:
-            #     div = R[obj_id][i]
-            for j in range(R.shape[0]):
-                if R[j][i] != 0:
-                    print("%s: %f" % (metabolite_ids[j].replace("_in", "").replace("_out", ""), float(R[j][i]) / div))
-            print("")
+        print("ECM #%d:" % count)
+        count += 1
+        div = 1
+        # if R[obj_id][i] != 0:
+        #     div = R[obj_id][i]
+        for j in range(R.shape[0]):
+            if R[j][i] != 0:
+                print("%s: %f" % (metabolite_ids[j].replace("_in", "").replace("_out", ""), float(R[j][i]) / div))
+        print("")
 
 
 def get_more_basis_columns(A, basis):
@@ -81,29 +80,29 @@ def kkt_check(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=1000, verbose=T
     basis = np.sort(basis)
     # basis_hashes = {hash(basis.tostring())} # store hashes of bases used before to prevent cycling
 
-    maxupdate = 10
-    B = BGLU(A, basis, maxupdate, False)
+    # maxupdate = 10
+    # B = BGLU(A, basis, maxupdate, False)
     for iteration in range(max_iter):
         bl = np.zeros(len(a), dtype=bool)
         bl[basis] = 1
         xb = x[basis]
 
-        # n = [i for i in range(len(c)) if i not in basis]
-        # B = A[:, basis]
-        # N = A[:, n]
+        n = [i for i in range(len(c)) if i not in basis]
+        B = A[:, basis]
+        N = A[:, n]
 
         # if np.linalg.matrix_rank(B) < min(B.shape):
         #     print("\nB became singular!\n")
         #     return True, 1
 
-        try:
-            l = B.solve(c[basis], transposed=True)  # similar to v = solve(B.T, cb)
-        except LinAlgError:
-            return True, 1
-        sn = c - l.dot(A)  # reduced cost
-        sn = sn[~bl]
-        # l = np.linalg.solve(np.transpose(B), c[basis])
-        # sn = c[n] - np.dot(np.transpose(N), l)
+        # try:
+        #     l = B.solve(c[basis], transposed=True)  # similar to v = solve(B.T, cb)
+        # except LinAlgError:
+        #     return True, 1
+        # sn = c - l.dot(A)  # reduced cost
+        # sn = sn[~bl]
+        l = np.linalg.solve(np.transpose(B), c[basis])
+        sn = c[n] - np.dot(np.transpose(N), l)
 
         if np.all(sn >= -tol):  # in this case x is an optimal solution
             if verbose:
@@ -111,8 +110,8 @@ def kkt_check(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=1000, verbose=T
             return True, 0
 
         entering = a[~bl][np.argmin(sn)]
-        u = B.solve(A[:, entering])
-        # u = np.linalg.solve(B, A[:, entering])
+        # u = B.solve(A[:, entering])
+        u = np.linalg.solve(B, A[:, entering])
 
         i = u > tol  # if none of the u are positive, unbounded
         if not np.any(i):
@@ -134,9 +133,9 @@ def kkt_check(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=1000, verbose=T
         x[entering] = step_size
         x[abs(x) < 10e-20] = 0
         original = basis[ab[i][l]]
-        B.update(ab[i][l], entering)  # modify basis
-        basis = B.b
-        # basis[ab[i][l]] = entering
+        # B.update(ab[i][l], entering)  # modify basis
+        # basis = B.b
+        basis[ab[i][l]] = entering
 
         # Alternative approach to singular B - doesnt work
         # if np.linalg.matrix_rank(A[:, basis]) < min(A[:, basis].shape):
@@ -258,6 +257,8 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, p
             print("Of %d candidates, %d were adjacent (0 percent)" % (len(plus) * len(minus), nr_adjacent))
 
     next_matrix = np.asarray(next_matrix)
+
+
 
     # redund in case we have too many rows
     rows_before = next_matrix.shape[0]
@@ -563,7 +564,25 @@ def unsplit_metabolites(R, network):
             processed[metabolite] = len(res) - 1
             ids.append(metabolite)
 
-    return np.asarray(res), ids
+    # remove all-zero rays
+    res = np.asarray(res)
+    res[:, [sum(abs(res)) != 0][0]]
+
+    return res, ids
+
+
+def in_cone(R, tar):
+    number_rays = R.shape[1]
+
+    A_ub = -np.identity(number_rays)
+    b_ub = np.zeros(number_rays)
+    A_eq = R
+    b_eq = tar
+    c = -np.ones(number_rays)
+
+    res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12})
+
+    return A_ub, b_ub, A_eq, b_eq, c
 
 
 def intersect_directly(R, internal_metabolites, network, perturbed=False, verbose=True, fracred=True, tol=1e-12):
@@ -579,8 +598,9 @@ def intersect_directly(R, internal_metabolites, network, perturbed=False, verbos
             [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0) for j in
              internal])]
         # i = internal[len(internal)-1]
+        to_remove = i - len(deleted[deleted < i])
         if verbose:
-            print("\nIteration %d (internal metabolite = %d) of %d" % (it, i, len(internal_metabolites)))
+            print("\nIteration %d (internal metabolite = %d: %s) of %d" % (it, to_remove, [m.id for m in network.metabolites][to_remove], len(internal_metabolites)))
             it += 1
         if fracred:
             R = reduce_column_norms(R)
@@ -592,8 +612,13 @@ def intersect_directly(R, internal_metabolites, network, perturbed=False, verbos
         deleted = np.append(deleted, i)
         internal.remove(i)
 
+        tar = np.zeros(R.shape[0])
+        glc_index = [m.id for m in network.metabolites].index("M_glc__D_e_in")
+        tar[glc_index] = -1
+        test = in_cone(R, tar)
+
     # remove artificial rays introduced by splitting metabolites
-    R = remove_fake_ecms(R, network)
+    # R = remove_fake_ecms(R, network)
     R, ids = unsplit_metabolites(R, network)
 
     if verbose:
