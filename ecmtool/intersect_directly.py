@@ -612,11 +612,6 @@ def intersect_directly(R, internal_metabolites, network, perturbed=False, verbos
         deleted = np.append(deleted, i)
         internal.remove(i)
 
-        tar = np.zeros(R.shape[0])
-        glc_index = [m.id for m in network.metabolites].index("M_glc__D_e_in")
-        tar[glc_index] = -1
-        test = in_cone(R, tar)
-
     # remove artificial rays introduced by splitting metabolites
     # R = remove_fake_ecms(R, network)
     R, ids = unsplit_metabolites(R, network)
