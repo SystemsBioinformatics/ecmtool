@@ -567,10 +567,10 @@ class Network:
             reaction_name = 'R_HIDDEN_EX_%s' % self.metabolites[index].id
             reversible = self.metabolites[index].direction == 'both'
 
-            self.reactions.append(Reaction(reaction_name, reaction_name, reversible=reversible))
-            row = to_fractions(np.zeros(shape=(self.N.shape[0], 1)))
-            row[index, 0] += -1 if self.metabolites[index].direction == 'output' else 1
-            self.N = np.append(self.N, row, axis=1)
+            # self.reactions.append(Reaction(reaction_name, reaction_name, reversible=reversible))
+            # row = to_fractions(np.zeros(shape=(self.N.shape[0], 1)))
+            # row[index, 0] += -1 if self.metabolites[index].direction == 'output' else 1
+            # self.N = np.append(self.N, row, axis=1)
 
     def remove_objective_reaction(self):
         reaction_matches = [index for index, reaction in enumerate(self.reactions) if reaction.id == self.objective_reaction_id]

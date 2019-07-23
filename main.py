@@ -161,14 +161,14 @@ if __name__ == '__main__':
     start = time()
 
     parser = ArgumentParser(description='Calculate Elementary Conversion Modes from an SBML model. For medium-to large networks, be sure to define --inputs and --outputs. This reduces the enumeration problem complexity considerably.')
-    parser.add_argument('--model_path', type=str, default='models/active_subnetwork_KO_6.xml', help='Relative or absolute path to an SBML model .xml file')
+    parser.add_argument('--model_path', type=str, default='models/e_coli_core_rounded.xml', help='Relative or absolute path to an SBML model .xml file')
     parser.add_argument('--direct', type=str2bool, default=True, help='Enable to intersect with equalities directly')
     parser.add_argument('--compress', type=str2bool, default=True, help='Perform compression to which the conversions are invariant, and reduce the network size considerably (default: True)')
     parser.add_argument('--out_path', default='conversion_cone.csv', help='Relative or absolute path to the .csv file you want to save the calculated conversions to (default: conversion_cone.csv)')
     parser.add_argument('--add_objective_metabolite', type=str2bool, default=True, help='Add a virtual metabolite containing the stoichiometry of the objective function of the model (default: true)')
     parser.add_argument('--check_feasibility', type=str2bool, default=False, help='For each found ECM, verify that a feasible flux exists that produces it (default: false)')
     parser.add_argument('--check_bijection', type=str2bool, default=False, help='Verify completeness of found ECMs by calculating ECMs from EFMs and proving bijection (don\'t use on large networks) (default: false)')
-    parser.add_argument('--print_metabolites', type=str2bool, default=False, help='Print the names and IDs of metabolites in the (compressed) metabolic network (default: true)')
+    parser.add_argument('--print_metabolites', type=str2bool, default=True, help='Print the names and IDs of metabolites in the (compressed) metabolic network (default: true)')
     parser.add_argument('--print_reactions', type=str2bool, default=False, help='Print the names and IDs of reactions in the (compressed) metabolic network (default: true)')
     parser.add_argument('--auto_direction', type=str2bool, default=True, help='Automatically determine external metabolites that can only be consumed or produced (default: true)')
     parser.add_argument('--inputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be consumed')
@@ -235,11 +235,11 @@ if __name__ == '__main__':
         #         if nr != 0:
         #             print("%s: %d" % (network.metabolites[j].id, nr))
 
-        if args.compress:
-            network.compress(verbose=args.verbose, SCEI=args.scei)
-
         if not args.only_rays:
             network.split_in_out()
+
+        if args.compress:
+            network.compress(verbose=args.verbose, SCEI=args.scei)
 
         for i in np.flip(range(network.N.shape[0]), 0):
             if sum(abs(network.N[i])) == 0:
@@ -259,6 +259,7 @@ if __name__ == '__main__':
         end = time()
         print('Ran (direct) in %f seconds' % (end - start))
 
+    input("waiting")
     if args.compare or not args.direct:
         network = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite,
                                              determine_inputs_outputs=args.auto_direction,

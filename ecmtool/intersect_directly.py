@@ -9,7 +9,7 @@ from ecmtool._bglu_dense import BGLU
 
 def fake_ecm(reaction, metabolite_ids, tol=1e-12):
     s = ""
-    for i,c in enumerate(np.asarray(reaction, dtype='int')):
+    for i, c in enumerate(np.asarray(reaction, dtype='int')):
         if abs(reaction[i]) > tol:
             if s == "":
                 s = metabolite_ids[i].replace("_in", "").replace("_out", "")
@@ -25,11 +25,10 @@ def print_ecms_direct(R, metabolite_ids):
     #         break
     #     obj_id += 1
 
-
     print("\n--ECMs found by intersecting directly--\n")
     count = 0
     for i in range(R.shape[1]):
-        if not fake_ecm(R[:,i], metabolite_ids):
+        if not fake_ecm(R[:, i], metabolite_ids):
             print("ECM #%d:" % count)
             count += 1
             div = 1
@@ -37,7 +36,7 @@ def print_ecms_direct(R, metabolite_ids):
             #     div = R[obj_id][i]
             for j in range(R.shape[0]):
                 if R[j][i] != 0:
-                    print("%s: %f" % (metabolite_ids[j].replace("_in","").replace("_out",""), float(R[j][i]) / div))
+                    print("%s: %f" % (metabolite_ids[j].replace("_in", "").replace("_out", ""), float(R[j][i]) / div))
             print("")
 
 
@@ -49,10 +48,10 @@ def get_more_basis_columns(A, basis):
     """
     m, n = A.shape
 
-    #if (len(basis) > 0 and np.linalg.matrix_rank(A[:,basis]) < len(basis)):
+    # if (len(basis) > 0 and np.linalg.matrix_rank(A[:,basis]) < len(basis)):
     #    raise Exception("Basis has dependent columns")
 
-    rank = np.linalg.matrix_rank(A[:,basis])
+    rank = np.linalg.matrix_rank(A[:, basis])
     new_basis = basis.copy()
     for i in range(n):
         if i in new_basis:
@@ -62,7 +61,7 @@ def get_more_basis_columns(A, basis):
         new_basis = np.append(new_basis, i)
         rank = np.linalg.matrix_rank(A[:, new_basis])
 
-        if rank == prev_rank: # column added did not increase rank
+        if rank == prev_rank:  # column added did not increase rank
             new_basis = prev_basis
         if rank == m:
             break
@@ -70,7 +69,7 @@ def get_more_basis_columns(A, basis):
     return new_basis
 
 
-def kkt_check(c, A, x, basis, tol=1e-5, verbose=True):
+def kkt_check(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=1000, verbose=True):
     """
     Determine whether KKT conditions hold for x0.
     Take size 0 steps if available.
@@ -79,20 +78,12 @@ def kkt_check(c, A, x, basis, tol=1e-5, verbose=True):
     ab = np.arange(A.shape[0])
     a = np.arange(A.shape[1])
 
-    step_size = 0
-    iteration = 0
     basis = np.sort(basis)
     # basis_hashes = {hash(basis.tostring())} # store hashes of bases used before to prevent cycling
 
     maxupdate = 10
     B = BGLU(A, basis, maxupdate, False)
-    while step_size < tol:
-        iteration += 1
-
-        if iteration > 1000:
-            print("Cycling?")
-            return True, 1
-
+    for iteration in range(max_iter):
         bl = np.zeros(len(a), dtype=bool)
         bl[basis] = 1
         xb = x[basis]
@@ -106,7 +97,7 @@ def kkt_check(c, A, x, basis, tol=1e-5, verbose=True):
         #     return True, 1
 
         try:
-            l = B.solve(c[basis], transposed=True)    # similar to v = solve(B.T, cb)
+            l = B.solve(c[basis], transposed=True)  # similar to v = solve(B.T, cb)
         except LinAlgError:
             return True, 1
         sn = c - l.dot(A)  # reduced cost
@@ -116,7 +107,7 @@ def kkt_check(c, A, x, basis, tol=1e-5, verbose=True):
 
         if np.all(sn >= -tol):  # in this case x is an optimal solution
             if verbose:
-                print("Did %d steps in kkt_check, found True" % (iteration-1))
+                print("Did %d steps in kkt_check, found True - smallest sn: %.8f" % (iteration - 1, min(sn)))
             return True, 0
 
         entering = a[~bl][np.argmin(sn)]
@@ -133,9 +124,9 @@ def kkt_check(c, A, x, basis, tol=1e-5, verbose=True):
         th = xb[i] / u[i]
         l = np.argmin(th)  # implicitly selects smallest subscript
         step_size = th[l]  # step size
-        if step_size > tol or np.dot(c, x) < -tol:  # found a better solution, so not adjacent
+        if np.dot(c, x) < -threshold:  # found a better solution, so not adjacent
             if verbose:
-                print("Did %d steps in kkt_check, found False" % (iteration - 1))
+                print("Did %d steps in kkt_check, found False - c*x %.8f" % (iteration - 1, np.dot(c, x)))
             return False, 0
 
         # Do pivot
@@ -172,6 +163,9 @@ def kkt_check(c, A, x, basis, tol=1e-5, verbose=True):
                 print("unable to fix singular B...")
                 break
 
+    print("Cycling?")
+    return True, 1
+
 
 def get_nonsingular_pair(A, basis, entering, leaving, basis_hashes):
     for enter in entering:
@@ -206,7 +200,7 @@ def independent_rows(A):
         basis = np.append(basis, i)
         rank = np.linalg.matrix_rank(A_float[basis])
 
-        if rank == prev_rank: # row added did not increase rank
+        if rank == prev_rank:  # row added did not increase rank
             basis = prev_basis
         if rank == original_rank:
             break
@@ -241,7 +235,8 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, p
         next_matrix.append(col)
 
     if calculate_adjacency:
-        adj = geometric_ray_adjacency(R, plus=plus, minus=minus, perturbed=perturbed, verbose=verbose, remove_cycles=True)
+        adj = geometric_ray_adjacency(R, plus=plus, minus=minus, perturbed=perturbed, verbose=verbose,
+                                      remove_cycles=True)
 
     # combine + and - if adjacent
     nr_adjacent = 0
@@ -258,7 +253,7 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, p
     if verbose:
         if len(plus) * len(minus) > 0:
             print("Of %d candidates, %d were adjacent (%f percent)" % (
-            len(plus) * len(minus), nr_adjacent, 100 * nr_adjacent / (len(plus) * len(minus))))
+                len(plus) * len(minus), nr_adjacent, 100 * nr_adjacent / (len(plus) * len(minus))))
         else:
             print("Of %d candidates, %d were adjacent (0 percent)" % (len(plus) * len(minus), nr_adjacent))
 
@@ -332,20 +327,22 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
                 print("Numerical difficulties with revised simplex, trying interior point method instead")
                 res2 = linprog(c, A_ub2, b_ub2, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
 
-            if abs(res2.fun) < tol: # res is 'unbounded' but res2 has optimum 0
+            if abs(res2.fun) < tol:  # res is 'unbounded' but res2 has optimum 0
                 break
 
             augment_reaction = [i for i, val in enumerate(res2.x) if val > 90][0]
             met = get_remove_metabolite(R, network, augment_reaction)
             deleted.append(met)
             if verbose:
-                print("Found an unbounded LP, augmenting reaction %d through metabolite %d (%s)" % (augment_reaction, met, network.metabolites[met].id))
+                print("Found an unbounded LP, augmenting reaction %d through metabolite %d (%s)" % (
+                augment_reaction, met, network.metabolites[met].id))
 
             R, _ = eliminate_metabolite(R, met, network, calculate_adjacency=False)
             number_rays = independent_rows(normalize_columns(np.array(R, dtype='float'))).shape[1]
             i = 0 + 2 * k
             j = 1 + 2 * k
-            A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))), i, j)
+            A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))), i,
+                                                     j)
 
             res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12}, x0=x0)
             if res.status == 4:
@@ -364,7 +361,7 @@ def normalize_columns(R):
 
 def smallest_positive(arr):
     a = np.where(np.isfinite(arr), arr, -1)
-    return min(np.where(a < 0, max(a)*2, a)), np.argmin(np.where(a < 0, max(a)*2, a))
+    return min(np.where(a < 0, max(a) * 2, a)), np.argmin(np.where(a < 0, max(a) * 2, a))
 
 
 def generate_BFS(R, i, j, eps):
@@ -373,11 +370,11 @@ def generate_BFS(R, i, j, eps):
     with np.errstate(divide='ignore', invalid='ignore'):
         alpha, k = smallest_positive(eps / ray1)
         beta = ray2[k] / ray1[k]
-        arr = (eps - alpha*ray1) / (ray2 - beta*ray1)
-        arr[k] = -1 # ignore place k, because it should always be divide by 0
+        arr = (eps - alpha * ray1) / (ray2 - beta * ray1)
+        arr[k] = -1  # ignore place k, because it should always be divide by 0
         delta2, _ = smallest_positive(arr)
-        delta1 = -beta*delta2
-    sbar = eps - (alpha + delta1)*ray1 - delta2*ray2
+        delta1 = -beta * delta2
+    sbar = eps - (alpha + delta1) * ray1 - delta2 * ray2
     l = np.zeros(R.shape[1])
     l[i] = 0.5 + alpha + delta1
     l[j] = 0.5 + delta2
@@ -386,7 +383,7 @@ def generate_BFS(R, i, j, eps):
     # round to 0 when a rounding error made it non-zero
     res = np.where(abs(res) < 1e-20, 0, res)
 
-    if len(res[res!=0]) != R.shape[0]*2:
+    if len(res[res != 0]) != R.shape[0] * 2:
         print("problem in generate_BFS")
 
     return res
@@ -395,13 +392,13 @@ def generate_BFS(R, i, j, eps):
 def setup_LP_perturbed(R, i, j, epsilon):
     m, n = R.shape
 
-    A_ub = -np.identity(n + 2*m)
-    b_ub = np.zeros(n + 2*m)
-    A_eq = np.concatenate((np.concatenate((R, -R)), np.identity(2*m)), axis=1)
+    A_ub = -np.identity(n + 2 * m)
+    b_ub = np.zeros(n + 2 * m)
+    A_eq = np.concatenate((np.concatenate((R, -R)), np.identity(2 * m)), axis=1)
     ray1 = R[:, i]
     ray2 = R[:, j]
     tar = 0.5 * ray1 + 0.5 * ray2
-    eps_vector = np.array([epsilon] * (2*m)) + np.random.uniform(-epsilon/2, epsilon/2, 2*m)
+    eps_vector = np.array([epsilon] * (2 * m)) + np.random.uniform(-epsilon / 2, epsilon / 2, 2 * m)
     b_eq = np.concatenate((tar, -tar)) + eps_vector
     x0 = generate_BFS(R, i, j, eps_vector)
     c = np.concatenate((-np.ones(n), np.zeros(2 * m)))
@@ -448,7 +445,7 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
     R_normalized = normalize_columns(np.array(R, dtype='float'))
     R_indep = independent_rows(R_normalized)
     # without normalization
-    #R_indep = independent_rows(R)
+    # R_indep = independent_rows(R)
 
     LPs_done = 0
     # set default plus and minus
@@ -466,7 +463,8 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
     print("\n\tLargest non-LP ray: %.2f" % max(
         [np.linalg.norm(np.array(R[:, i], dtype='float')) for i in range(R.shape[1])]))
     print("\tMax/min: %.3f" % max(
-        [abs(abs(np.array(R[:, i], dtype='float')).max() / np.min(abs(np.array(R[:, i], dtype='float'))[np.nonzero(R[:, i])])) for i in range(R.shape[1])]))
+        [abs(abs(np.array(R[:, i], dtype='float')).max() / np.min(
+            abs(np.array(R[:, i], dtype='float'))[np.nonzero(R[:, i])])) for i in range(R.shape[1])]))
     print("\tLargest LP ray: %.2f" % max(
         [np.linalg.norm(np.array(R_indep[:, i], dtype='float')) for i in range(R_indep.shape[1])]))
 
@@ -481,8 +479,8 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
             else:
                 A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP(R_indep, i, j)
 
-            disable_lp = True
             # KKT
+            disable_lp = True
             if perturbed:
                 ext_basis = np.nonzero(x0)[0]
             else:
@@ -577,14 +575,17 @@ def intersect_directly(R, internal_metabolites, network, perturbed=False, verbos
     rows_removed_redund = 0
 
     while len(internal) > 0:
-        i = internal[np.argmin([np.sum(R[j - len(deleted[deleted<j]), :] > 0) * np.sum(R[j - len(deleted[deleted<j]), :] < 0) for j in internal])]
-        #i = internal[len(internal)-1]
+        i = internal[np.argmin(
+            [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0) for j in
+             internal])]
+        # i = internal[len(internal)-1]
         if verbose:
             print("\nIteration %d (internal metabolite = %d) of %d" % (it, i, len(internal_metabolites)))
             it += 1
         if fracred:
             R = reduce_column_norms(R)
-        R, removed = eliminate_metabolite(R, i - len(deleted[deleted<i]), network, calculate_adjacency=True, perturbed=perturbed)
+        R, removed = eliminate_metabolite(R, i - len(deleted[deleted < i]), network, calculate_adjacency=True,
+                                          perturbed=perturbed)
         rows_removed_redund += removed
         if fracred:
             R = reduce_column_norms(R)
@@ -598,6 +599,6 @@ def intersect_directly(R, internal_metabolites, network, perturbed=False, verbos
     if verbose:
         print("\n\tRows removed by redund overall: %d\n" % rows_removed_redund)
         # if rows_removed_redund != 0:
-            # input("Waiting...")
+        # input("Waiting...")
 
     return R, ids
