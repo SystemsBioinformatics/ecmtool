@@ -4,7 +4,10 @@ from scipy.optimize import linprog
 from scipy.linalg import LinAlgError
 
 from ecmtool.helpers import redund
-# from ecmtool._bglu_dense import BGLU
+from ecmtool._bglu_dense import BGLU
+
+t1, t2, t3 = 0, 0, 0
+t21, t22, t23, t24 = 0, 0, 0, 0
 
 
 def fake_ecm(reaction, metabolite_ids, tol=1e-12):
@@ -19,24 +22,23 @@ def fake_ecm(reaction, metabolite_ids, tol=1e-12):
 
 
 def print_ecms_direct(R, metabolite_ids):
-    # obj_id = 0
-    # for i in range(len(metabolite_ids)):
-    #     if metabolite_ids[i] == "objective" or metabolite_ids[i] == "objective_out":
-    #         break
-    #     obj_id += 1
+    obj_id = -1
+    if "objective" in metabolite_ids:
+        obj_id = metabolite_ids.index("objective")
+    elif "objective_out" in metabolite_ids:
+        obj_id = metabolite_ids.index("objective_out")
 
-    print("\n--ECMs found by intersecting directly--\n")
-    count = 0
-    for i in range(R.shape[1]):
-        print("ECM #%d:" % count)
-        count += 1
-        div = 1
-        # if R[obj_id][i] != 0:
-        #     div = R[obj_id][i]
-        for j in range(R.shape[0]):
-            if R[j][i] != 0:
-                print("%s: %f" % (metabolite_ids[j].replace("_in", "").replace("_out", ""), float(R[j][i]) / div))
-        print("")
+    print("\n--%d ECMs found by intersecting directly--\n" % R.shape[1])
+    # for i in range(R.shape[1]):
+    #     print("ECM #%d:" % i)
+    #     div = 1
+    #     if obj_id != -1 and R[obj_id][i] != 0:
+    #         div = R[obj_id][i]
+    #     for j in range(R.shape[0]):
+    #         if R[j][i] != 0:
+    #             print("%s: %f" % (metabolite_ids[j].replace("_in", "").replace("_out", ""), float(R[j][i]) / div))
+    #     print("")
+
 
 
 def get_more_basis_columns(A, basis):
@@ -73,48 +75,45 @@ def kkt_check(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=1000, verbose=T
     Determine whether KKT conditions hold for x0.
     Take size 0 steps if available.
     """
-
+    global t2, t3, t21, t22, t23, t24
     ab = np.arange(A.shape[0])
     a = np.arange(A.shape[1])
 
-    basis = np.sort(basis)
-    # basis_hashes = {hash(basis.tostring())} # store hashes of bases used before to prevent cycling
-
-    # maxupdate = 10
-    # B = BGLU(A, basis, maxupdate, False)
+    maxupdate = 10
+    B = BGLU(A, basis, maxupdate, False)
     for iteration in range(max_iter):
+        t21 -= time()
         bl = np.zeros(len(a), dtype=bool)
         bl[basis] = 1
         xb = x[basis]
 
-        n = [i for i in range(len(c)) if i not in basis]
-        B = A[:, basis]
-        N = A[:, n]
-
-        # if np.linalg.matrix_rank(B) < min(B.shape):
-        #     print("\nB became singular!\n")
-        #     return True, 1
-
-        # try:
-        #     l = B.solve(c[basis], transposed=True)  # similar to v = solve(B.T, cb)
-        # except LinAlgError:
-        #     return True, 1
-        # sn = c - l.dot(A)  # reduced cost
-        # sn = sn[~bl]
-        l = np.linalg.solve(np.transpose(B), c[basis])
-        sn = c[n] - np.dot(np.transpose(N), l)
+        t21 += time()
+        t3 -= time()
+        try:
+            l = B.solve(c[basis], transposed=True)  # similar to v = linalg.solve(B.T, c[basis])
+        except LinAlgError:
+            return True, 1
+        t22 -= time()
+        t3 += time()
+        sn = c - l.dot(A)  # reduced cost
+        sn = sn[~bl]
 
         if np.all(sn >= -tol):  # in this case x is an optimal solution
+            t22 += time()
             if verbose:
                 print("Did %d steps in kkt_check, found True - smallest sn: %.8f" % (iteration - 1, min(sn)))
             return True, 0
 
         entering = a[~bl][np.argmin(sn)]
-        # u = B.solve(A[:, entering])
-        u = np.linalg.solve(B, A[:, entering])
+        t22 += time()
+        t3 -= time()
+        u = B.solve(A[:, entering])
+        t23 -= time()
+        t3 += time()
 
         i = u > tol  # if none of the u are positive, unbounded
         if not np.any(i):
+            t23 += time()
             print("Warning: unbounded problem in KKT_check")
             if verbose:
                 print("Did %d steps in kkt_check2" % iteration - 1)
@@ -123,45 +122,24 @@ def kkt_check(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=1000, verbose=T
         th = xb[i] / u[i]
         l = np.argmin(th)  # implicitly selects smallest subscript
         step_size = th[l]  # step size
-        if np.dot(c, x) < -threshold:  # found a better solution, so not adjacent
-            if verbose:
-                print("Did %d steps in kkt_check, found False - c*x %.8f" % (iteration - 1, np.dot(c, x)))
-            return False, 0
+
 
         # Do pivot
         x[basis] = x[basis] - step_size * u
         x[entering] = step_size
         x[abs(x) < 10e-20] = 0
-        original = basis[ab[i][l]]
-        # B.update(ab[i][l], entering)  # modify basis
-        # basis = B.b
-        basis[ab[i][l]] = entering
+        t23 += time()
+        t24 -= time()
+        B.update(ab[i][l], entering)  # modify basis
+        basis = B.b
 
-        # Alternative approach to singular B - doesnt work
-        # if np.linalg.matrix_rank(A[:, basis]) < min(A[:, basis].shape):
-        #    basis[ab[i][l]] = original
-        #     entering_options = a[~bl][sn < -tol]
-        #     leaving_options = ab[i][th > -tol]
-        #     temporary debug: only the original entering/leaving option
-        #     entering_options = [j]
-        #     leaving_options = [ab[i][l]]
-        #
-        #     basis = get_nonsingular_pair(A, basis, entering_options, leaving_options, basis_hashes)
-        # basis = np.sort(basis)
-        # basis_hashes.add(hash(basis.tostring()))
+        if np.dot(c, x) < -threshold:  # found a better solution, so not adjacent
+            t24 += time()
+            if verbose:
+                print("Did %d steps in kkt_check, found False - c*x %.8f" % (iteration - 1, np.dot(c, x)))
+            return False, 0
 
-        # Old method for anti-singular
-        while np.linalg.matrix_rank(A[:, basis]) < min(A[:, basis].shape):
-            if (l + 1 < len(th)) and th[l + 1] < tol:
-                # try changing leaving index
-                basis[ab[i][l]] = original
-                l += 1
-                original = basis[ab[i][l]]
-                basis[ab[i][l]] = entering
-            else:
-                print("unable to fix singular B...")
-                break
-
+        t24 += time()
     print("Cycling?")
     return True, 1
 
@@ -439,7 +417,7 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
         if plus/minus are not provided, find all adjacencies; otherwise only between each + and - pair
     :return: r by r adjacency matrix
     """
-
+    global t1
     start = time()
 
     # with normalization
@@ -486,8 +464,9 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
                 ext_basis = np.nonzero(x0)[0]
             else:
                 ext_basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [i, j])
+            t1 -= time()
             KKT, status = kkt_check(c, np.asarray(A_eq, dtype='float'), x0, ext_basis)
-
+            t1 += time()
             # DEBUG
             # status = 0
 
@@ -566,7 +545,7 @@ def unsplit_metabolites(R, network):
 
     # remove all-zero rays
     res = np.asarray(res)
-    res[:, [sum(abs(res)) != 0][0]]
+    res = res[:, [sum(abs(res)) != 0][0]]
 
     return res, ids
 
@@ -618,7 +597,16 @@ def intersect_directly(R, internal_metabolites, network, perturbed=False, verbos
 
     if verbose:
         print("\n\tRows removed by redund overall: %d\n" % rows_removed_redund)
-        # if rows_removed_redund != 0:
-        # input("Waiting...")
+        if rows_removed_redund != 0:
+            pass
+            # input("Waiting...")
+
+    print("Time spent in kkt_check: %f" % t1)
+    print("Time spent outside linalg.solve: %f" % t2)
+    print("Time spent in linalg.solve: %f" % t3)
+    print("t21: %f" % t21)
+    print("t22: %f" % t22)
+    print("t23: %f" % t23)
+    print("t24: %f" % t24)
 
     return R, ids
