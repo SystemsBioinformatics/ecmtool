@@ -2,6 +2,7 @@ import numpy as np
 from time import time
 from scipy.optimize import linprog
 from scipy.linalg import LinAlgError
+import multiprocessing as multi
 
 from ecmtool.helpers import redund
 from ecmtool._bglu_dense import BGLU
@@ -193,11 +194,11 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, p
         adj = geometric_ray_adjacency(R, plus=plus, minus=minus, perturbed=perturbed, verbose=verbose,
                                       remove_cycles=True)
 
-    # combine + and - if adjacent
+        # combine + and - if adjacent
     nr_adjacent = 0
-    for p in plus:
-        for m in minus:
-            if not calculate_adjacency or adj[p, m] == 1:
+    for i, p in enumerate(plus):
+        for j, m in enumerate(minus):
+            if not calculate_adjacency or adj[i, j] == 1:
                 nr_adjacent += 1
                 rp = R[met, p]
                 rm = R[met, m]
@@ -473,13 +474,10 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
     print("\tLargest LP ray: %.2f" % max(
         [np.linalg.norm(np.array(R_indep[:, i], dtype='float')) for i in range(R_indep.shape[1])]))
 
-    for ind1, i in enumerate(plus):
-        for ind2, j in enumerate(minus):
-            it = ind2 + ind1 * len(minus)
-            if verbose:
-                print("Doing KKT test %d of %d (%.2f percent done)" % (it, total, it * 100 / total))
-
-            adjacency[i, j] = determine_adjacency(R_indep, i, j, perturbed)
+    with multi.Pool(multi.cpu_count()) as pool:
+        adjacency_as_list = pool.starmap(determine_adjacency, [(R, i, j, perturbed) for i in plus for j in minus])
+        adjacency = np.array(adjacency_as_list)
+        adjacency = adjacency.reshape((len(plus), len(minus)))
 
     end = time()
     print("Did %d LPs in %f seconds" % (LPs_done, end - start))
