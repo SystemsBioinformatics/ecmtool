@@ -7,6 +7,7 @@ import multiprocessing as multi
 from ecmtool.helpers import redund
 from ecmtool._bglu_dense import BGLU
 
+
 def fake_ecm(reaction, metabolite_ids, tol=1e-12):
     s = ""
     for i, c in enumerate(np.asarray(reaction, dtype='int')):
@@ -89,8 +90,8 @@ def kkt_check(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=1000, verbose=T
         sn = sn[~bl]
 
         if np.all(sn >= -tol):  # in this case x is an optimal solution
-            if verbose:
-                print("Did %d steps in kkt_check, found True - smallest sn: %.8f" % (iteration - 1, min(sn)))
+            # if verbose:
+            #     print("Did %d steps in kkt_check, found True - smallest sn: %.8f" % (iteration - 1, min(sn)))
             return True, 0
 
         entering = a[~bl][np.argmin(sn)]
@@ -99,8 +100,8 @@ def kkt_check(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=1000, verbose=T
         i = u > tol  # if none of the u are positive, unbounded
         if not np.any(i):
             print("Warning: unbounded problem in KKT_check")
-            if verbose:
-                print("Did %d steps in kkt_check2" % iteration - 1)
+            # if verbose:
+            #     print("Did %d steps in kkt_check2" % iteration - 1)
             return True, 1
 
         th = xb[i] / u[i]
@@ -115,8 +116,8 @@ def kkt_check(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=1000, verbose=T
         basis = B.b
 
         if np.dot(c, x) < -threshold:  # found a better solution, so not adjacent
-            if verbose:
-                print("Did %d steps in kkt_check, found False - c*x %.8f" % (iteration - 1, np.dot(c, x)))
+            # if verbose:
+            #     print("Did %d steps in kkt_check, found False - c*x %.8f" % (iteration - 1, np.dot(c, x)))
             return False, 0
 
     print("Cycling?")
@@ -164,7 +165,8 @@ def independent_rows(A):
     return A[basis]
 
 
-def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, perturbed=False, verbose=True):
+def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, perturbed=False, verbose=True,
+                         lps_per_job=1):
     # determine +/0/-
     plus = []
     zero = []
@@ -192,13 +194,13 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, p
 
     if calculate_adjacency:
         adj = geometric_ray_adjacency(R, plus=plus, minus=minus, perturbed=perturbed, verbose=verbose,
-                                      remove_cycles=True)
+                                      remove_cycles=True, lps_per_job=lps_per_job)
 
-        # combine + and - if adjacent
+    # combine + and - if adjacent
     nr_adjacent = 0
-    for i, p in enumerate(plus):
-        for j, m in enumerate(minus):
-            if not calculate_adjacency or adj[i, j] == 1:
+    for p in plus:
+        for m in minus:
+            if not calculate_adjacency or adj[p, m] == 1:
                 nr_adjacent += 1
                 rp = R[met, p]
                 rm = R[met, m]
@@ -434,7 +436,22 @@ def determine_adjacency(R, i, j, perturbed, tol=1e-10):
     return 0
 
 
-def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False, verbose=True, remove_cycles=True):
+def multiple_adjacencies(R, pairs, perturbed):
+    return [(p, determine_adjacency(R, p[0], p[1], perturbed)) for p in pairs]
+
+
+def unpack_results(results, number_rays):
+    adjacency = np.zeros(shape=(number_rays, number_rays))
+    for result in results:
+        for line in result:
+            i = line[0][0]
+            j = line[0][1]
+            adjacency[i][j] = line[1]
+    return adjacency
+
+
+def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False, verbose=True, remove_cycles=True,
+                            lps_per_job=1):
     """
     Returns r by r adjacency matrix of rays, given
     ray matrix R. Diagonal is 0, not 1.
@@ -475,9 +492,14 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
         [np.linalg.norm(np.array(R_indep[:, i], dtype='float')) for i in range(R_indep.shape[1])]))
 
     with multi.Pool(multi.cpu_count()) as pool:
-        adjacency_as_list = pool.starmap(determine_adjacency, [(R_indep, i, j, perturbed) for i in plus for j in minus])
-        adjacency = np.array(adjacency_as_list)
-        adjacency = adjacency.reshape((len(plus), len(minus)))
+        # adjacency_as_list = pool.starmap(determine_adjacency, [(R_indep, i, j, perturbed) for i in plus for j in minus])
+        # adjacency = np.array(adjacency_as_list)
+        # adjacency = adjacency.reshape((len(plus), len(minus)))
+        pairs = np.array([(i, j) for i in plus for j in minus])
+        split_indices = [i for i in range(1, len(pairs)) if i % lps_per_job == 0]
+        split_pairs = np.split(pairs, split_indices)
+        result = pool.starmap(multiple_adjacencies, [(R_indep, pairs, perturbed) for pairs in split_pairs])
+        adjacency = unpack_results(result, number_rays)
 
     end = time()
     print("Did %d LPs in %f seconds" % (LPs_done, end - start))
@@ -535,7 +557,7 @@ def in_cone(R, tar):
     return A_ub, b_ub, A_eq, b_eq, c
 
 
-def intersect_directly(R, internal_metabolites, network, perturbed=False, verbose=True, tol=1e-12):
+def intersect_directly(R, internal_metabolites, network, perturbed=False, verbose=True, tol=1e-12, lps_per_job=1):
     # rows are rays
     deleted = np.array([])
     it = 1
@@ -558,9 +580,9 @@ def intersect_directly(R, internal_metabolites, network, perturbed=False, verbos
                 [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0) for j
                  in internal]))
             it += 1
-        input("waiting")
+        # input("waiting")
         R, removed = eliminate_metabolite(R, i - len(deleted[deleted < i]), network, calculate_adjacency=True,
-                                          perturbed=perturbed)
+                                          perturbed=perturbed, lps_per_job=lps_per_job)
         rows_removed_redund += removed
         deleted = np.append(deleted, i)
         internal.remove(i)

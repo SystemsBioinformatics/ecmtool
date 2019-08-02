@@ -183,6 +183,7 @@ if __name__ == '__main__':
     parser.add_argument('--scei', type=str2bool, default=True, help='Enable to use SCEI compression (default: true)')
     parser.add_argument('--perturb', type=str2bool, default=True, help='Enable to perturb LPs to prevent degeneracy (default: false)')
     parser.add_argument('--compare', type=str2bool, default=False, help='Enable to compare output of direct vs indirect')
+    parser.add_argument('--job_size', type=int, default=1, help='Number of LPs per multiprocessing job')
     args = parser.parse_args()
 
     if args.model_path == '':
@@ -253,7 +254,7 @@ if __name__ == '__main__':
 
         external = np.asarray(network.external_metabolite_indices())
         internal = np.setdiff1d(range(R.shape[0]), external)
-        T_intersected, ids = intersect_directly(R, internal, network, perturbed=args.perturb, verbose=args.verbose)
+        T_intersected, ids = intersect_directly(R, internal, network, perturbed=args.perturb, verbose=args.verbose, lps_per_job=args.job_size)
 
         print_ecms_direct(T_intersected, ids)
         end = time()
