@@ -475,7 +475,7 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
         [np.linalg.norm(np.array(R_indep[:, i], dtype='float')) for i in range(R_indep.shape[1])]))
 
     with multi.Pool(multi.cpu_count()) as pool:
-        adjacency_as_list = pool.starmap(determine_adjacency, [(R, i, j, perturbed) for i in plus for j in minus])
+        adjacency_as_list = pool.starmap(determine_adjacency, [(R_indep, i, j, perturbed) for i in plus for j in minus])
         adjacency = np.array(adjacency_as_list)
         adjacency = adjacency.reshape((len(plus), len(minus)))
 
@@ -558,6 +558,7 @@ def intersect_directly(R, internal_metabolites, network, perturbed=False, verbos
                 [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0) for j
                  in internal]))
             it += 1
+        input("waiting")
         R, removed = eliminate_metabolite(R, i - len(deleted[deleted < i]), network, calculate_adjacency=True,
                                           perturbed=perturbed)
         rows_removed_redund += removed
