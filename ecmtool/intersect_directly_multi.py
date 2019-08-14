@@ -501,13 +501,18 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
         report_unit = np.split(split_pairs, split_indices)
         adjacency = None
         LPs_done = 0
+        start_time = time()
         for unit in report_unit:
             result = pool.starmap(multiple_adjacencies, [(R_indep, pairs, perturbed) for pairs in unit])
             adjacency = unpack_results(result, number_rays, adjacency)
             LPs_done += int(q / lps_per_job) * lps_per_job
             if len(pairs) != 0:
-                print("Did {} of the LPs ({:.2f} percent)".format(
-                    min(LPs_done, len(pairs)), 100 * min(LPs_done, len(pairs))/len(pairs)))
+                duration = time() - start_time
+                fraction_done = min(LPs_done, len(pairs))/len(pairs)
+                est_total_time = duration / fraction_done
+                time_remaining = est_total_time - duration
+                print("Did {} of the LPs ({:.2f} percent). Estimated time remaining for this step: {:.2f}s".format(
+                    min(LPs_done, len(pairs)), 100 * fraction_done, time_remaining))
 
     end = time()
     print("Did LPs in %f seconds" % (end - start))
