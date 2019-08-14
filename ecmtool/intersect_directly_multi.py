@@ -217,30 +217,29 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, p
 
     next_matrix = np.asarray(next_matrix)
 
-
-
+    rows_removed_redund = 0
     # redund in case we have too many rows
-    rows_before = next_matrix.shape[0]
+    if not calculate_adjacency:
+        rows_before = next_matrix.shape[0]
 
-    if verbose:
-        print("\tDimensions before redund: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
-    start = time()
-    # next_matrix = redund(next_matrix)
-    end = time()
-    rows_removed_redund = rows_before - next_matrix.shape[0]
-    if verbose:
-        print("\tDimensions after redund: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
-        print("\t\tRows removed by redund: %d" % (rows_before - next_matrix.shape[0]))
-        print("\tRedund took %f seconds" % (end - start))
-        # if rows_before - next_matrix.shape[0] != 0:
-        #    input("Waiting...")
+        if verbose:
+            print("\tDimensions before redund: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
+        start = time()
+        next_matrix = redund(next_matrix)
+        end = time()
+        rows_removed_redund = rows_before - next_matrix.shape[0]
+        if verbose:
+            print("\tDimensions after redund: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
+            print("\t\tRows removed by redund: %d" % (rows_before - next_matrix.shape[0]))
+            print("\tRedund took %f seconds" % (end - start))
 
     next_matrix = np.transpose(next_matrix)
 
     # delete all-zero row
     next_matrix = np.delete(next_matrix, met, 0)
     network.drop_metabolites([met])
-    print("\tDimensions after deleting row: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
+    print("After removing this metabolite, we have %d metabolites, %d rays" %
+          (next_matrix.shape[0], next_matrix.shape[1]))
 
     return next_matrix, rows_removed_redund
 
@@ -470,7 +469,6 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
     # without normalization
     # R_indep = independent_rows(R)
 
-    LPs_done = 0
     # set default plus and minus
     if (len(plus) > 0 and plus[0] == -1):
         plus = [x for x in range(R_indep.shape[1])]
@@ -483,16 +481,16 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
     disable_lp = not remove_cycles
     total = len(plus) * len(minus)
 
-    print("\n\tLargest non-LP ray: %.2f" % max(
-        [np.linalg.norm(np.array(R[:, i], dtype='float')) for i in range(R.shape[1])]))
-    print("\tMax/min: %.3f" % max(
-        [abs(abs(np.array(R[:, i], dtype='float')).max() / np.min(
-            abs(np.array(R[:, i], dtype='float'))[np.nonzero(R[:, i])])) for i in range(R.shape[1])]))
-    print("\tLargest LP ray: %.2f" % max(
-        [np.linalg.norm(np.array(R_indep[:, i], dtype='float')) for i in range(R_indep.shape[1])]))
+    # print("\tLargest non-LP ray: %.2f" % max(
+    #     [np.linalg.norm(np.array(R[:, i], dtype='float')) for i in range(R.shape[1])]))
+    # print("\tMax/min: %.3f" % max(
+    #     [abs(abs(np.array(R[:, i], dtype='float')).max() / np.min(
+    #         abs(np.array(R[:, i], dtype='float'))[np.nonzero(R[:, i])])) for i in range(R.shape[1])]))
+    # print("\tLargest LP ray: %.2f" % max(
+    #     [np.linalg.norm(np.array(R_indep[:, i], dtype='float')) for i in range(R_indep.shape[1])]))
 
     cpu_count = multi.cpu_count()
-    print("\n\nUsing %d cores\n\n" % cpu_count)
+    print("Using %d cores" % cpu_count)
     with multi.Pool(cpu_count) as pool:
         # adjacency_as_list = pool.starmap(determine_adjacency, [(R_indep, i, j, perturbed) for i in plus for j in minus])
         # adjacency = np.array(adjacency_as_list)
@@ -504,7 +502,7 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
         adjacency = unpack_results(result, number_rays)
 
     end = time()
-    print("Did %d LPs in %f seconds" % (LPs_done, end - start))
+    print("Did LPs in %f seconds" % (end - start))
     return adjacency
 
 
@@ -574,7 +572,7 @@ def intersect_directly(R, internal_metabolites, network, perturbed=False, verbos
         # i = internal[len(internal)-1]
         to_remove = i - len(deleted[deleted < i])
         if verbose:
-            print("\nIteration %d (internal metabolite = %d: %s) of %d" % (it, to_remove, [m.id for m in network.metabolites][to_remove], len(internal_metabolites)))
+            print("\n\nIteration %d (internal metabolite = %d: %s) of %d" % (it, to_remove, [m.id for m in network.metabolites][to_remove], len(internal_metabolites)))
             print("Possible LP amounts for this step:\n" + ", ".join(np.sort(
                 [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0) for j
                  in internal]).astype(str)))
