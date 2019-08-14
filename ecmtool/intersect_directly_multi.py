@@ -492,6 +492,7 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
         [np.linalg.norm(np.array(R_indep[:, i], dtype='float')) for i in range(R_indep.shape[1])]))
 
     cpu_count = multi.cpu_count()
+    print("\n\nUsing %d cores\n\n" % cpu_count)
     with multi.Pool(cpu_count) as pool:
         # adjacency_as_list = pool.starmap(determine_adjacency, [(R_indep, i, j, perturbed) for i in plus for j in minus])
         # adjacency = np.array(adjacency_as_list)
