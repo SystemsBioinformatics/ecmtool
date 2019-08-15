@@ -164,7 +164,7 @@ if __name__ == '__main__':
     start = time()
 
     parser = ArgumentParser(description='Calculate Elementary Conversion Modes from an SBML model. For medium-to large networks, be sure to define --inputs and --outputs. This reduces the enumeration problem complexity considerably.')
-    parser.add_argument('--model_path', type=str, default='models/active_subnetwork_KO_5.xml', help='Relative or absolute path to an SBML model .xml file')
+    parser.add_argument('--model_path', type=str, default='models/iECW_1372.xml', help='Relative or absolute path to an SBML model .xml file')
     parser.add_argument('--direct', type=str2bool, default=True, help='Enable to intersect with equalities directly')
     parser.add_argument('--compress', type=str2bool, default=True, help='Perform compression to which the conversions are invariant, and reduce the network size considerably (default: True)')
     parser.add_argument('--out_path', default='conversion_cone.csv', help='Relative or absolute path to the .csv file you want to save the calculated conversions to (default: conversion_cone.csv)')
@@ -244,9 +244,12 @@ if __name__ == '__main__':
         if args.compress:
             network.compress(verbose=args.verbose, SCEI=args.scei)
 
+        removed = 0
         for i in np.flip(range(network.N.shape[0]), 0):
             if sum(abs(network.N[i])) == 0:
                 network.drop_metabolites([i], force_external=True)
+                removed += 1
+        print("Removed %d metabolites that were not in any reactions" % removed)
 
         network.N = np.transpose(redund(np.transpose(network.N)))
         network.split_reversible()
