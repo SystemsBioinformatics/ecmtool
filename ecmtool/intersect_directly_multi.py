@@ -210,37 +210,36 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, p
 
     if verbose:
         if len(plus) * len(minus) > 0:
-            print("Of %d candidates, %d were adjacent (%f percent)" % (
+            print("Of %d candidates, %d were adjacent (%.2f percent)" % (
                 len(plus) * len(minus), nr_adjacent, 100 * nr_adjacent / (len(plus) * len(minus))))
         else:
             print("Of %d candidates, %d were adjacent (0 percent)" % (len(plus) * len(minus), nr_adjacent))
 
     next_matrix = np.asarray(next_matrix)
 
-
-
+    rows_removed_redund = 0
     # redund in case we have too many rows
-    rows_before = next_matrix.shape[0]
+    if not calculate_adjacency:
+        rows_before = next_matrix.shape[0]
 
-    if verbose:
-        print("\tDimensions before redund: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
-    start = time()
-    # next_matrix = redund(next_matrix)
-    end = time()
-    rows_removed_redund = rows_before - next_matrix.shape[0]
-    if verbose:
-        print("\tDimensions after redund: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
-        print("\t\tRows removed by redund: %d" % (rows_before - next_matrix.shape[0]))
-        print("\tRedund took %f seconds" % (end - start))
-        # if rows_before - next_matrix.shape[0] != 0:
-        #    input("Waiting...")
+        if verbose:
+            print("\tDimensions before redund: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
+        start = time()
+        next_matrix = redund(next_matrix)
+        end = time()
+        rows_removed_redund = rows_before - next_matrix.shape[0]
+        if verbose:
+            print("\tDimensions after redund: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
+            print("\t\tRows removed by redund: %d" % (rows_before - next_matrix.shape[0]))
+            print("\tRedund took %f seconds" % (end - start))
 
     next_matrix = np.transpose(next_matrix)
 
     # delete all-zero row
     next_matrix = np.delete(next_matrix, met, 0)
     network.drop_metabolites([met])
-    print("\tDimensions after deleting row: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
+    print("After removing this metabolite, we have %d metabolites and %d rays" %
+          (next_matrix.shape[0], next_matrix.shape[1]))
 
     return next_matrix, rows_removed_redund
 
@@ -440,8 +439,9 @@ def multiple_adjacencies(R, pairs, perturbed):
     return [(p, determine_adjacency(R, p[0], p[1], perturbed)) for p in pairs]
 
 
-def unpack_results(results, number_rays):
-    adjacency = np.zeros(shape=(number_rays, number_rays))
+def unpack_results(results, number_rays, adjacency=None):
+    if adjacency is None:
+        adjacency = np.zeros(shape=(number_rays, number_rays))
     for result in results:
         for line in result:
             i = line[0][0]
@@ -470,7 +470,6 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
     # without normalization
     # R_indep = independent_rows(R)
 
-    LPs_done = 0
     # set default plus and minus
     if (len(plus) > 0 and plus[0] == -1):
         plus = [x for x in range(R_indep.shape[1])]
@@ -483,26 +482,40 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
     disable_lp = not remove_cycles
     total = len(plus) * len(minus)
 
-    print("\n\tLargest non-LP ray: %.2f" % max(
-        [np.linalg.norm(np.array(R[:, i], dtype='float')) for i in range(R.shape[1])]))
-    print("\tMax/min: %.3f" % max(
-        [abs(abs(np.array(R[:, i], dtype='float')).max() / np.min(
-            abs(np.array(R[:, i], dtype='float'))[np.nonzero(R[:, i])])) for i in range(R.shape[1])]))
-    print("\tLargest LP ray: %.2f" % max(
-        [np.linalg.norm(np.array(R_indep[:, i], dtype='float')) for i in range(R_indep.shape[1])]))
+    # print("\tLargest non-LP ray: %.2f" % max(
+    #     [np.linalg.norm(np.array(R[:, i], dtype='float')) for i in range(R.shape[1])]))
+    # print("\tMax/min: %.3f" % max(
+    #     [abs(abs(np.array(R[:, i], dtype='float')).max() / np.min(
+    #         abs(np.array(R[:, i], dtype='float'))[np.nonzero(R[:, i])])) for i in range(R.shape[1])]))
+    # print("\tLargest LP ray: %.2f" % max(
+    #     [np.linalg.norm(np.array(R_indep[:, i], dtype='float')) for i in range(R_indep.shape[1])]))
 
-    with multi.Pool(multi.cpu_count()) as pool:
-        # adjacency_as_list = pool.starmap(determine_adjacency, [(R_indep, i, j, perturbed) for i in plus for j in minus])
-        # adjacency = np.array(adjacency_as_list)
-        # adjacency = adjacency.reshape((len(plus), len(minus)))
+    cpu_count = multi.cpu_count() - 1
+    print("Using %d cores" % cpu_count)
+    with multi.Pool(cpu_count) as pool:
         pairs = np.array([(i, j) for i in plus for j in minus])
         split_indices = [i for i in range(1, len(pairs)) if i % lps_per_job == 0]
         split_pairs = np.split(pairs, split_indices)
-        result = pool.starmap(multiple_adjacencies, [(R_indep, pairs, perturbed) for pairs in split_pairs])
-        adjacency = unpack_results(result, number_rays)
+        q = 1000
+        split_indices = [i for i in range(1, len(split_pairs)) if i % (q / lps_per_job) == 0]
+        report_unit = np.split(split_pairs, split_indices)
+        adjacency = None
+        LPs_done = 0
+        start_time = time()
+        for unit in report_unit:
+            result = pool.starmap(multiple_adjacencies, [(R_indep, pairs, perturbed) for pairs in unit])
+            adjacency = unpack_results(result, number_rays, adjacency)
+            LPs_done += int(q / lps_per_job) * lps_per_job
+            if len(pairs) != 0:
+                duration = time() - start_time
+                fraction_done = min(LPs_done, len(pairs))/len(pairs)
+                est_total_time = duration / fraction_done
+                time_remaining = est_total_time - duration
+                print("Did {} of the LPs ({:.2f} percent). Estimated time remaining for this step: {:.2f}s".format(
+                    min(LPs_done, len(pairs)), 100 * fraction_done, time_remaining))
 
     end = time()
-    print("Did %d LPs in %f seconds" % (LPs_done, end - start))
+    print("Did LPs in %f seconds" % (end - start))
     return adjacency
 
 
@@ -572,7 +585,7 @@ def intersect_directly(R, internal_metabolites, network, perturbed=False, verbos
         # i = internal[len(internal)-1]
         to_remove = i - len(deleted[deleted < i])
         if verbose:
-            print("\nIteration %d (internal metabolite = %d: %s) of %d" % (it, to_remove, [m.id for m in network.metabolites][to_remove], len(internal_metabolites)))
+            print("\n\nIteration %d (internal metabolite = %d: %s) of %d" % (it, to_remove, [m.id for m in network.metabolites][to_remove], len(internal_metabolites)))
             print("Possible LP amounts for this step:\n" + ", ".join(np.sort(
                 [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0) for j
                  in internal]).astype(str)))

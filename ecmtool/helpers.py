@@ -462,19 +462,3 @@ def get_metabolite_adjacency(N):
                 adjacency[adjacent, metabolite_index] = 1
 
     return adjacency
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
