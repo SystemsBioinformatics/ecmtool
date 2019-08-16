@@ -164,7 +164,7 @@ if __name__ == '__main__':
     start = time()
 
     parser = ArgumentParser(description='Calculate Elementary Conversion Modes from an SBML model. For medium-to large networks, be sure to define --inputs and --outputs. This reduces the enumeration problem complexity considerably.')
-    parser.add_argument('--model_path', type=str, default='models/iECW_1372.xml', help='Relative or absolute path to an SBML model .xml file')
+    parser.add_argument('--model_path', type=str, default='models/e_coli_core.xml', help='Relative or absolute path to an SBML model .xml file')
     parser.add_argument('--direct', type=str2bool, default=True, help='Enable to intersect with equalities directly')
     parser.add_argument('--compress', type=str2bool, default=True, help='Perform compression to which the conversions are invariant, and reduce the network size considerably (default: True)')
     parser.add_argument('--out_path', default='conversion_cone.csv', help='Relative or absolute path to the .csv file you want to save the calculated conversions to (default: conversion_cone.csv)')
@@ -181,7 +181,7 @@ if __name__ == '__main__':
     parser.add_argument('--only_rays', type=str2bool, default=False, help='Enable to only return extreme rays, and not elementary modes. This describes the full conversion space, but not all biologically relevant minimal conversions. See (Urbanczik, 2005) (default: false)')
     parser.add_argument('--verbose', type=str2bool, default=True, help='Enable to show detailed console output (default: true)')
     parser.add_argument('--scei', type=str2bool, default=True, help='Enable to use SCEI compression (default: true)')
-    parser.add_argument('--perturb', type=str2bool, default=True, help='Enable to perturb LPs to prevent degeneracy (default: false)')
+    parser.add_argument('--perturb', type=str2bool, default=False, help='Enable to perturb LPs to prevent degeneracy (default: false)')
     parser.add_argument('--compare', type=str2bool, default=False, help='Enable to compare output of direct vs indirect')
     parser.add_argument('--job_size', type=int, default=1, help='Number of LPs per multiprocessing job')
     args = parser.parse_args()

@@ -430,6 +430,18 @@ def setup_LP(R_indep, i, j):
     return A_ub, b_ub, A_eq, b_eq, c, x0
 
 
+def refine_LP(b_eq, x0, A_eq, basis, epsilon):
+    # b_eq2 = b_eq + B * eps
+    # x0 = x0 + eps (on entries corresponding to B)
+    B = A_eq[:, basis]
+    eps = np.random.uniform(0.5 * epsilon, epsilon, len(basis))
+    b_eq_2 = b_eq + np.dot(B, eps)
+    x0_2 = x0
+    x0_2[basis] += eps
+
+    return b_eq_2, x0_2
+
+
 def determine_adjacency(R, i, j, perturbed, tol=1e-10):
     if perturbed:
         A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP_perturbed(R, i, j, 1e-10)
@@ -442,6 +454,12 @@ def determine_adjacency(R, i, j, perturbed, tol=1e-10):
         ext_basis = np.nonzero(x0)[0]
     else:
         ext_basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [i, j])
+
+    # DEBUG
+    refine = True
+    if refine:
+        b_eq, x0 = refine_LP(b_eq, x0, A_eq, ext_basis, 1e-10)
+
     KKT, status = kkt_check(c, np.asarray(A_eq, dtype='float'), x0, ext_basis)
     # DEBUG
     # status = 0
