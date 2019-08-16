@@ -1,11 +1,12 @@
-import numpy as np
-from time import time
-from scipy.optimize import linprog
-from scipy.linalg import LinAlgError
 import multiprocessing as multi
+from time import time
 
-from ecmtool.helpers import redund
+import numpy as np
+from scipy.linalg import LinAlgError
+from scipy.optimize import linprog
+
 from ecmtool._bglu_dense import BGLU
+from ecmtool.helpers import redund
 
 
 def fake_ecm(reaction, metabolite_ids, tol=1e-12):
@@ -165,6 +166,30 @@ def independent_rows(A):
     return A[basis]
 
 
+def cancel_with_cycle(R, met, cycle_ind, network, verbose=True, tol=1e-12):
+    cancelling_reaction = R[:, cycle_ind]
+    reactions_using_met = [i for i in range(R.shape[1]) if R[met, i] != 0 and i != cycle_ind]
+
+    next_R = np.copy(R)
+    next_R = np.delete(next_R, reactions_using_met + [cycle_ind], axis=1)
+
+    for reac_ind in reactions_using_met:
+        coeff_cycle = R[met, cycle_ind]
+        coeff_reac = R[met, reac_ind]
+        new_ray = coeff_cycle * R[:, reac_ind] - coeff_reac * R[:, cycle_ind]
+        new_ray = new_ray.reshape(len(new_ray), 1)
+        if sum(abs(new_ray)) > tol:
+            next_R = np.concatenate((next_R, new_ray), axis=1)
+
+    # delete all-zero row
+    next_R = np.delete(next_R, met, 0)
+    network.drop_metabolites([met])
+    print("After removing this metabolite, we have %d metabolites and %d rays" %
+          (next_R.shape[0], next_R.shape[1]))
+
+    return next_R
+
+
 def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, perturbed=False, verbose=True,
                          lps_per_job=1):
     # determine +/0/-
@@ -255,59 +280,41 @@ def get_remove_metabolite(R, network, reaction, verbose=True):
 
 
 def remove_cycles(R, network, tol=1e-12, verbose=True):
+    """Detect whether there are cycles, by doing an LP. If LP is unbounded find a minimal cycle. Cancel one metabolite
+    with the cycle."""
     deleted = []
-    for k in range(2):
-        number_rays = independent_rows(normalize_columns(np.array(R, dtype='float'))).shape[1]
-        i = 0 + 2 * k
-        j = 1 + 2 * k
-        if j > R.shape[1] - 1:
-            return R, deleted
-        A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))), i, j)
+    A_ub, b_ub, A_eq, b_eq, c = setup_cycle_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))))
 
-        if sum(abs(b_eq)) < tol:
-            augment_reaction = i;
-            met = get_remove_metabolite(R, network, augment_reaction)
-            if verbose:
-                print("Found an unbounded LP, augmenting reaction %d through metabolite %d" % (augment_reaction, met))
-            R, _ = eliminate_metabolite(R, met, network, calculate_adjacency=False)
+    res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
 
-        res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12},
-                      x0=x0)
-        if res.status == 4:
-            print("Numerical difficulties with revised simplex, trying interior point method instead")
-            res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
+    # if the objective is unbounded, there is a cycle that sums to zero
+    while np.max(res.x) > 90:  # It is unbounded
+        # Find minimal cycle
+        cycle_indices = np.where(res.x > 90)[0]
+        reacs_involved = [np.count_nonzero(R[:,i]) for i in cycle_indices]
+        cycle_ind = cycle_indices[np.argmin(reacs_involved)]
 
-        # if the objective is unbounded, there is a cycle that sums to zero
-        while res.status == 3:  # status 3 is unbounded
-            A_ub2 = np.concatenate((A_ub, np.identity(number_rays)))
-            b_ub2 = np.concatenate((b_ub, [100] * number_rays))
+        A_ub, b_ub, A_eq, b_eq, c = setup_cycle_detection_LP(
+             independent_rows(normalize_columns(np.array(R, dtype='float'))), cycle_ind)
 
-            res2 = linprog(c, A_ub2, b_ub2, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12}, x0=x0)
-            if res2.status == 4:
-                print("Numerical difficulties with revised simplex, trying interior point method instead")
-                res2 = linprog(c, A_ub2, b_ub2, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
+        res2 = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
 
-            if abs(res2.fun) < tol:  # res is 'unbounded' but res2 has optimum 0
-                break
+        cycle_plus = np.zeros(len(res2.x))
+        cycle_plus[cycle_ind] = res2.x[cycle_ind]
+        cycle_min = np.copy(res2.x)
+        cycle_min[cycle_ind] = 0
 
-            augment_reaction = [i for i, val in enumerate(res2.x) if val > 90][0]
-            met = get_remove_metabolite(R, network, augment_reaction)
-            deleted.append(met)
-            if verbose:
-                print("Found an unbounded LP, augmenting reaction %d through metabolite %d (%s)" % (
-                augment_reaction, met, network.metabolites[met].id))
+        met = get_remove_metabolite(R, network, cycle_ind)
 
-            R, _ = eliminate_metabolite(R, met, network, calculate_adjacency=False)
-            number_rays = independent_rows(normalize_columns(np.array(R, dtype='float'))).shape[1]
-            i = 0 + 2 * k
-            j = 1 + 2 * k
-            A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))), i,
-                                                     j)
+        deleted.append(met)
+        if verbose:
+            print("Found an unbounded LP, cancelling metabolite %d (%s) with reaction %d" % (
+                met, network.metabolites[met].id, cycle_ind))
 
-            res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12}, x0=x0)
-            if res.status == 4:
-                print("Numerical difficulties with revised simplex, trying interior point method instead")
-                res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
+        R = cancel_with_cycle(R, met, cycle_ind, network)
+        A_ub, b_ub, A_eq, b_eq, c = setup_cycle_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))))
+
+        res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
 
     return R, deleted
 
@@ -366,6 +373,42 @@ def setup_LP_perturbed(R, i, j, epsilon):
     c[j] = 0
 
     return A_ub, b_ub, A_eq, b_eq, c, x0
+
+
+def setup_cycle_detection_LP(R_indep, cycle_ind):
+    number_rays = R_indep.shape[1]
+
+    A_ub = -np.identity(number_rays)
+    b_ub = np.zeros(number_rays)
+    A_eq = R_indep
+    b_eq = np.zeros(A_eq.shape[0])
+
+    # Add that the cycle_ind should be used
+    extra_row = np.zeros((1, A_eq.shape[1]))
+    extra_row[0, cycle_ind] = 1
+    A_eq2 = np.concatenate((A_eq, extra_row), axis=0)
+    b_eq2 = np.zeros(len(b_eq) + 1)
+    b_eq2[-1] = 1
+
+    c = np.ones(number_rays)
+
+    return A_ub, b_ub, A_eq2, b_eq2, c
+
+
+def setup_cycle_LP(R_indep):
+    number_rays = R_indep.shape[1]
+
+    A_ub = -np.identity(number_rays)
+    b_ub = np.zeros(number_rays)
+    A_eq = R_indep
+    b_eq = np.zeros(A_eq.shape[0])
+    c = -np.ones(number_rays)
+
+    # Add upper bound of 100
+    A_ub2 = np.concatenate((A_ub, np.identity(number_rays)))
+    b_ub2 = np.concatenate((b_ub, [100] * number_rays))
+
+    return A_ub2, b_ub2, A_eq, b_eq, c
 
 
 def setup_LP(R_indep, i, j):
@@ -508,7 +551,7 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
             LPs_done += int(q / lps_per_job) * lps_per_job
             if len(pairs) != 0:
                 duration = time() - start_time
-                fraction_done = min(LPs_done, len(pairs))/len(pairs)
+                fraction_done = min(LPs_done, len(pairs)) / len(pairs)
                 est_total_time = duration / fraction_done
                 time_remaining = est_total_time - duration
                 print("Did {} of the LPs ({:.2f} percent). Estimated time remaining for this step: {:.2f}s".format(
@@ -585,7 +628,8 @@ def intersect_directly(R, internal_metabolites, network, perturbed=False, verbos
         # i = internal[len(internal)-1]
         to_remove = i - len(deleted[deleted < i])
         if verbose:
-            print("\n\nIteration %d (internal metabolite = %d: %s) of %d" % (it, to_remove, [m.id for m in network.metabolites][to_remove], len(internal_metabolites)))
+            print("\n\nIteration %d (internal metabolite = %d: %s) of %d" % (
+                it, to_remove, [m.id for m in network.metabolites][to_remove], len(internal_metabolites)))
             print("Possible LP amounts for this step:\n" + ", ".join(np.sort(
                 [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0) for j
                  in internal]).astype(str)))
