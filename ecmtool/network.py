@@ -289,6 +289,7 @@ class Network:
 
         metabolite_count_intermediate, reaction_count_intermediate = self.N.shape
         self.cancel_singly(verbose=verbose)
+        self.cancel_dead_ends(verbose=verbose)
         if verbose:
             print('Removed %d reactions and %d metabolites' %
                   (reaction_count_intermediate - self.N.shape[1], metabolite_count_intermediate - self.N.shape[0]))
@@ -361,6 +362,8 @@ class Network:
         :param verbose:
         :return:
         """
+        removable_metabolites, removable_reactions = [], []
+
         if verbose:
             print('Trying to cancel compounds by singly produced/consumed metabolites')
 
@@ -408,7 +411,6 @@ class Network:
                     # Reactions changed by irreversible reactions must become irreversible too
                     self.reactions[other_reaction_index].reversible = False
 
-        removable_metabolites, removable_reactions = [], []
         for metabolite_index in internal_metabolite_indices:
             if np.count_nonzero(self.N[metabolite_index, :]) == 1:
                 # This metabolite is used in only one reaction
@@ -417,6 +419,42 @@ class Network:
                 removable_reactions.append(reaction_index)
 
         self.drop_reactions(removable_reactions)
+        self.drop_metabolites(removable_metabolites)
+
+    def cancel_dead_ends(self, verbose = False):
+        """
+        Cancel metabolites that are either only produced or only consumed
+        :param verbose:
+        :return:
+        """
+        removable_metabolites = []
+
+        if verbose:
+            print('Removes compounds that are only produced/consumed.')
+
+        internal_metabolite_indices = np.setdiff1d(range(len(self.metabolites)), self.external_metabolite_indices())
+        total_internal_metabolites = len(internal_metabolite_indices)
+
+        for iteration, index in enumerate(internal_metabolite_indices):
+            if verbose:
+                print('Cancelling dead ends - %.2f%%' % (iteration / float(total_internal_metabolites) * 100))
+
+            reaction_index = None
+            producing_reactions = list(np.where(self.N[index, :] > 0)[0])
+            consuming_reactions = list(np.where(self.N[index, :] < 0)[0])
+            reactions_to_cancel = []
+
+            for reaction_index in producing_reactions:
+                if self.reactions[reaction_index].reversible and reaction_index not in consuming_reactions:
+                    consuming_reactions.append(reaction_index)
+
+            for reaction_index in consuming_reactions:
+                if self.reactions[reaction_index].reversible and reaction_index not in producing_reactions:
+                    producing_reactions.append(reaction_index)
+
+        if len(producing_reactions) == 0 or len(consuming_reactions) == 0:
+            removable_metabolites.append(index)
+
         self.drop_metabolites(removable_metabolites)
 
     def cancel_compounds(self, verbose=False):
@@ -479,6 +517,7 @@ class Network:
                 removable_metabolites.append(metabolite_index)
 
         self.drop_metabolites(removable_metabolites)
+
 
     def cancel_clementine(self, verbose=False):
         if verbose:

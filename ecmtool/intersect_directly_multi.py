@@ -2,7 +2,6 @@ import multiprocessing as multi
 from time import time
 
 import numpy as np
-import sympy
 from scipy.linalg import LinAlgError
 from scipy.optimize import linprog
 
@@ -169,21 +168,41 @@ def cancel_with_cycle(R, met, cycle_ind, network, verbose=True, tol=1e-12):
     reactions_using_met = [i for i in range(R.shape[1]) if R[met, i] != 0 and i != cycle_ind]
 
     next_R = np.copy(R)
-    next_R = np.delete(next_R, reactions_using_met + [cycle_ind], axis=1)
+    to_be_dropped = [cycle_ind]
 
     for reac_ind in reactions_using_met:
         coeff_cycle = R[met, cycle_ind]
         coeff_reac = R[met, reac_ind]
-        new_ray = coeff_cycle * R[:, reac_ind] - coeff_reac * R[:, cycle_ind]
-        new_ray = new_ray.reshape(len(new_ray), 1)
+        new_ray = R[:, reac_ind] - (coeff_reac / coeff_cycle) * R[:, cycle_ind]
         if sum(abs(new_ray)) > tol:
-            next_R = np.concatenate((next_R, new_ray), axis=1)
+            next_R[:, reac_ind] = new_ray
+        else:
+            to_be_dropped.append(reac_ind)
+
+    # Delete cycle ray that is now the only one that produces met, so has to be zero + rays that are full of zeros now
+    next_R = np.delete(next_R, to_be_dropped, axis=1)
 
     # delete all-zero row
     next_R = np.delete(next_R, met, 0)
     network.drop_metabolites([met])
     print("After removing this metabolite, we have %d metabolites and %d rays" %
           (next_R.shape[0], next_R.shape[1]))
+
+    next_R = np.transpose(next_R)
+    rows_before = next_R.shape[0]
+
+    if verbose:
+        print("\tDimensions before redund: %d %d" % (next_R.shape[0], next_R.shape[1]))
+    start = time()
+    next_R = redund(next_R)
+    end = time()
+    rows_removed_redund = rows_before - next_R.shape[0]
+    if verbose:
+        print("\tDimensions after redund: %d %d" % (next_R.shape[0], next_R.shape[1]))
+        print("\t\tRows removed by redund: %d" % (rows_before - next_R.shape[0]))
+        print("\tRedund took %f seconds" % (end - start))
+
+    next_R = np.transpose(next_R)
 
     return next_R
 
@@ -289,19 +308,8 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
     while np.max(res.x) > 90:  # It is unbounded
         # Find minimal cycle
         cycle_indices = np.where(res.x > 90)[0]
-        reacs_involved = [np.count_nonzero(R[:, i]) for i in cycle_indices]
-        cycle_ind = cycle_indices[np.argmin(reacs_involved)]
-
-        A_ub, b_ub, A_eq, b_eq, c = setup_cycle_detection_LP(
-             independent_rows(normalize_columns(np.array(R, dtype='float'))), cycle_ind)
-
-        res2 = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
-
-        cycle_plus = np.zeros(len(res2.x))
-        cycle_plus[cycle_ind] = res2.x[cycle_ind]
-        cycle_min = np.copy(res2.x)
-        cycle_min[cycle_ind] = 0
-
+        metabs_involved = [np.count_nonzero(R[:, i]) for i in cycle_indices]
+        cycle_ind = cycle_indices[np.argmin(metabs_involved)]
         met = get_remove_metabolite(R, network, cycle_ind)
 
         deleted.append(met)
@@ -313,6 +321,15 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
         A_ub, b_ub, A_eq, b_eq, c = setup_cycle_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))))
 
         res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
+
+    internal_metabolite_indices = [i for i, metab in enumerate(network.metabolites) if not metab.is_external]
+    removable_metabolites = []
+    for metabolite_index in internal_metabolite_indices:
+        nonzero_count = np.count_nonzero(network.N[metabolite_index, :])
+        if nonzero_count == 0:
+            removable_metabolites.append(metabolite_index)
+
+    network.drop_metabolites(removable_metabolites)
 
     return R, deleted
 
@@ -548,8 +565,7 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
     # print("\tLargest LP ray: %.2f" % max(
     #     [np.linalg.norm(np.array(R_indep[:, i], dtype='float')) for i in range(R_indep.shape[1])]))
 
-    # cpu_count = multi.cpu_count() - 1
-    cpu_count = 1
+    cpu_count = multi.cpu_count() - 1
     print("Using %d cores" % cpu_count)
     with multi.Pool(cpu_count) as pool:
         pairs = np.array([(i, j) for i in plus for j in minus])
