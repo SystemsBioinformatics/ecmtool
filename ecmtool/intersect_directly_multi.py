@@ -291,7 +291,7 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
     while np.max(res.x) > 90:  # It is unbounded
         # Find minimal cycle
         cycle_indices = np.where(res.x > 90)[0]
-        reacs_involved = [np.count_nonzero(R[:,i]) for i in cycle_indices]
+        reacs_involved = [np.count_nonzero(R[:, i]) for i in cycle_indices]
         cycle_ind = cycle_indices[np.argmin(reacs_involved)]
 
         A_ub, b_ub, A_eq, b_eq, c = setup_cycle_detection_LP(
