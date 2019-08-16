@@ -2,6 +2,7 @@ import multiprocessing as multi
 from time import time
 
 import numpy as np
+import sympy
 from scipy.linalg import LinAlgError
 from scipy.optimize import linprog
 
@@ -46,9 +47,6 @@ def get_more_basis_columns(A, basis):
     columns. Finds additional columns that do not make the matrix singular.
     """
     m, n = A.shape
-
-    # if (len(basis) > 0 and np.linalg.matrix_rank(A[:,basis]) < len(basis)):
-    #    raise Exception("Basis has dependent columns")
 
     rank = np.linalg.matrix_rank(A[:, basis])
     new_basis = basis.copy()
@@ -431,8 +429,6 @@ def setup_LP(R_indep, i, j):
 
 
 def refine_LP(b_eq, x0, A_eq, basis, epsilon):
-    # b_eq2 = b_eq + B * eps
-    # x0 = x0 + eps (on entries corresponding to B)
     B = A_eq[:, basis]
     eps = np.random.uniform(0.5 * epsilon, epsilon, len(basis))
     b_eq_2 = b_eq + np.dot(B, eps)
@@ -450,6 +446,7 @@ def determine_adjacency(R, i, j, perturbed, tol=1e-10):
 
     # KKT
     disable_lp = True
+
     if perturbed:
         ext_basis = np.nonzero(x0)[0]
     else:
@@ -551,7 +548,8 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
     # print("\tLargest LP ray: %.2f" % max(
     #     [np.linalg.norm(np.array(R_indep[:, i], dtype='float')) for i in range(R_indep.shape[1])]))
 
-    cpu_count = multi.cpu_count() - 1
+    # cpu_count = multi.cpu_count() - 1
+    cpu_count = 1
     print("Using %d cores" % cpu_count)
     with multi.Pool(cpu_count) as pool:
         pairs = np.array([(i, j) for i in plus for j in minus])
