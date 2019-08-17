@@ -303,17 +303,27 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
     """Detect whether there are cycles, by doing an LP. If LP is unbounded find a minimal cycle. Cancel one metabolite
     with the cycle."""
     deleted = []
-    A_ub, b_ub, A_eq, b_eq, c = setup_cycle_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))))
+    A_ub, b_ub, A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))))
 
-    res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
+    # TODO: Erik, can you add your LP solver here? These ones do not work.
+    res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12},
+                  x0=x0)
+    if res.status == 4:
+        print("Numerical difficulties with revised simplex, trying interior point method instead")
+        res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
 
     # if the objective is unbounded, there is a cycle that sums to zero
     while np.max(res.x) > 90:  # It is unbounded
         # Find minimal cycle
         cycle_indices = np.where(res.x > 90)[0]
-        metabs_involved = [np.count_nonzero(R[:, i]) for i in cycle_indices]
-        cycle_ind = cycle_indices[np.argmin(metabs_involved)]
-        met = get_remove_metabolite(R, network, cycle_ind)
+        met = -1
+        counter = 0
+        while met < 0:
+            cycle_ind = cycle_indices[counter]
+            met = get_remove_metabolite(R, network, cycle_ind)
+            counter = counter + 1
+            if counter > len(cycle_indices):
+                print('No internal metabolite was found that was part of the cycle. This might cause problems.')
 
         deleted.append(met)
         if verbose:
@@ -321,9 +331,15 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
                 met, network.metabolites[met].id, cycle_ind))
 
         R = cancel_with_cycle(R, met, cycle_ind, network)
-        A_ub, b_ub, A_eq, b_eq, c = setup_cycle_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))))
 
-        res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
+        A_ub, b_ub, A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))))
+
+        # TODO: Erik, can you add your LP solver here? These ones do not work.
+        res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12},
+                      x0=x0)
+        if res.status == 4:
+            print("Numerical difficulties with revised simplex, trying interior point method instead")
+            res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
 
     internal_metabolite_indices = [i for i, metab in enumerate(network.metabolites) if not metab.is_external]
     removable_metabolites = []
@@ -426,7 +442,9 @@ def setup_cycle_LP(R_indep):
     A_ub2 = np.concatenate((A_ub, np.identity(number_rays)))
     b_ub2 = np.concatenate((b_ub, [100] * number_rays))
 
-    return A_ub2, b_ub2, A_eq, b_eq, c
+    x0 = np.zeros(number_rays)
+
+    return A_ub2, b_ub2, A_eq, b_eq, c, x0
 
 
 def setup_LP(R_indep, i, j):

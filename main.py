@@ -248,8 +248,8 @@ if __name__ == '__main__':
             if sum(abs(network.N[i])) == 0:
                 network.drop_metabolites([i], force_external=True)
 
-        network.N = np.transpose(redund(np.transpose(network.N)))
         network.split_reversible()
+        network.N = np.transpose(redund(np.transpose(network.N)))
         R, deleted = remove_cycles(network.N, network)
 
         external = np.asarray(network.external_metabolite_indices())
