@@ -251,8 +251,8 @@ if __name__ == '__main__':
                 removed += 1
         print("Removed %d metabolites that were not in any reactions" % removed)
 
-        network.N = np.transpose(redund(np.transpose(network.N)))
         network.split_reversible()
+        network.N = np.transpose(redund(np.transpose(network.N)))
         R, deleted = remove_cycles(network.N, network)
 
         external = np.asarray(network.external_metabolite_indices())

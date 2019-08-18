@@ -673,6 +673,7 @@ class Network:
     def split_reversible(self):
         for i in self.reversible_reaction_indices():
             self.N = np.append(self.N, np.transpose([-self.N[:, i]]), axis=1)
+            self.reactions[i].reversible = False
             self.reactions.append(Reaction(self.reactions[i].id + "_rev", self.reactions[i].name + "_rev", False))
 
 
