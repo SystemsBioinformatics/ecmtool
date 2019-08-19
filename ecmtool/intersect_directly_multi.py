@@ -639,7 +639,7 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, verbose=True, re
 
     # bases = get_bases(R_indep, plus, minus)
 
-    cpu_count = 3
+    cpu_count = multi.cpu_count()
     print("Using %d cores" % cpu_count)
 
     pairs = np.array([(i, j) for i in plus for j in minus])
@@ -728,7 +728,6 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12
         i = internal[np.argmin(
             [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0) for j in
              internal])]
-        # i = internal[len(internal)-1]
         to_remove = i - len(deleted[deleted < i])
         if verbose:
             print("\n\nIteration %d (internal metabolite = %d: %s) of %d" % (
@@ -740,9 +739,13 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12
                 [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0) for j
                  in internal]))
             it += 1
+
         # input("waiting")
-        R, removed = eliminate_metabolite(R, i - len(deleted[deleted < i]), network, calculate_adjacency=True,
-                                          lps_per_job=lps_per_job)
+        # TODO make iteration_without_lps
+        # if np.sum(R[i - len(deleted[deleted < i]), :] > 0) * np.sum(R[i - len(deleted[deleted < i]), :] < 0) == 0:
+        #     R, removed = iteration_without_lps(R, to_remove, network)
+
+        R, removed = eliminate_metabolite(R, to_remove, network, calculate_adjacency=True, lps_per_job=lps_per_job)
         rows_removed_redund += removed
         deleted = np.append(deleted, i)
         internal.remove(i)
