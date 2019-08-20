@@ -414,7 +414,7 @@ class Network:
         for metabolite_index in internal_metabolite_indices:
             if np.count_nonzero(self.N[metabolite_index, :]) == 1:
                 # This metabolite is used in only one reaction
-                reaction_index = [index for index in range(len(self.reactions)) if self.N[metabolite_index, index] != 0][0]
+                reaction_index = [index for index in range(self.N.shape[1]) if self.N[metabolite_index, index] != 0][0]
                 removable_metabolites.append(metabolite_index)
                 removable_reactions.append(reaction_index)
 
@@ -452,8 +452,8 @@ class Network:
                 if self.reactions[reaction_index].reversible and reaction_index not in producing_reactions:
                     producing_reactions.append(reaction_index)
 
-        if len(producing_reactions) == 0 or len(consuming_reactions) == 0:
-            removable_metabolites.append(index)
+            if len(producing_reactions) == 0 or len(consuming_reactions) == 0:
+                removable_metabolites.append(index)
 
         self.drop_metabolites(removable_metabolites)
 

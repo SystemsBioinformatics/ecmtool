@@ -1,4 +1,5 @@
 import os
+
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
 
 import numpy as np
@@ -8,7 +9,8 @@ from argparse import ArgumentParser, ArgumentTypeError
 from sklearn.preprocessing import normalize
 
 from ecmtool.helpers import get_efms, get_metabolite_adjacency, redund
-from ecmtool.intersect_directly_multi import intersect_directly, print_ecms_direct, remove_cycles, reduce_column_norms
+from ecmtool.intersect_directly_multi import intersect_directly, print_ecms_direct, remove_cycles, \
+    compress_after_cycle_removing
 from ecmtool.network import extract_sbml_stoichiometry
 from ecmtool.conversion_cone import get_conversion_cone, iterative_conversion_cone, unique
 from ecmtool.functions_for_Erik import check_bijection_Erik
@@ -31,7 +33,8 @@ def print_ECMs(cone, debug_tags, network, orig_N, add_objective_metabolite, chec
         if add_objective_metabolite and objective > 0:
             ecm /= objective
 
-        metabolite_ids = [met.id for met in network.metabolites] if not network.compressed else network.uncompressed_metabolite_ids
+        metabolite_ids = [met.id for met in
+                          network.metabolites] if not network.compressed else network.uncompressed_metabolite_ids
 
         print('\nECM #%d:' % index)
         for metabolite_index, stoichiometry_val in enumerate(ecm):
@@ -39,13 +42,13 @@ def print_ECMs(cone, debug_tags, network, orig_N, add_objective_metabolite, chec
                 print('%s\t\t->\t%.4f' % (metabolite_ids[metabolite_index], stoichiometry_val))
 
         if check_feasibility:
-            allowed_error = 10**-6
+            allowed_error = 10 ** -6
             solution = linprog(c=[0] * orig_N.shape[1], A_eq=orig_N, b_eq=cone[index, :],
                                bounds=[(-1000, 1000)] * orig_N.shape[1], options={'tol': allowed_error})
             print('ECM satisfies stoichiometry' if solution.status == 0 else 'ECM does not satisfy stoichiometry')
 
 
-def remove_close_vectors(matrix, threshold=10**-6, verbose=True):
+def remove_close_vectors(matrix, threshold=10 ** -6, verbose=True):
     i = 0
     new_matrix = matrix
 
@@ -54,10 +57,13 @@ def remove_close_vectors(matrix, threshold=10**-6, verbose=True):
 
     while i < new_matrix.shape[0]:
         temp_matrix = new_matrix
-        unique_indices = range(i + 1) + [index + i + 1 for index in find_matching_vector_indices(temp_matrix[i, :], temp_matrix[i + 1:, :], near=False, threshold=threshold)]
+        unique_indices = range(i + 1) + [index + i + 1 for index in
+                                         find_matching_vector_indices(temp_matrix[i, :], temp_matrix[i + 1:, :],
+                                                                      near=False, threshold=threshold)]
 
         if verbose:
-            print('%.2f%% (removed %d/%d)' % (100*float(i)/new_matrix.shape[0], matrix.shape[0] - new_matrix.shape[0], matrix.shape[0]))
+            print('%.2f%% (removed %d/%d)' % (
+            100 * float(i) / new_matrix.shape[0], matrix.shape[0] - new_matrix.shape[0], matrix.shape[0]))
 
         new_matrix = temp_matrix[unique_indices, :]
         i += 1
@@ -116,33 +122,35 @@ def check_bijection(conversion_cone, network, model_path, args, verbose=True):
     ecmtool_ecms_normalised = normalize(conversion_cone, axis=1)
 
     if verbose:
-        print('Found %d efmtool-calculated ECMs, and %d ecmtool ones' % (len(efm_ecms_unique), len(ecmtool_ecms_normalised)))
+        print('Found %d efmtool-calculated ECMs, and %d ecmtool ones' % (
+        len(efm_ecms_unique), len(ecmtool_ecms_normalised)))
         print('Checking bijection')
 
     is_bijection = True
 
     for index, ecm in enumerate(efm_ecms_unique):
         if verbose:
-            print('Checking %d/%d (round 1/2)' % (index+1, len(efm_ecms_unique)))
+            print('Checking %d/%d (round 1/2)' % (index + 1, len(efm_ecms_unique)))
         close_vectors = find_matching_vector_indices(ecm, ecmtool_ecms_normalised, near=True)
         if len(close_vectors) != 1:
             is_bijection = False
-            print('\nCalculated ECM #%d not uniquely in enumerated list (got %d matches):' % (index, len(close_vectors)))
+            print(
+                '\nCalculated ECM #%d not uniquely in enumerated list (got %d matches):' % (index, len(close_vectors)))
             for metabolite_index, stoichiometry_val in enumerate(ecm):
                 if stoichiometry_val != 0.0:
                     print('%d %s\t\t->\t%.4f' % (
-                    metabolite_index, network.uncompressed_metabolite_names[metabolite_index], stoichiometry_val))
+                        metabolite_index, network.uncompressed_metabolite_names[metabolite_index], stoichiometry_val))
 
     for index, ecm in enumerate(ecmtool_ecms_normalised):
         if verbose:
-            print('Checking %d/%d (round 2/2)' % (index+1, len(ecmtool_ecms_normalised)))
+            print('Checking %d/%d (round 2/2)' % (index + 1, len(ecmtool_ecms_normalised)))
         if ecm not in efm_ecms_unique:
             is_bijection = False
             print('\nEnumerated ECM #%d not in calculated list:' % index)
             for metabolite_index, stoichiometry_val in enumerate(ecm):
                 if stoichiometry_val != 0.0:
                     print('%d %s\t\t->\t%.4f' % (
-                    metabolite_index, network.uncompressed_metabolites_names[metabolite_index], stoichiometry_val))
+                        metabolite_index, network.uncompressed_metabolites_names[metabolite_index], stoichiometry_val))
 
     print('Enumerated ECMs and calculated ECMs are%s bijective' % ('' if is_bijection else ' not'))
 
@@ -160,28 +168,46 @@ def set_inoutputs(inputs, outputs, network):
     network.set_outputs(outputs)
     return
 
+
 if __name__ == '__main__':
     start = time()
 
-    parser = ArgumentParser(description='Calculate Elementary Conversion Modes from an SBML model. For medium-to large networks, be sure to define --inputs and --outputs. This reduces the enumeration problem complexity considerably.')
-    parser.add_argument('--model_path', type=str, default='models/e_coli_core.xml', help='Relative or absolute path to an SBML model .xml file')
+    parser = ArgumentParser(
+        description='Calculate Elementary Conversion Modes from an SBML model. For medium-to large networks, be sure to define --inputs and --outputs. This reduces the enumeration problem complexity considerably.')
+    parser.add_argument('--model_path', type=str, default='models/e_coli_core.xml',
+                        help='Relative or absolute path to an SBML model .xml file')
     parser.add_argument('--direct', type=str2bool, default=True, help='Enable to intersect with equalities directly')
-    parser.add_argument('--compress', type=str2bool, default=True, help='Perform compression to which the conversions are invariant, and reduce the network size considerably (default: True)')
-    parser.add_argument('--out_path', default='conversion_cone.csv', help='Relative or absolute path to the .csv file you want to save the calculated conversions to (default: conversion_cone.csv)')
-    parser.add_argument('--add_objective_metabolite', type=str2bool, default=True, help='Add a virtual metabolite containing the stoichiometry of the objective function of the model (default: true)')
-    parser.add_argument('--check_feasibility', type=str2bool, default=False, help='For each found ECM, verify that a feasible flux exists that produces it (default: false)')
-    parser.add_argument('--check_bijection', type=str2bool, default=False, help='Verify completeness of found ECMs by calculating ECMs from EFMs and proving bijection (don\'t use on large networks) (default: false)')
-    parser.add_argument('--print_metabolites', type=str2bool, default=True, help='Print the names and IDs of metabolites in the (compressed) metabolic network (default: true)')
-    parser.add_argument('--print_reactions', type=str2bool, default=False, help='Print the names and IDs of reactions in the (compressed) metabolic network (default: true)')
-    parser.add_argument('--auto_direction', type=str2bool, default=True, help='Automatically determine external metabolites that can only be consumed or produced (default: true)')
-    parser.add_argument('--inputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be consumed')
-    parser.add_argument('--outputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be produced')
-    parser.add_argument('--hide', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that are transformed into internal metabolites by adding bidirectional exchange reactions')
-    parser.add_argument('--iterative', type=str2bool, default=False, help='Enable iterative conversion mode enumeration (helps on large, dense networks) (default: false)')
-    parser.add_argument('--only_rays', type=str2bool, default=False, help='Enable to only return extreme rays, and not elementary modes. This describes the full conversion space, but not all biologically relevant minimal conversions. See (Urbanczik, 2005) (default: false)')
-    parser.add_argument('--verbose', type=str2bool, default=True, help='Enable to show detailed console output (default: true)')
+    parser.add_argument('--compress', type=str2bool, default=True,
+                        help='Perform compression to which the conversions are invariant, and reduce the network size considerably (default: True)')
+    parser.add_argument('--out_path', default='conversion_cone.csv',
+                        help='Relative or absolute path to the .csv file you want to save the calculated conversions to (default: conversion_cone.csv)')
+    parser.add_argument('--add_objective_metabolite', type=str2bool, default=True,
+                        help='Add a virtual metabolite containing the stoichiometry of the objective function of the model (default: true)')
+    parser.add_argument('--check_feasibility', type=str2bool, default=False,
+                        help='For each found ECM, verify that a feasible flux exists that produces it (default: false)')
+    parser.add_argument('--check_bijection', type=str2bool, default=False,
+                        help='Verify completeness of found ECMs by calculating ECMs from EFMs and proving bijection (don\'t use on large networks) (default: false)')
+    parser.add_argument('--print_metabolites', type=str2bool, default=True,
+                        help='Print the names and IDs of metabolites in the (compressed) metabolic network (default: true)')
+    parser.add_argument('--print_reactions', type=str2bool, default=False,
+                        help='Print the names and IDs of reactions in the (compressed) metabolic network (default: true)')
+    parser.add_argument('--auto_direction', type=str2bool, default=True,
+                        help='Automatically determine external metabolites that can only be consumed or produced (default: true)')
+    parser.add_argument('--inputs', type=str, default='',
+                        help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be consumed')
+    parser.add_argument('--outputs', type=str, default='',
+                        help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be produced')
+    parser.add_argument('--hide', type=str, default='',
+                        help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that are transformed into internal metabolites by adding bidirectional exchange reactions')
+    parser.add_argument('--iterative', type=str2bool, default=False,
+                        help='Enable iterative conversion mode enumeration (helps on large, dense networks) (default: false)')
+    parser.add_argument('--only_rays', type=str2bool, default=False,
+                        help='Enable to only return extreme rays, and not elementary modes. This describes the full conversion space, but not all biologically relevant minimal conversions. See (Urbanczik, 2005) (default: false)')
+    parser.add_argument('--verbose', type=str2bool, default=True,
+                        help='Enable to show detailed console output (default: true)')
     parser.add_argument('--scei', type=str2bool, default=True, help='Enable to use SCEI compression (default: true)')
-    parser.add_argument('--compare', type=str2bool, default=False, help='Enable to compare output of direct vs indirect')
+    parser.add_argument('--compare', type=str2bool, default=False,
+                        help='Enable to compare output of direct vs indirect')
     parser.add_argument('--job_size', type=int, default=1, help='Number of LPs per multiprocessing job')
     args = parser.parse_args()
 
@@ -252,7 +278,15 @@ if __name__ == '__main__':
 
         network.split_reversible()
         network.N = np.transpose(redund(np.transpose(network.N)))
-        R, deleted = remove_cycles(network.N, network)
+        R, network = remove_cycles(network.N, network)
+        # TODO: Make this cleaner
+        # After this we do not use network.reactions anymore? I will now delete any superfluous reaction in network.
+        # This is needed for the next compression to work.
+        n_reac_according_to_N = network.N.shape[1]
+        removable_reacs = np.arange(n_reac_according_to_N, len(network.reactions))
+        network.drop_reactions(removable_reacs)
+        network = compress_after_cycle_removing(network)
+        R = network.N
 
         external = np.asarray(network.external_metabolite_indices())
         internal = np.setdiff1d(range(R.shape[0]), external)
@@ -314,11 +348,14 @@ if __name__ == '__main__':
                 print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
 
         if args.iterative:
-            cone = network.uncompress(iterative_conversion_cone(network, only_rays=args.only_rays, verbose=args.verbose))
+            cone = network.uncompress(
+                iterative_conversion_cone(network, only_rays=args.only_rays, verbose=args.verbose))
         else:
-            cone = network.uncompress(get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
-                                       input_metabolites=network.input_metabolite_indices(),
-                                       output_metabolites=network.output_metabolite_indices(), verbose=args.verbose, only_rays=args.only_rays))
+            cone = network.uncompress(get_conversion_cone(network.N, network.external_metabolite_indices(),
+                                                          network.reversible_reaction_indices(),
+                                                          input_metabolites=network.input_metabolite_indices(),
+                                                          output_metabolites=network.output_metabolite_indices(),
+                                                          verbose=args.verbose, only_rays=args.only_rays))
 
         np.savetxt(args.out_path, cone, delimiter=',')
 
@@ -347,7 +384,8 @@ if __name__ == '__main__':
         for i in range(len(metabolites)):
             aligned_R[i, :] = T_without_zeroes[ids.index(metabolites[i]), :]
 
-        match, ecms_first_min_ecms_second, ecms_second_min_ecms_first = check_bijection_Erik(aligned_R, np.transpose(cone_without_zeroes), network)
+        match, ecms_first_min_ecms_second, ecms_second_min_ecms_first = check_bijection_Erik(aligned_R, np.transpose(
+            cone_without_zeroes), network)
         if match:
             print("\n\t\tMatch\n")
         else:
