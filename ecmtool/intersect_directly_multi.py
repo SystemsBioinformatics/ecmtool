@@ -310,7 +310,7 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
         res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
 
     # if the objective is unbounded, there is a cycle that sums to zero
-    while np.max(res.x) > 90:  # It is unbounded
+    while np.max(res.x) > 90 and not np.any(np.isnan(res.x)):  # It is unbounded
         # Find minimal cycle
         cycle_indices = np.where(res.x > 90)[0]
         met = -1
@@ -337,6 +337,9 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
         if res.status == 4:
             print("Numerical difficulties with revised simplex, trying interior point method instead")
             res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
+
+    if np.any(np.isnan(res.x)):
+        raise Exception('Remove cycles did not work, because LP-solver had issues. Try to solve this.')
 
     internal_metabolite_indices = [i for i, metab in enumerate(network.metabolites) if not metab.is_external]
     removable_metabolites = []
