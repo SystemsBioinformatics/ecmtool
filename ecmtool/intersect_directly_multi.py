@@ -252,6 +252,24 @@ def cancel_with_cycle(R, met, cycle_ind, network, removable_reactions, verbose=T
     return next_R, removable_reactions
 
 
+def iteration_without_lps(R, met, network):
+    next_matrix = []
+    for z in range(R.shape[1]):
+        if abs(R[met, z]) < 1e-12:
+            col = R[:, z]
+            next_matrix.append(col)
+    next_matrix = np.asarray(next_matrix)
+    next_matrix = np.transpose(next_matrix)
+
+    # delete all-zero row
+    next_matrix = np.delete(next_matrix, met, 0)
+    network.drop_metabolites([met])
+    print("After removing this metabolite, we have %d metabolites and %d rays" %
+          (next_matrix.shape[0], next_matrix.shape[1]))
+
+    return next_matrix
+
+
 def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, verbose=True,
                          lps_per_job=1):
     # determine +/0/-
@@ -564,10 +582,7 @@ def setup_LP(R_indep, i, j):
 
     A_ub = -np.identity(number_rays)
     b_ub = np.zeros(number_rays)
-    A_eq = R_indep
-    ray1 = R_indep[:, i]
-    ray2 = R_indep[:, j]
-    b_eq = 0.5 * ray1 + 0.5 * ray2
+    b_eq = R_indep[:, i] / 2 + R_indep[:, j] / 2
     c = -np.ones(number_rays)
     c[i] = 0
     c[j] = 0
@@ -575,7 +590,7 @@ def setup_LP(R_indep, i, j):
     x0[i] = 0.5
     x0[j] = 0.5
 
-    return A_ub, b_ub, A_eq, b_eq, c, x0
+    return A_ub, b_ub, R_indep, b_eq, c, x0
 
 
 def perturb_LP(b_eq, x0, A_eq, basis, epsilon):
@@ -586,44 +601,19 @@ def perturb_LP(b_eq, x0, A_eq, basis, epsilon):
     return b_eq, x0
 
 
-def determine_adjacency(R, i, j, start_basis, tol=1e-10):
+def determine_adjacency(R, i, j, basis, tol=1e-10):
     A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP(R, i, j)
-    # ext_basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [i, j])
-    ext_basis = add_rays(np.asarray(A_eq, dtype='float'), start_basis, i, j)
-    b_eq, x0 = perturb_LP(b_eq, x0, A_eq, ext_basis, 1e-10)
-    KKT, status = kkt_check(c, np.asarray(A_eq, dtype='float'), x0, ext_basis)
+    b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, 1e-10)
+    KKT, status = kkt_check(c, A_eq, x0, basis)
 
     if status == 0:
         return 1 if KKT else 0
     else:
-        print("\t\t\tKKT had non-zero exit status...")
-        # input("Waiting...")
-        res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex',
-                      options={'tol': 1e-12, 'maxiter': 500})
-
-        if res.status == 1:
-            print("Iteration limit %d reached, trying Blands pivot rule" % (res.nit))
-            res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex',
-                          options={'tol': 1e-12, 'pivot': "Bland", 'maxiter': 20000})
-
-        if res.status == 4:
-            print("Numerical difficulties with revised simplex, trying interior point method instead")
-            res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point',
-                          options={'tol': 1e-12})
-
-        if res.status != 0:
-            print("Status %d" % res.status)
-            # input("Waiting...")
-
-        print("res.fun: %.2e res.nit: %d" % (abs(res.fun), res.nit))
-        if res.status != 0 or abs(res.fun) < tol:
-            return 1
-
-        return 0
+        raise Exception("KKT check had non-zero exit status")
 
 
-def multiple_adjacencies(R, pairs, start_basis):
-    return [(p, determine_adjacency(R, p[0], p[1], start_basis)) for p in pairs]
+def multiple_adjacencies(R, pairs, basis):
+    return [(p, determine_adjacency(R, p[0], p[1], basis)) for p in pairs]
 
 
 def unpack_results(results, number_rays, adjacency=None):
@@ -637,42 +627,42 @@ def unpack_results(results, number_rays, adjacency=None):
     return adjacency
 
 
-def add_second_ray(A, basis_p, p, m):
+def add_second_ray(A, B_plus_inv, basis_p, p, m):
     res = np.copy(basis_p)
     if m in basis_p:
         return res
 
     # Faster, but doesnt work (get singular matrix)
-    # x = np.linalg.solve(B_plus_inv, A[:, m])
-    # x[np.where(basis_p == p)[0][0]] = 0 # dont select p for replacement in basis
-    # res[np.argmax(x)] = m
-    # return res
+    x = np.dot(B_plus_inv, A[:, m])
+    x[np.where(basis_p == p)[0][0]] = 0  # dont select p for replacement in basis
+    res[np.argmax(abs(x))] = m
+    return res
 
-    for i in range(len(basis_p)):
-        if basis_p[i] == p:
-            continue
-        res[i] = m
-        rank = np.linalg.matrix_rank(A[:, res])
-        if rank == A.shape[0]:
-            return res
-        res[i] = basis_p[i]
+    # for i in range(len(basis_p)):
+    #     if basis_p[i] == p:
+    #         continue
+    #     res[i] = m
+    #     rank = np.linalg.matrix_rank(A[:, res])
+    #     if rank == A.shape[0]:
+    #         return res
+    #     res[i] = basis_p[i]
 
 
-def add_first_ray(A, start_basis, p):
+def add_first_ray(A, B_inv, start_basis, p):
     res = np.copy(start_basis)
     if p in start_basis:
         return res
 
-    # x = np.linalg.solve(B_inv, A[:, p])
-    # res[np.argmax(x)] = p
-    # return res
+    x = np.dot(B_inv, A[:, p])
+    res[np.argmax(abs(x))] = p
+    return res
 
-    for i in range(len(start_basis)):
-        res[i] = p
-        rank = np.linalg.matrix_rank(A[:, res])
-        if rank == A.shape[0]:
-            return res
-        res[i] = start_basis[i]
+    # for i in range(len(start_basis)):
+    #     res[i] = p
+    #     rank = np.linalg.matrix_rank(A[:, res])
+    #     if rank == A.shape[0]:
+    #         return res
+    #     res[i] = start_basis[i]
 
 
 def add_rays(A, start_basis, p, m):
@@ -714,17 +704,17 @@ def get_start_basis(A):
 
 def get_bases(A, plus, minus):
     m = A.shape[0]
-    bases = np.zeros((len(plus), len(minus), m))
+    bases = np.zeros((len(plus), len(minus), m), dtype='int')
 
     start_basis = get_start_basis(A)
-    # B_inv = np.linalg.inv(A[:, start_basis])
+    B_inv = np.linalg.inv(A[:, start_basis])
 
-    for p in plus:
-        basis_p = add_first_ray(A, start_basis, p)
-        # B_plus_inv = np.linalg.inv(A[:, basis_p])
-        for m in minus:
-            basis_pm = add_second_ray(A, basis_p, p, m)
-            pass
+    for i, p in enumerate(plus):
+        basis_p = add_first_ray(A, B_inv, start_basis, p)
+        B_plus_inv = np.linalg.inv(A[:, basis_p])
+        for j, m in enumerate(minus):
+            basis_pm = add_second_ray(A, B_plus_inv, basis_p, p, m)
+            bases[i][j] = basis_pm
 
     return bases
 
@@ -754,12 +744,12 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, verbose=True, re
 
     number_rays = R_indep.shape[1]
 
-    # bases = get_bases(R_indep, plus, minus)
+    bases = get_bases(R_indep, plus, minus)
 
     cpu_count = multi.cpu_count()
     print("Using %d cores" % cpu_count)
 
-    pairs = np.array([(i, j) for i in plus for j in minus])
+    pairs = np.array([(i, j, ind_p, ind_m) for ind_p, i in enumerate(plus) for ind_m, j in enumerate(minus)])
     split_indices = [i for i in range(1, len(pairs)) if i % lps_per_job == 0]
     split_pairs = np.split(pairs, split_indices)
     q = 1000
@@ -771,7 +761,9 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, verbose=True, re
     start_basis = get_start_basis(R_indep)
     with multi.Pool(cpu_count) as pool:
         for unit in report_unit:
-            result = pool.starmap(multiple_adjacencies, [(R_indep, pairs, start_basis) for pairs in unit])
+            # result = pool.starmap(multiple_adjacencies, [(R_indep, pairs, start_basis) for pairs in unit])
+            # pre-computed bases
+            result = pool.starmap(multiple_adjacencies, [(R_indep, pairs, bases[pairs[0][2], pairs[0][3]]) for pairs in unit])
 
             adjacency = unpack_results(result, number_rays, adjacency)
             LPs_done += int(q / lps_per_job) * lps_per_job
@@ -858,12 +850,11 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12
             it += 1
 
         # input("waiting")
-        # TODO make iteration_without_lps
-        # if np.sum(R[i - len(deleted[deleted < i]), :] > 0) * np.sum(R[i - len(deleted[deleted < i]), :] < 0) == 0:
-        #     R, removed = iteration_without_lps(R, to_remove, network)
-
-        R, removed = eliminate_metabolite(R, to_remove, network, calculate_adjacency=True, lps_per_job=lps_per_job)
-        rows_removed_redund += removed
+        if np.sum(R[i - len(deleted[deleted < i]), :] > 0) * np.sum(R[i - len(deleted[deleted < i]), :] < 0) == 0:
+            R = iteration_without_lps(R, to_remove, network)
+        else:
+            R, removed = eliminate_metabolite(R, to_remove, network, calculate_adjacency=True, lps_per_job=lps_per_job)
+            rows_removed_redund += removed
         deleted = np.append(deleted, i)
         internal.remove(i)
 
