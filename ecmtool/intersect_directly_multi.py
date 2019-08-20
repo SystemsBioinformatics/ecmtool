@@ -9,17 +9,6 @@ from ecmtool._bglu_dense import BGLU
 from ecmtool.helpers import redund
 
 
-def fake_ecm(reaction, metabolite_ids, tol=1e-12):
-    s = ""
-    for i, c in enumerate(np.asarray(reaction, dtype='int')):
-        if abs(reaction[i]) > tol:
-            if s == "":
-                s = metabolite_ids[i].replace("_in", "").replace("_out", "")
-            elif s != metabolite_ids[i].replace("_in", "").replace("_out", ""):
-                return False
-    return True
-
-
 def print_ecms_direct(R, metabolite_ids):
     obj_id = -1
     if "objective" in metabolite_ids:
@@ -157,9 +146,18 @@ def independent_rows(A):
 
         if rank == prev_rank:  # row added did not increase rank
             basis = prev_basis
+        # else:
+        #     print("added row, condition number is now: %f" % np.linalg.cond(A_float[basis]))
+        #     if np.linalg.cond(A_float[basis]) > 1000:
+        #         basis = prev_basis
+        #         rank = np.linalg.matrix_rank(A_float[basis])
+        #         print("Rejected column based on condition number...")
+
         if rank == original_rank:
             break
 
+    if rank != original_rank:
+        print("\t(rows) Rank deficiency! Got rank %d instead of %d" % (rank, m))
     return A[basis]
 
 
@@ -207,7 +205,7 @@ def cancel_with_cycle(R, met, cycle_ind, network, verbose=True, tol=1e-12):
     return next_R
 
 
-def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, perturbed=False, verbose=True,
+def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, verbose=True,
                          lps_per_job=1):
     # determine +/0/-
     plus = []
@@ -235,7 +233,7 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, p
         next_matrix.append(col)
 
     if calculate_adjacency:
-        adj = geometric_ray_adjacency(R, plus=plus, minus=minus, perturbed=perturbed, verbose=verbose,
+        adj = geometric_ray_adjacency(R, plus=plus, minus=minus, verbose=verbose,
                                       remove_cycles=True, lps_per_job=lps_per_job)
 
     # combine + and - if adjacent
@@ -466,47 +464,26 @@ def setup_LP(R_indep, i, j):
     return A_ub, b_ub, A_eq, b_eq, c, x0
 
 
-def refine_LP(b_eq, x0, A_eq, basis, epsilon):
-    B = A_eq[:, basis]
-    eps = np.random.uniform(0.5 * epsilon, epsilon, len(basis))
-    b_eq_2 = b_eq + np.dot(B, eps)
-    x0_2 = x0
-    x0_2[basis] += eps
+def perturb_LP(b_eq, x0, A_eq, basis, epsilon):
+    eps = np.random.uniform(epsilon / 2, epsilon, len(basis))
+    b_eq = b_eq + np.dot(A_eq[:, basis], eps)
+    x0[basis] += eps
 
-    return b_eq_2, x0_2
+    return b_eq, x0
 
 
-def determine_adjacency(R, i, j, perturbed, tol=1e-10):
-    if perturbed:
-        A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP_perturbed(R, i, j, 1e-10)
-    else:
-        A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP(R, i, j)
-
-    # KKT
-    disable_lp = True
-
-    if perturbed:
-        ext_basis = np.nonzero(x0)[0]
-    else:
-        ext_basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [i, j])
-
-    # DEBUG
-    refine = True
-    if refine:
-        b_eq, x0 = refine_LP(b_eq, x0, A_eq, ext_basis, 1e-10)
-
+def determine_adjacency(R, i, j, start_basis, tol=1e-10):
+    A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP(R, i, j)
+    # ext_basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [i, j])
+    ext_basis = add_rays(np.asarray(A_eq, dtype='float'), start_basis, i, j)
+    b_eq, x0 = perturb_LP(b_eq, x0, A_eq, ext_basis, 1e-10)
     KKT, status = kkt_check(c, np.asarray(A_eq, dtype='float'), x0, ext_basis)
-    # DEBUG
-    # status = 0
 
     if status == 0:
         return 1 if KKT else 0
-
-    print("\t\t\tKKT had non-zero exit status...")
-    # input("Waiting...")
-    disable_lp = False
-
-    if not disable_lp:
+    else:
+        print("\t\t\tKKT had non-zero exit status...")
+        # input("Waiting...")
         res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex',
                       options={'tol': 1e-12, 'maxiter': 500})
 
@@ -528,11 +505,11 @@ def determine_adjacency(R, i, j, perturbed, tol=1e-10):
         if res.status != 0 or abs(res.fun) < tol:
             return 1
 
-    return 0
+        return 0
 
 
-def multiple_adjacencies(R, pairs, perturbed):
-    return [(p, determine_adjacency(R, p[0], p[1], perturbed)) for p in pairs]
+def multiple_adjacencies(R, pairs, start_basis):
+    return [(p, determine_adjacency(R, p[0], p[1], start_basis)) for p in pairs]
 
 
 def unpack_results(results, number_rays, adjacency=None):
@@ -546,7 +523,99 @@ def unpack_results(results, number_rays, adjacency=None):
     return adjacency
 
 
-def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False, verbose=True, remove_cycles=True,
+def add_second_ray(A, basis_p, p, m):
+    res = np.copy(basis_p)
+    if m in basis_p:
+        return res
+
+    # Faster, but doesnt work (get singular matrix)
+    # x = np.linalg.solve(B_plus_inv, A[:, m])
+    # x[np.where(basis_p == p)[0][0]] = 0 # dont select p for replacement in basis
+    # res[np.argmax(x)] = m
+    # return res
+
+    for i in range(len(basis_p)):
+        if basis_p[i] == p:
+            continue
+        res[i] = m
+        rank = np.linalg.matrix_rank(A[:, res])
+        if rank == A.shape[0]:
+            return res
+        res[i] = basis_p[i]
+
+
+def add_first_ray(A, start_basis, p):
+    res = np.copy(start_basis)
+    if p in start_basis:
+        return res
+
+    # x = np.linalg.solve(B_inv, A[:, p])
+    # res[np.argmax(x)] = p
+    # return res
+
+    for i in range(len(start_basis)):
+        res[i] = p
+        rank = np.linalg.matrix_rank(A[:, res])
+        if rank == A.shape[0]:
+            return res
+        res[i] = start_basis[i]
+
+
+def add_rays(A, start_basis, p, m):
+    basis = add_first_ray(A, start_basis, p)
+    basis = add_second_ray(A, basis, p, m)
+    return basis
+
+
+def get_start_basis(A):
+    # return any column basis of A
+    m, n = A.shape
+
+    rank = 0
+    new_basis = np.array([], dtype='int')
+    for i in range(n):
+        if i in new_basis:
+            continue
+        prev_rank = rank
+        prev_basis = new_basis
+        new_basis = np.append(new_basis, i)
+        rank = np.linalg.matrix_rank(A[:, new_basis])
+
+        if rank == prev_rank:  # column added did not increase rank
+            new_basis = prev_basis
+        # else:
+        #     print("added column, condition number is now: %f" % np.linalg.cond(A[:, new_basis]))
+        #     if np.linalg.cond(A[:, new_basis]) > 1000:
+        #         new_basis = prev_basis
+        #         rank = np.linalg.matrix_rank(A[:, new_basis])
+        #         print("Rejected column based on condition number...")
+
+        if rank == m:
+            break
+
+    if rank != m:
+        print("\tRank deficiency! Got rank %d instead of %d" % (rank, m))
+    return new_basis
+
+
+def get_bases(A, plus, minus):
+    m = A.shape[0]
+    bases = np.zeros((len(plus), len(minus), m))
+
+    start_basis = get_start_basis(A)
+    # B_inv = np.linalg.inv(A[:, start_basis])
+
+    for p in plus:
+        basis_p = add_first_ray(A, start_basis, p)
+        # B_plus_inv = np.linalg.inv(A[:, basis_p])
+        for m in minus:
+            basis_pm = add_second_ray(A, basis_p, p, m)
+            pass
+
+    return bases
+
+
+def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, verbose=True, remove_cycles=True,
                             lps_per_job=1):
     """
     Returns r by r adjacency matrix of rays, given
@@ -560,11 +629,8 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
     """
     start = time()
 
-    # with normalization
     R_normalized = normalize_columns(np.array(R, dtype='float'))
     R_indep = independent_rows(R_normalized)
-    # without normalization
-    # R_indep = independent_rows(R)
 
     # set default plus and minus
     if (len(plus) > 0 and plus[0] == -1):
@@ -573,33 +639,26 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, perturbed=False,
         minus = [x for x in range(R_indep.shape[1])]
 
     number_rays = R_indep.shape[1]
-    adjacency = np.zeros(shape=(number_rays, number_rays))
 
-    disable_lp = not remove_cycles
-    total = len(plus) * len(minus)
+    # bases = get_bases(R_indep, plus, minus)
 
-    # print("\tLargest non-LP ray: %.2f" % max(
-    #     [np.linalg.norm(np.array(R[:, i], dtype='float')) for i in range(R.shape[1])]))
-    # print("\tMax/min: %.3f" % max(
-    #     [abs(abs(np.array(R[:, i], dtype='float')).max() / np.min(
-    #         abs(np.array(R[:, i], dtype='float'))[np.nonzero(R[:, i])])) for i in range(R.shape[1])]))
-    # print("\tLargest LP ray: %.2f" % max(
-    #     [np.linalg.norm(np.array(R_indep[:, i], dtype='float')) for i in range(R_indep.shape[1])]))
-
-    cpu_count = multi.cpu_count() - 1
+    cpu_count = multi.cpu_count()
     print("Using %d cores" % cpu_count)
+
+    pairs = np.array([(i, j) for i in plus for j in minus])
+    split_indices = [i for i in range(1, len(pairs)) if i % lps_per_job == 0]
+    split_pairs = np.split(pairs, split_indices)
+    q = 1000
+    split_indices = [i for i in range(1, len(split_pairs)) if i % (q / lps_per_job) == 0]
+    report_unit = np.split(split_pairs, split_indices)
+    adjacency = None
+    LPs_done = 0
+    start_time = time()
+    start_basis = get_start_basis(R_indep)
     with multi.Pool(cpu_count) as pool:
-        pairs = np.array([(i, j) for i in plus for j in minus])
-        split_indices = [i for i in range(1, len(pairs)) if i % lps_per_job == 0]
-        split_pairs = np.split(pairs, split_indices)
-        q = 1000
-        split_indices = [i for i in range(1, len(split_pairs)) if i % (q / lps_per_job) == 0]
-        report_unit = np.split(split_pairs, split_indices)
-        adjacency = None
-        LPs_done = 0
-        start_time = time()
         for unit in report_unit:
-            result = pool.starmap(multiple_adjacencies, [(R_indep, pairs, perturbed) for pairs in unit])
+            result = pool.starmap(multiple_adjacencies, [(R_indep, pairs, start_basis) for pairs in unit])
+
             adjacency = unpack_results(result, number_rays, adjacency)
             LPs_done += int(q / lps_per_job) * lps_per_job
             if len(pairs) != 0:
@@ -621,12 +680,6 @@ def reduce_column_norms(matrix):
         if norm > 2:
             matrix[:, i] /= int(np.floor(norm))
     return matrix
-
-
-def remove_fake_ecms(R, network):
-    metabolite_ids = [network.metabolites[i].id for i in network.external_metabolite_indices()]
-    real_ecms = np.array([not fake_ecm(R[:, i], metabolite_ids) for i in range(R.shape[1])])
-    return R[:, real_ecms]
 
 
 def unsplit_metabolites(R, network):
@@ -666,7 +719,7 @@ def in_cone(R, tar):
     return A_ub, b_ub, A_eq, b_eq, c
 
 
-def intersect_directly(R, internal_metabolites, network, perturbed=False, verbose=True, tol=1e-12, lps_per_job=1):
+def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12, lps_per_job=1):
     # rows are rays
     deleted = np.array([])
     it = 1
@@ -678,7 +731,6 @@ def intersect_directly(R, internal_metabolites, network, perturbed=False, verbos
         i = internal[np.argmin(
             [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0) for j in
              internal])]
-        # i = internal[len(internal)-1]
         to_remove = i - len(deleted[deleted < i])
         if verbose:
             print("\n\nIteration %d (internal metabolite = %d: %s) of %d" % (
@@ -690,15 +742,18 @@ def intersect_directly(R, internal_metabolites, network, perturbed=False, verbos
                 [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0) for j
                  in internal]))
             it += 1
+
         # input("waiting")
-        R, removed = eliminate_metabolite(R, i - len(deleted[deleted < i]), network, calculate_adjacency=True,
-                                          perturbed=perturbed, lps_per_job=lps_per_job)
+        # TODO make iteration_without_lps
+        # if np.sum(R[i - len(deleted[deleted < i]), :] > 0) * np.sum(R[i - len(deleted[deleted < i]), :] < 0) == 0:
+        #     R, removed = iteration_without_lps(R, to_remove, network)
+
+        R, removed = eliminate_metabolite(R, to_remove, network, calculate_adjacency=True, lps_per_job=lps_per_job)
         rows_removed_redund += removed
         deleted = np.append(deleted, i)
         internal.remove(i)
 
     # remove artificial rays introduced by splitting metabolites
-    # R = remove_fake_ecms(R, network)
     R, ids = unsplit_metabolites(R, network)
 
     if verbose:
