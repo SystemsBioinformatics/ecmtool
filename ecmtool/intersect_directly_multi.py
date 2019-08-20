@@ -465,10 +465,7 @@ def setup_LP(R_indep, i, j):
 
     A_ub = -np.identity(number_rays)
     b_ub = np.zeros(number_rays)
-    A_eq = R_indep
-    ray1 = R_indep[:, i]
-    ray2 = R_indep[:, j]
-    b_eq = 0.5 * ray1 + 0.5 * ray2
+    b_eq = R_indep[:, i] / 2 + R_indep[:, j] / 2
     c = -np.ones(number_rays)
     c[i] = 0
     c[j] = 0
@@ -476,7 +473,7 @@ def setup_LP(R_indep, i, j):
     x0[i] = 0.5
     x0[j] = 0.5
 
-    return A_ub, b_ub, A_eq, b_eq, c, x0
+    return A_ub, b_ub, R_indep, b_eq, c, x0
 
 
 def perturb_LP(b_eq, x0, A_eq, basis, epsilon):
@@ -489,39 +486,13 @@ def perturb_LP(b_eq, x0, A_eq, basis, epsilon):
 
 def determine_adjacency(R, i, j, basis, tol=1e-10):
     A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP(R, i, j)
-    # ext_basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [i, j])
-    # ext_basis = add_rays(np.asarray(A_eq, dtype='float'), start_basis, i, j)
-    ext_basis = basis
-    b_eq, x0 = perturb_LP(b_eq, x0, A_eq, ext_basis, 1e-10)
-    KKT, status = kkt_check(c, np.asarray(A_eq, dtype='float'), x0, ext_basis)
+    b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, 1e-10)
+    KKT, status = kkt_check(c, A_eq, x0, basis)
 
     if status == 0:
         return 1 if KKT else 0
     else:
-        print("\t\t\tKKT had non-zero exit status...")
-        # input("Waiting...")
-        res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex',
-                      options={'tol': 1e-12, 'maxiter': 500})
-
-        if res.status == 1:
-            print("Iteration limit %d reached, trying Blands pivot rule" % (res.nit))
-            res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex',
-                          options={'tol': 1e-12, 'pivot': "Bland", 'maxiter': 20000})
-
-        if res.status == 4:
-            print("Numerical difficulties with revised simplex, trying interior point method instead")
-            res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point',
-                          options={'tol': 1e-12})
-
-        if res.status != 0:
-            print("Status %d" % res.status)
-            # input("Waiting...")
-
-        print("res.fun: %.2e res.nit: %d" % (abs(res.fun), res.nit))
-        if res.status != 0 or abs(res.fun) < tol:
-            return 1
-
-        return 0
+        raise Exception("KKT check had non-zero exit status")
 
 
 def multiple_adjacencies(R, pairs, basis):
