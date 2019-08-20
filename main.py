@@ -279,6 +279,7 @@ if __name__ == '__main__':
         network.split_reversible()
         network.N = np.transpose(redund(np.transpose(network.N)))
         R, network = remove_cycles(network.N, network)
+        R = network.N
         # TODO: Make this cleaner
         # After this we do not use network.reactions anymore? I will now delete any superfluous reaction in network.
         # This is needed for the next compression to work.

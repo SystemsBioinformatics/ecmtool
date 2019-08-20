@@ -289,7 +289,7 @@ class Network:
 
         metabolite_count_intermediate, reaction_count_intermediate = self.N.shape
         self.cancel_singly(verbose=verbose)
-        self.cancel_dead_ends(verbose=verbose)
+        #self.cancel_dead_ends(verbose=verbose)
         if verbose:
             print('Removed %d reactions and %d metabolites' %
                   (reaction_count_intermediate - self.N.shape[1], metabolite_count_intermediate - self.N.shape[0]))
