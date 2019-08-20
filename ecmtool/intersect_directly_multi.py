@@ -362,7 +362,7 @@ def get_remove_metabolite(R, network, reaction, verbose=True):
 def compress_after_cycle_removing(network, verbose=True):
     original_metabolite_count, original_reaction_count = network.N.shape
     network.cancel_singly(verbose=verbose)
-    network.cancel_dead_ends(verbose=verbose)
+    #network.cancel_dead_ends(verbose=verbose)
 
     if verbose:
         print('Removed %d reactions and %d metabolites in total' %
@@ -476,9 +476,10 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
 
     R = np.transpose(R)
 
+    network.N = R
     network.drop_reactions(removable_reactions)
     network.drop_metabolites(removable_metabolites)
-    network.N = R
+    R = network.N
 
     return R, network
 
