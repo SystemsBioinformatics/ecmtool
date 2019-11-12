@@ -124,7 +124,7 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     reactions = cbmpy_model.reactions
     objective_reaction_column = None
     pairs = cbmpy.CBTools.findDeadEndReactions(cbmpy_model)
-    external_metabolites, external_reactions = zip(*pairs) if len(pairs) else (zip(*cbmpy.CBTools.findDeadEndMetabolites(cbmpy_model))[0], [])
+    external_metabolites, external_reactions = list(zip(*pairs)) if len(pairs) else (list(zip(*cbmpy.CBTools.findDeadEndMetabolites(cbmpy_model)))[0], [])
 
     # Catch any metabolites that were not recognised automatically, but are likely external
     external_metabolites = list(external_metabolites) + [item.id for item in species if item.compartment == external_compartment]
