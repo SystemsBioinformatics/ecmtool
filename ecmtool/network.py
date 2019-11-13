@@ -124,7 +124,9 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     reactions = cbmpy_model.reactions
     objective_reaction_column = None
     pairs = cbmpy.CBTools.findDeadEndReactions(cbmpy_model)
-    external_metabolites, external_reactions = list(zip(*pairs)) if len(pairs) else (list(zip(*cbmpy.CBTools.findDeadEndMetabolites(cbmpy_model)))[0], [])
+    external_metabolites, external_reactions = list(zip(*pairs)) if len(pairs) else ([], [])
+    if not len(pairs) and len(list(zip(*cbmpy.CBTools.findDeadEndMetabolites(cbmpy_model)))):
+        external_metabolites = list(zip(*cbmpy.CBTools.findDeadEndMetabolites(cbmpy_model)))[0]
 
     # Catch any metabolites that were not recognised automatically, but are likely external
     external_metabolites = list(external_metabolites) + [item.id for item in species if item.compartment == external_compartment]
@@ -724,6 +726,6 @@ class Network:
 
                 metabolite.is_external = False
                 metabolite.compartment = 'virtual'
-                count+=1
+                count += 1
         self.N = to_fractions(self.N)
-        print("Split %d input/output external metabolites" % (count))
+        print("Split %d input/output external metabolites" % count)
