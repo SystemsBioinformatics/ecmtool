@@ -747,7 +747,7 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, verbose=True, re
 
     bases = get_bases(R_indep, plus, minus)
 
-    cpu_count = multi.cpu_count()
+    cpu_count = 1
     print("Using %d cores" % cpu_count)
 
     pairs = np.array([(i, j, ind_p, ind_m) for ind_p, i in enumerate(plus) for ind_m, j in enumerate(minus)])
