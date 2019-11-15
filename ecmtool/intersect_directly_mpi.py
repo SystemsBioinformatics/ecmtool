@@ -1,7 +1,7 @@
 import multiprocessing as multi
-from mpi4py import MPI
 from time import time
 
+from mpi4py import MPI
 import numpy as np
 from scipy.linalg import LinAlgError
 from scipy.optimize import linprog
@@ -37,8 +37,13 @@ def get_more_basis_columns(A, basis):
     """
     m, n = A.shape
 
-    rank = np.linalg.matrix_rank(A[:, basis])
-    new_basis = basis.copy()
+    if not len(basis):
+        rank = 0
+        new_basis = np.array([],dtype = 'int')
+    else:
+        rank = np.linalg.matrix_rank(A[:, basis])
+        new_basis = basis.copy()
+
     for i in range(n):
         if i in new_basis:
             continue
@@ -112,6 +117,63 @@ def kkt_check(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=1000, verbose=T
     return True, 1
 
 
+def cycle_check_with_output(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=1000, verbose=True):
+    """
+    Determine whether KKT conditions hold for x0.
+    Take size 0 steps if available.
+    """
+    ab = np.arange(A.shape[0])
+    a = np.arange(A.shape[1])
+
+    maxupdate = 10
+    B = BGLU(A, basis, maxupdate, False)
+    for iteration in range(max_iter):
+        bl = np.zeros(len(a), dtype=bool)
+        bl[basis] = 1
+        xb = x[basis]
+
+        try:
+            l = B.solve(c[basis], transposed=True)  # similar to v = linalg.solve(B.T, c[basis])
+        except LinAlgError:
+            return False, 1, [-1]
+        sn = c - l.dot(A)  # reduced cost
+        sn = sn[~bl]
+
+        if np.all(sn >= -tol):  # in this case x is an optimal solution
+            # if verbose:
+            #     print("Did %d steps in kkt_check, found True - smallest sn: %.8f" % (iteration - 1, min(sn)))
+            return False, 0, [-1]
+
+        entering = a[~bl][np.argmin(sn)]
+        u = B.solve(A[:, entering])
+
+        i = u > tol  # if none of the u are positive, unbounded
+        if not np.any(i):
+            print("Warning: unbounded problem in KKT_check")
+            # if verbose:
+            #     print("Did %d steps in kkt_check2" % iteration - 1)
+            return True, 0, [entering]
+
+        th = xb[i] / u[i]
+        l = np.argmin(th)  # implicitly selects smallest subscript
+        step_size = th[l]  # step size
+
+        # Do pivot
+        x[basis] = x[basis] - step_size * u
+        x[entering] = step_size
+        x[abs(x) < 10e-20] = 0
+        B.update(ab[i][l], entering)  # modify basis
+        basis = B.b
+
+        if np.dot(c, x) < -threshold:  # found a better solution, so not adjacent
+            # if verbose:
+            #     print("Did %d steps in kkt_check, found False - c*x %.8f" % (iteration - 1, np.dot(c, x)))
+            return True, 0, [np.argmax(x)]
+
+    print("Cycling?")
+    return False, 1, [-1]
+
+
 def get_nonsingular_pair(A, basis, entering, leaving, basis_hashes):
     for enter in entering:
         for leave in leaving:
@@ -162,7 +224,7 @@ def independent_rows(A):
     return A[basis]
 
 
-def cancel_with_cycle(R, met, cycle_ind, network, verbose=True, tol=1e-12):
+def cancel_with_cycle(R, met, cycle_ind, network, removable_reactions, verbose=True, tol=1e-12):
     cancelling_reaction = R[:, cycle_ind]
     reactions_using_met = [i for i in range(R.shape[1]) if R[met, i] != 0 and i != cycle_ind]
 
@@ -181,29 +243,14 @@ def cancel_with_cycle(R, met, cycle_ind, network, verbose=True, tol=1e-12):
     # Delete cycle ray that is now the only one that produces met, so has to be zero + rays that are full of zeros now
     next_R = np.delete(next_R, to_be_dropped, axis=1)
 
+    removable_reactions.append(to_be_dropped)
     # delete all-zero row
     next_R = np.delete(next_R, met, 0)
     network.drop_metabolites([met])
     print("After removing this metabolite, we have %d metabolites and %d rays" %
           (next_R.shape[0], next_R.shape[1]))
 
-    next_R = np.transpose(next_R)
-    rows_before = next_R.shape[0]
-
-    if verbose:
-        print("\tDimensions before redund: %d %d" % (next_R.shape[0], next_R.shape[1]))
-    start = time()
-    next_R = redund(next_R)
-    end = time()
-    rows_removed_redund = rows_before - next_R.shape[0]
-    if verbose:
-        print("\tDimensions after redund: %d %d" % (next_R.shape[0], next_R.shape[1]))
-        print("\t\tRows removed by redund: %d" % (rows_before - next_R.shape[0]))
-        print("\tRedund took %f seconds" % (end - start))
-
-    next_R = np.transpose(next_R)
-
-    return next_R
+    return next_R, removable_reactions
 
 
 def iteration_without_lps(R, met, network):
@@ -254,12 +301,18 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, v
     if calculate_adjacency:
         adj = geometric_ray_adjacency(R, plus=plus, minus=minus, verbose=verbose,
                                       remove_cycles=True, lps_per_job=lps_per_job)
-
-    # combine + and - if adjacent
-    nr_adjacent = 0
-    for p in plus:
-        for m in minus:
-            if not calculate_adjacency or adj[p, m] == 1:
+        # combine + and - if adjacent
+        nr_adjacent = 0
+        for (p, m) in adj:
+            nr_adjacent += 1
+            rp = R[met, p]
+            rm = R[met, m]
+            new_row = rp * R[:, m] - rm * R[:, p]
+            if sum(abs(new_row)) > tol:
+                next_matrix.append(new_row)
+    else:   # calculate_adjacency is off
+        for p in plus:
+            for m in minus:
                 nr_adjacent += 1
                 rp = R[met, p]
                 rm = R[met, m]
@@ -313,23 +366,46 @@ def get_remove_metabolite(R, network, reaction, verbose=True):
     return 0
 
 
+def compress_after_cycle_removing(network, verbose=True):
+    original_metabolite_count, original_reaction_count = network.N.shape
+    network.cancel_singly(verbose=verbose)
+    #network.cancel_dead_ends(verbose=verbose)
+
+    if verbose:
+        print('Removed %d reactions and %d metabolites in total' %
+              (original_reaction_count - network.N.shape[1], original_metabolite_count - network.N.shape[0]))
+
+    return network
+
+
 def remove_cycles(R, network, tol=1e-12, verbose=True):
     """Detect whether there are cycles, by doing an LP. If LP is unbounded find a minimal cycle. Cancel one metabolite
     with the cycle."""
-    deleted = []
+    removable_metabolites = []
+    removable_reactions = []
+    count_since_last_redund = 0
     A_ub, b_ub, A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))))
 
-    # TODO: Erik, can you add your LP solver here? These ones do not work.
-    res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12},
-                  x0=x0)
-    if res.status == 4:
-        print("Numerical difficulties with revised simplex, trying interior point method instead")
-        res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
+    basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [])
+    b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, 1e-10)
+    cycle_present, status, cycle_indices = cycle_check_with_output(c, np.asarray(A_eq, dtype='float'), x0, basis)
+
+    if status != 0:
+        res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12},
+                      x0=x0)
+        if res.status == 4:
+            print("Numerical difficulties with revised simplex, trying interior point method instead")
+            res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
+
+        cycle_present = True if np.max(res.x) > 90 else False
+        if cycle_present:
+            cycle_indices = np.where(res.x > 90)[0]
+        if np.any(np.isnan(res.x)):
+            raise Exception('Remove cycles did not work, because LP-solver had issues. Try to solve this.')
 
     # if the objective is unbounded, there is a cycle that sums to zero
-    while np.max(res.x) > 90:  # It is unbounded
+    while cycle_present:
         # Find minimal cycle
-        cycle_indices = np.where(res.x > 90)[0]
         met = -1
         counter = 0
         while met < 0:
@@ -339,32 +415,80 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
             if counter > len(cycle_indices):
                 print('No internal metabolite was found that was part of the cycle. This might cause problems.')
 
-        deleted.append(met)
+        removable_metabolites.append(met)
         if verbose:
             print("Found an unbounded LP, cancelling metabolite %d (%s) with reaction %d" % (
                 met, network.metabolites[met].id, cycle_ind))
 
-        R = cancel_with_cycle(R, met, cycle_ind, network)
+        R, removable_reactions = cancel_with_cycle(R, met, cycle_ind, network, removable_reactions)
+        count_since_last_redund = count_since_last_redund + 1
+
+        if count_since_last_redund > 10:
+            count_since_last_redund = 0
+            R = np.transpose(R)
+            rows_before = R.shape[0]
+
+            if verbose:
+                print("\tDimensions before redund: %d %d" % (R.shape[0], R.shape[1]))
+            start = time()
+            R = redund(R)
+            end = time()
+            rows_removed_redund = rows_before - R.shape[0]
+            if verbose:
+                print("\tDimensions after redund: %d %d" % (R.shape[0], R.shape[1]))
+                print("\t\tRows removed by redund: %d" % (rows_before - R.shape[0]))
+                print("\tRedund took %f seconds" % (end - start))
+
+            R = np.transpose(R)
 
         A_ub, b_ub, A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))))
 
-        # TODO: Erik, can you add your LP solver here? These ones do not work.
-        res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12},
-                      x0=x0)
-        if res.status == 4:
-            print("Numerical difficulties with revised simplex, trying interior point method instead")
-            res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
+        # Do new LP to check if there is still a cycle present.
+        basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [])
+        b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, 1e-10)
+        cycle_present, status, cycle_indices = cycle_check_with_output(c, np.asarray(A_eq, dtype='float'), x0, basis)
+
+        if status != 0:
+            res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12},
+                          x0=x0)
+            if res.status == 4:
+                print("Numerical difficulties with revised simplex, trying interior point method instead")
+                res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
+
+            cycle_present = True if np.max(res.x) > 90 else False
+            if cycle_present:
+                cycle_indices = np.where(res.x > 90)[0]
+            if np.any(np.isnan(res.x)):
+                raise Exception('Remove cycles did not work, because LP-solver had issues. Try to solve this.')
 
     internal_metabolite_indices = [i for i, metab in enumerate(network.metabolites) if not metab.is_external]
-    removable_metabolites = []
     for metabolite_index in internal_metabolite_indices:
         nonzero_count = np.count_nonzero(network.N[metabolite_index, :])
         if nonzero_count == 0:
             removable_metabolites.append(metabolite_index)
 
-    network.drop_metabolites(removable_metabolites)
+    # Do redund one more time
+    R = np.transpose(R)
+    rows_before = R.shape[0]
 
-    return R, deleted
+    if verbose:
+        print("\tDimensions before redund: %d %d" % (R.shape[0], R.shape[1]))
+    start = time()
+    R = redund(R)
+    end = time()
+    if verbose:
+        print("\tDimensions after redund: %d %d" % (R.shape[0], R.shape[1]))
+        print("\t\tRows removed by redund: %d" % (rows_before - R.shape[0]))
+        print("\tRedund took %f seconds" % (end - start))
+
+    R = np.transpose(R)
+
+    network.N = R
+    network.drop_reactions(removable_reactions)
+    network.drop_metabolites(removable_metabolites)
+    R = network.N
+
+    return R, network
 
 
 def normalize_columns(R):
@@ -630,42 +754,34 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, verbose=True, re
 
     bases = get_bases(R_indep, plus, minus)
 
-    # cpu_count = multi.cpu_count()
-    # print("Using %d cores" % cpu_count)
-
     comm = MPI.COMM_WORLD
     mpi_size = comm.Get_size()
     mpi_rank = comm.Get_rank()
 
     pairs = np.array([(i, j, ind_p, ind_m) for ind_p, i in enumerate(plus) for ind_m, j in enumerate(minus)])
-    split_indices = [i for i in range(1, len(pairs)) if i % lps_per_job == 0]
-    split_pairs = np.split(pairs, split_indices)
-    q = 1000
-    split_indices = [i for i in range(1, len(split_pairs)) if i % (q / lps_per_job) == 0]
-    report_unit = np.split(split_pairs, split_indices)
-    adjacency = None
-    LPs_done = 0
+    # split_indices = [i for i in range(1, len(pairs)) if i % lps_per_job == 0]
+    # split_pairs = np.split(pairs, split_indices)
+    # q = 1000
+    # split_indices = [i for i in range(1, len(split_pairs)) if i % (q / lps_per_job) == 0]
+    # report_unit = np.split(split_pairs, split_indices)
+    adjacency = []
     start_time = time()
-    # start_basis = get_start_basis(R_indep)
-    with multi.Pool(3) as pool:
-        for unit in report_unit:
-            # result = pool.starmap(multiple_adjacencies, [(R_indep, pairs, start_basis) for pairs in unit])
-            # pre-computed bases
-            inputs = [(R_indep, pairs, bases[pairs[0][2], pairs[0][3]]) for pairs in unit]
-            result = pool.starmap(multiple_adjacencies, inputs)
+    for (index, pair) in enumerate(pairs):
+        if index % mpi_size == mpi_rank:
+            basis = bases[pair[2], pair[3]]
+            res = determine_adjacency(R_indep, pair[0], pair[1], basis)
+            if res == 1:
+                adjacency.append((pair[0], pair[1]))
 
-            adjacency = unpack_results(result, number_rays, adjacency)
-            LPs_done += int(q / lps_per_job) * lps_per_job
-            if len(pairs) != 0:
-                duration = time() - start_time
-                fraction_done = min(LPs_done, len(pairs)) / len(pairs)
-                est_total_time = duration / fraction_done
-                time_remaining = est_total_time - duration
-                print("Did {} of the LPs ({:.2f} percent). Estimated time remaining for this step: {:.2f}s".format(
-                    min(LPs_done, len(pairs)), 100 * fraction_done, time_remaining))
+    # MPI communication step
+    adj_sets = comm.allgather(adjacency)
+    for i in range(mpi_size):
+        if i != mpi_rank:
+            adjacency.extend(adj_sets[i])
+    adjacency.sort()
 
     end = time()
-    print("Did LPs in %f seconds" % (end - start))
+    print("Did LPs in %f seconds" % (end - start_time))
     return adjacency
 
 

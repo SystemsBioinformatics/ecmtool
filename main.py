@@ -9,7 +9,7 @@ from argparse import ArgumentParser, ArgumentTypeError
 from sklearn.preprocessing import normalize
 
 from ecmtool.helpers import get_efms, get_metabolite_adjacency, redund
-from ecmtool.intersect_directly_multi import intersect_directly, print_ecms_direct, remove_cycles, \
+from ecmtool.intersect_directly_mpi import intersect_directly, print_ecms_direct, remove_cycles, \
     compress_after_cycle_removing
 from ecmtool.network import extract_sbml_stoichiometry
 from ecmtool.conversion_cone import get_conversion_cone, iterative_conversion_cone, unique
@@ -174,7 +174,7 @@ if __name__ == '__main__':
 
     parser = ArgumentParser(
         description='Calculate Elementary Conversion Modes from an SBML model. For medium-to large networks, be sure to define --inputs and --outputs. This reduces the enumeration problem complexity considerably.')
-    parser.add_argument('--model_path', type=str, default='models/e_coli_core.xml',
+    parser.add_argument('--model_path', type=str, default='models/active_subnetwork_KO_5.xml',
                         help='Relative or absolute path to an SBML model .xml file')
     parser.add_argument('--direct', type=str2bool, default=True, help='Enable to intersect with equalities directly')
     parser.add_argument('--compress', type=str2bool, default=True,
