@@ -772,6 +772,8 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, verbose=True, re
             res = determine_adjacency(R_indep, pair[0], pair[1], basis)
             if res == 1:
                 adjacency.append((pair[0], pair[1]))
+            if mpi_rank == 0 and index % 100 == 0:
+                print("Process 0 is now on adjacency test %d" % index)
 
     # MPI communication step
     adj_sets = comm.allgather(adjacency)
