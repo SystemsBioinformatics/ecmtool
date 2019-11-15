@@ -298,7 +298,8 @@ if __name__ == '__main__':
         print_ecms_direct(T_intersected, ids)
 
         # save to file
-        np.savetxt(args.out_path, T_intersected, delimiter=',')
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            np.savetxt(args.out_path, T_intersected, delimiter=',')
 
         end = time()
         print('Ran (direct) in %f seconds with %d processes' % (end - start, MPI.COMM_WORLD.Get_size()))
