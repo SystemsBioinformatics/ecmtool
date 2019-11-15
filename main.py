@@ -15,6 +15,8 @@ from ecmtool.network import extract_sbml_stoichiometry
 from ecmtool.conversion_cone import get_conversion_cone, iterative_conversion_cone, unique
 from ecmtool.functions_for_Erik import check_bijection_Erik
 
+from mpi4py import MPI
+
 
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
@@ -295,7 +297,7 @@ if __name__ == '__main__':
 
         print_ecms_direct(T_intersected, ids)
         end = time()
-        print('Ran (direct) in %f seconds' % (end - start))
+        print('Ran (direct) in %f seconds with %d processes' % (end - start, MPI.COMM_WORLD.Get_size()))
 
     # input("waiting")
     if args.compare or not args.direct:
