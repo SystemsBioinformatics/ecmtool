@@ -299,7 +299,7 @@ if __name__ == '__main__':
 
         # save to file
         if MPI.COMM_WORLD.Get_rank() == 0:
-            np.savetxt(args.out_path, T_intersected, delimiter=',')
+            np.savetxt(args.out_path, np.transpose(T_intersected), delimiter=',')
 
         end = time()
         print('Ran (direct) in %f seconds with %d processes' % (end - start, MPI.COMM_WORLD.Get_size()))
