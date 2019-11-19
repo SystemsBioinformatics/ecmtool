@@ -69,7 +69,7 @@ def get_more_basis_columns(A, basis):
     return new_basis
 
 
-def kkt_check(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=10000, verbose=True):
+def kkt_check(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=100000, verbose=True):
     """
     Determine whether KKT conditions hold for x0.
     Take size 0 steps if available.
@@ -79,7 +79,9 @@ def kkt_check(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=10000, verbose=
 
     maxupdate = 10
     B = BGLU(A, basis, maxupdate, False)
-    for iteration in range(max_iter):
+    # for iteration in range(max_iter):
+    iteration = 0
+    while True:
         bl = np.zeros(len(a), dtype=bool)
         bl[basis] = 1
         xb = x[basis]
@@ -93,8 +95,8 @@ def kkt_check(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=10000, verbose=
         sn = sn[~bl]
 
         if np.all(sn >= -tol):  # in this case x is an optimal solution
-            if verbose:
-                mpi_print("Did %d steps in kkt_check, found True - smallest sn: %.8f" % (iteration - 1, min(sn)))
+            # if verbose:
+            #     mpi_print("Did %d steps in kkt_check, found True - smallest sn: %.8f" % (iteration - 1, min(sn)))
             return True, 0
 
         entering = a[~bl][np.argmin(sn)]
@@ -119,15 +121,18 @@ def kkt_check(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=10000, verbose=
         basis = B.b
 
         if np.dot(c, x) < -threshold:  # found a better solution, so not adjacent
-            if verbose:
-                mpi_print("Did %d steps in kkt_check, found False - c*x %.8f" % (iteration - 1, np.dot(c, x)))
+            # if verbose:
+            #     mpi_print("Did %d steps in kkt_check, found False - c*x %.8f" % (iteration, np.dot(c, x)))
             return False, 0
 
+        iteration += 1
+        if iteration % 10000 == 0:
+            print("Warning: reached %d iterations" % iteration)
     mpi_print("Cycling?")
     return True, 1
 
 
-def cycle_check_with_output(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=1000, verbose=True):
+def cycle_check_with_output(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=100000, verbose=True):
     """
     Determine whether KKT conditions hold for x0.
     Take size 0 steps if available.

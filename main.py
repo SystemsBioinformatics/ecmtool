@@ -10,7 +10,7 @@ from sklearn.preprocessing import normalize
 
 from ecmtool.helpers import get_efms, get_metabolite_adjacency, redund
 from ecmtool.intersect_directly_mpi import intersect_directly, print_ecms_direct, remove_cycles, \
-    compress_after_cycle_removing
+    compress_after_cycle_removing, mpi_print
 from ecmtool.network import extract_sbml_stoichiometry
 from ecmtool.conversion_cone import get_conversion_cone, iterative_conversion_cone, unique
 from ecmtool.functions_for_Erik import check_bijection_Erik
@@ -162,7 +162,7 @@ def set_inoutputs(inputs, outputs, network):
     outputs = [int(index) for index in outputs.split(',') if len(index)]
     if len(outputs) < 1 and len(inputs) >= 1:
         # If no outputs are given, define all external metabolites that are not inputs as outputs
-        print(
+        mpi_print(
             'No output metabolites given or determined from model. All non-input metabolites will be defined as outputs.')
         outputs = np.setdiff1d(network.external_metabolite_indices(), inputs)
 
@@ -214,7 +214,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.model_path == '':
-        print('No model given, please specify --model_path')
+        mpi_print('No model given, please specify --model_path')
         exit()
 
     if len(args.inputs) or len(args.outputs):
@@ -246,12 +246,12 @@ if __name__ == '__main__':
             network.hide(hide_indices)
 
         if args.print_reactions:
-            print('Reactions%s:' % (' before compression' if args.compress else ''))
+            mpi_print('Reactions%s:' % (' before compression' if args.compress else ''))
             for index, item in enumerate(network.reactions):
-                print(index, item.id, item.name, 'reversible' if item.reversible else 'irreversible')
+                mpi_print(index, item.id, item.name, 'reversible' if item.reversible else 'irreversible')
 
         if args.print_metabolites:
-            print('Metabolites%s:' % (' before compression' if args.compress else ''))
+            mpi_print('Metabolites%s:' % (' before compression' if args.compress else ''))
             for index, item in enumerate(network.metabolites):
                 print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
 
@@ -259,11 +259,11 @@ if __name__ == '__main__':
         orig_N = network.N
 
         # for i, r in enumerate(network.reactions):
-        #     print("\n%s:" % (r.id))
+        #     mpi_print("\n%s:" % (r.id))
         #     for j in range(len(network.N[:, i])):
         #         nr = network.N[j, i];
         #         if nr != 0:
-        #             print("%s: %d" % (network.metabolites[j].id, nr))
+        #             mpi_print("%s: %d" % (network.metabolites[j].id, nr))
 
         if not args.only_rays:
             network.split_in_out()
@@ -276,7 +276,7 @@ if __name__ == '__main__':
             if sum(abs(network.N[i])) == 0:
                 network.drop_metabolites([i], force_external=True)
                 removed += 1
-        print("Removed %d metabolites that were not in any reactions" % removed)
+        mpi_print("Removed %d metabolites that were not in any reactions" % removed)
 
         network.split_reversible()
         network.N = np.transpose(redund(np.transpose(network.N)))
@@ -302,7 +302,7 @@ if __name__ == '__main__':
             np.savetxt(args.out_path, np.transpose(T_intersected), delimiter=',')
 
         end = time()
-        print('Ran (direct) in %f seconds with %d processes' % (end - start, MPI.COMM_WORLD.Get_size()))
+        mpi_print('Ran (direct) in %f seconds with %d processes' % (end - start, MPI.COMM_WORLD.Get_size()))
 
     # input("waiting")
     if args.compare or not args.direct:
@@ -323,37 +323,37 @@ if __name__ == '__main__':
             network.hide(hide_indices)
 
         if args.print_reactions:
-            print('Reactions%s:' % (' before compression' if args.compress else ''))
+            mpi_print('Reactions%s:' % (' before compression' if args.compress else ''))
             for index, item in enumerate(network.reactions):
-                print(index, item.id, item.name, 'reversible' if item.reversible else 'irreversible')
+                mpi_print(index, item.id, item.name, 'reversible' if item.reversible else 'irreversible')
 
         if args.print_metabolites:
-            print('Metabolites%s:' % (' before compression' if args.compress else ''))
+            mpi_print('Metabolites%s:' % (' before compression' if args.compress else ''))
             for index, item in enumerate(network.metabolites):
-                print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
+                mpi_print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
 
         orig_ids = [m.id for m in network.metabolites]
         orig_N = network.N
 
         # for i, r in enumerate(network.reactions):
-        #     print("\n%s:" % (r.id))
+        #     mpi_print("\n%s:" % (r.id))
         #     for j in range(len(network.N[:, i])):
         #         nr = network.N[j, i];
         #         if nr != 0:
-        #             print("%s: %d" % (network.metabolites[j].id, nr))
+        #             mpi_print("%s: %d" % (network.metabolites[j].id, nr))
 
         if args.compress:
             network.compress(verbose=args.verbose, SCEI=args.scei)
 
         if args.print_reactions and args.compress:
-            print('Reactions (after compression):')
+            mpi_print('Reactions (after compression):')
             for index, item in enumerate(network.reactions):
-                print(index, item.id, item.name, 'reversible' if item.reversible else 'irreversible')
+                mpi_print(index, item.id, item.name, 'reversible' if item.reversible else 'irreversible')
 
         if args.print_metabolites and args.compress:
-            print('Metabolites (after compression):')
+            mpi_print('Metabolites (after compression):')
             for index, item in enumerate(network.metabolites):
-                print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
+                mpi_print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
 
         if args.iterative:
             cone = network.uncompress(
@@ -373,7 +373,7 @@ if __name__ == '__main__':
             check_bijection(cone, network, model_path, args)
 
         end = time()
-        print('Ran in %f seconds' % (end - start))
+        mpi_print('Ran in %f seconds' % (end - start))
 
     if args.compare:
         metabolites = [m.id for m in network.metabolites]
@@ -395,9 +395,9 @@ if __name__ == '__main__':
         match, ecms_first_min_ecms_second, ecms_second_min_ecms_first = check_bijection_Erik(aligned_R, np.transpose(
             cone_without_zeroes), network)
         if match:
-            print("\n\t\tMatch\n")
+            mpi_print("\n\t\tMatch\n")
         else:
-            print("\n\t\tNO match\n")
-            print("\nFirst minus second:")
+            mpi_print("\n\t\tNO match\n")
+            mpi_print("\nFirst minus second:")
             for i in range(ecms_first_min_ecms_second.shape[1]):
                 pass
