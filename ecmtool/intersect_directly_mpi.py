@@ -69,7 +69,7 @@ def get_more_basis_columns(A, basis):
     return new_basis
 
 
-def kkt_check(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=1000, verbose=True):
+def kkt_check(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=10000, verbose=True):
     """
     Determine whether KKT conditions hold for x0.
     Take size 0 steps if available.
@@ -87,13 +87,14 @@ def kkt_check(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=1000, verbose=T
         try:
             l = B.solve(c[basis], transposed=True)  # similar to v = linalg.solve(B.T, c[basis])
         except LinAlgError:
+            print("LinAlgError in B.solve")
             return True, 1
         sn = c - l.dot(A)  # reduced cost
         sn = sn[~bl]
 
         if np.all(sn >= -tol):  # in this case x is an optimal solution
-            # if verbose:
-            #     mpi_print("Did %d steps in kkt_check, found True - smallest sn: %.8f" % (iteration - 1, min(sn)))
+            if verbose:
+                mpi_print("Did %d steps in kkt_check, found True - smallest sn: %.8f" % (iteration - 1, min(sn)))
             return True, 0
 
         entering = a[~bl][np.argmin(sn)]
@@ -118,8 +119,8 @@ def kkt_check(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=1000, verbose=T
         basis = B.b
 
         if np.dot(c, x) < -threshold:  # found a better solution, so not adjacent
-            # if verbose:
-            #     mpi_print("Did %d steps in kkt_check, found False - c*x %.8f" % (iteration - 1, np.dot(c, x)))
+            if verbose:
+                mpi_print("Did %d steps in kkt_check, found False - c*x %.8f" % (iteration - 1, np.dot(c, x)))
             return False, 0
 
     mpi_print("Cycling?")
