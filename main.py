@@ -1,4 +1,4 @@
-import os
+import os, sys
 
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
 
@@ -7,15 +7,26 @@ from time import time
 from scipy.optimize import linprog
 from argparse import ArgumentParser, ArgumentTypeError
 from sklearn.preprocessing import normalize
-
-from ecmtool.helpers import get_efms, get_metabolite_adjacency, redund
-from ecmtool.intersect_directly_mpi import intersect_directly, print_ecms_direct, remove_cycles, \
-    compress_after_cycle_removing, mpi_print
-from ecmtool.network import extract_sbml_stoichiometry
-from ecmtool.conversion_cone import get_conversion_cone, iterative_conversion_cone, unique
-from ecmtool.functions_for_Erik import check_bijection_Erik
-
 from mpi4py import MPI
+
+
+class HiddenPrints:
+    def __enter__(self):
+        self._original_stdout = sys.stdout
+        sys.stdout = open(os.devnull, 'w')
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout.close()
+        sys.stdout = self._original_stdout
+
+
+with HiddenPrints():
+    from ecmtool.helpers import get_efms, get_metabolite_adjacency, redund
+    from ecmtool.intersect_directly_mpi import intersect_directly, print_ecms_direct, remove_cycles, \
+        compress_after_cycle_removing, mpi_print
+    from ecmtool.network import extract_sbml_stoichiometry
+    from ecmtool.conversion_cone import get_conversion_cone, iterative_conversion_cone, unique
+    from ecmtool.functions_for_Erik import check_bijection_Erik
 
 
 def str2bool(v):
@@ -213,86 +224,90 @@ if __name__ == '__main__':
     parser.add_argument('--job_size', type=int, default=1, help='Number of LPs per multiprocessing job')
     args = parser.parse_args()
 
-    if args.model_path == '':
-        mpi_print('No model given, please specify --model_path')
-        exit()
+    with HiddenPrints():
+        if args.model_path == '':
+            mpi_print('No model given, please specify --model_path')
+            exit()
 
-    if len(args.inputs) or len(args.outputs):
-        # Disable automatic determination of external metabolite direction if lists are given manually
-        args.auto_direction = False
+        if len(args.inputs) or len(args.outputs):
+            # Disable automatic determination of external metabolite direction if lists are given manually
+            args.auto_direction = False
 
-    if args.iterative:
-        # Only compress when flag is enabled, and when not performing iterative enumeration.
-        # Iterative enumeration performs compression after the iteration steps.
-        args.compress = False
+        if args.iterative:
+            # Only compress when flag is enabled, and when not performing iterative enumeration.
+            # Iterative enumeration performs compression after the iteration steps.
+            args.compress = False
 
-    model_path = args.model_path
+        model_path = args.model_path
 
     if args.compare or args.direct:
-        network = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite,
-                                             determine_inputs_outputs=args.auto_direction,
-                                             skip_external_reactions=True)
+        with HiddenPrints():
+            network = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite,
+                                                 determine_inputs_outputs=args.auto_direction,
+                                                 skip_external_reactions=True)
 
-        debug_tags = []
-        # add_debug_tags(network)
+            debug_tags = []
+            # add_debug_tags(network)
 
-        adj = get_metabolite_adjacency(network.N)
+            adj = get_metabolite_adjacency(network.N)
 
-        if not args.auto_direction:
-            set_inoutputs(args.inputs, args.outputs, network)
+            if not args.auto_direction:
+                set_inoutputs(args.inputs, args.outputs, network)
 
-        if args.hide:
-            hide_indices = [int(index) for index in args.hide.split(',') if len(index)]
-            network.hide(hide_indices)
+            if args.hide:
+                hide_indices = [int(index) for index in args.hide.split(',') if len(index)]
+                network.hide(hide_indices)
 
-        if args.print_reactions:
-            mpi_print('Reactions%s:' % (' before compression' if args.compress else ''))
-            for index, item in enumerate(network.reactions):
-                mpi_print(index, item.id, item.name, 'reversible' if item.reversible else 'irreversible')
+            if args.print_reactions:
+                mpi_print('Reactions%s:' % (' before compression' if args.compress else ''))
+                for index, item in enumerate(network.reactions):
+                    mpi_print(index, item.id, item.name, 'reversible' if item.reversible else 'irreversible')
 
-        if args.print_metabolites:
-            mpi_print('Metabolites%s:' % (' before compression' if args.compress else ''))
-            for index, item in enumerate(network.metabolites):
-                print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
+            if args.print_metabolites:
+                mpi_print('Metabolites%s:' % (' before compression' if args.compress else ''))
+                for index, item in enumerate(network.metabolites):
+                    print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
 
-        orig_ids = [m.id for m in network.metabolites]
-        orig_N = network.N
+            orig_ids = [m.id for m in network.metabolites]
+            orig_N = network.N
 
-        # for i, r in enumerate(network.reactions):
-        #     mpi_print("\n%s:" % (r.id))
-        #     for j in range(len(network.N[:, i])):
-        #         nr = network.N[j, i];
-        #         if nr != 0:
-        #             mpi_print("%s: %d" % (network.metabolites[j].id, nr))
+            # for i, r in enumerate(network.reactions):
+            #     mpi_print("\n%s:" % (r.id))
+            #     for j in range(len(network.N[:, i])):
+            #         nr = network.N[j, i];
+            #         if nr != 0:
+            #             mpi_print("%s: %d" % (network.metabolites[j].id, nr))
 
-        if not args.only_rays:
-            network.split_in_out()
+            if not args.only_rays:
+                network.split_in_out()
 
-        if args.compress:
-            network.compress(verbose=args.verbose, SCEI=args.scei)
+            if args.compress:
+                network.compress(verbose=args.verbose, SCEI=args.scei)
 
-        removed = 0
-        for i in np.flip(range(network.N.shape[0]), 0):
-            if sum(abs(network.N[i])) == 0:
-                network.drop_metabolites([i], force_external=True)
-                removed += 1
-        mpi_print("Removed %d metabolites that were not in any reactions" % removed)
+            removed = 0
+            for i in np.flip(range(network.N.shape[0]), 0):
+                if sum(abs(network.N[i])) == 0:
+                    network.drop_metabolites([i], force_external=True)
+                    removed += 1
+            mpi_print("Removed %d metabolites that were not in any reactions" % removed)
 
-        network.split_reversible()
-        network.N = np.transpose(redund(np.transpose(network.N)))
-        R, network = remove_cycles(network.N, network)
-        R = network.N
-        # TODO: Make this cleaner
-        # After this we do not use network.reactions anymore? I will now delete any superfluous reaction in network.
-        # This is needed for the next compression to work.
-        n_reac_according_to_N = network.N.shape[1]
-        removable_reacs = np.arange(n_reac_according_to_N, len(network.reactions))
-        network.drop_reactions(removable_reacs)
-        network = compress_after_cycle_removing(network)
-        R = network.N
+            network.split_reversible()
+            network.N = np.transpose(redund(np.transpose(network.N)))
 
-        external = np.asarray(network.external_metabolite_indices())
-        internal = np.setdiff1d(range(R.shape[0]), external)
+            R, network = remove_cycles(network.N, network)
+            R = network.N
+            # TODO: Make this cleaner
+            # After this we do not use network.reactions anymore? I will now delete any superfluous reaction in network.
+            # This is needed for the next compression to work.
+            n_reac_according_to_N = network.N.shape[1]
+            removable_reacs = np.arange(n_reac_according_to_N, len(network.reactions))
+            network.drop_reactions(removable_reacs)
+            network = compress_after_cycle_removing(network)
+            R = network.N
+
+            external = np.asarray(network.external_metabolite_indices())
+            internal = np.setdiff1d(range(R.shape[0]), external)
+
         T_intersected, ids = intersect_directly(R, internal, network, verbose=args.verbose, lps_per_job=args.job_size)
 
         print_ecms_direct(T_intersected, ids)
