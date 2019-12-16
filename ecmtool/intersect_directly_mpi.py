@@ -313,11 +313,11 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, v
         col = R[:, z]
         next_matrix.append(col)
 
+    nr_adjacent = 0
     if calculate_adjacency:
         adj = geometric_ray_adjacency(R, plus=plus, minus=minus, verbose=verbose,
                                       remove_cycles=True, lps_per_job=lps_per_job)
         # combine + and - if adjacent
-        nr_adjacent = 0
         for (p, m) in adj:
             nr_adjacent += 1
             rp = R[met, p]
@@ -657,7 +657,7 @@ def add_second_ray(A, B_plus_inv, basis_p, p, m):
 
     # Faster, but doesnt work (get singular matrix)
     x = np.dot(B_plus_inv, A[:, m])
-    x[np.where(basis_p == p)[0][0]] = 0  # dont select p for replacement in basis
+    x[np.where(basis_p == p)[0][0]] = 0  # exclude p for replacement in basis
     res[np.argmax(abs(x))] = m
     return res
 
@@ -742,7 +742,7 @@ def get_bases(A, plus, minus):
     return bases
 
 
-def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, verbose=True, remove_cycles=True,
+def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose=True, remove_cycles=True,
                             lps_per_job=1):
     """
     Returns r by r adjacency matrix of rays, given
@@ -756,49 +756,52 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, verbose=True, re
     """
     start = time()
 
-    R_normalized = normalize_columns(np.array(R, dtype='float'))
-    R_indep = independent_rows(R_normalized)
+    matrix_normalized = normalize_columns(np.array(ray_matrix, dtype='float'))
+    matrix_indep_rows = independent_rows(matrix_normalized)
 
     # set default plus and minus
     if len(plus) > 0 and plus[0] == -1:
-        plus = [x for x in range(R_indep.shape[1])]
+        plus = [x for x in range(matrix_indep_rows.shape[1])]
     if len(minus) > 0 and minus[0] == -1:
-        minus = [x for x in range(R_indep.shape[1])]
-
-    number_rays = R_indep.shape[1]
-
-    bases = get_bases(R_indep, plus, minus)
+        minus = [x for x in range(matrix_indep_rows.shape[1])]
 
     comm = MPI.COMM_WORLD
     mpi_size = comm.Get_size()
     mpi_rank = comm.Get_rank()
 
-    pairs = np.array([(i, j, ind_p, ind_m) for ind_p, i in enumerate(plus) for ind_m, j in enumerate(minus)])
-    # split_indices = [i for i in range(1, len(pairs)) if i % lps_per_job == 0]
-    # split_pairs = np.split(pairs, split_indices)
-    # q = 1000
-    # split_indices = [i for i in range(1, len(split_pairs)) if i % (q / lps_per_job) == 0]
-    # report_unit = np.split(split_pairs, split_indices)
     adjacency = []
-    start_time = time()
     nr_tests = len(plus) * len(minus)
-    for i in range(mpi_rank, len(plus) * len(minus), mpi_size):
-        plus_index = i % len(plus)
-        minus_index = i // len(plus)
-        basis = bases[plus_index, minus_index]
-        res = determine_adjacency(R_indep, plus[plus_index], minus[minus_index], basis)
-        if res == 1:
-            adjacency.append((plus[plus_index], minus[minus_index]))
-        if i % 100 == 0:
-            mpi_print("Process %d is now on adjacency test %d" % (mpi_rank, i))
-    # for (index, pair) in enumerate(pairs):
-    #     if index % mpi_size == mpi_rank:
-    #         basis = bases[pair[2], pair[3]]
-    #         res = determine_adjacency(R_indep, pair[0], pair[1], basis)
-    #         if res == 1:
-    #             adjacency.append((pair[0], pair[1]))
-    #         if mpi_rank == 0 and index % 100 == 0:
-    #             mpi_print("Process 0 is now on adjacency test %d" % index)
+
+    # first find any column basis of R_indep
+    start_basis = get_start_basis(matrix_indep_rows)
+    start_basis_inv = np.linalg.inv(matrix_indep_rows[:, start_basis])
+    for i, p in enumerate(plus):
+        # add the plus ray into the basis
+        plus_basis = add_first_ray(matrix_indep_rows, start_basis_inv, start_basis, p)
+        plus_basis_inv = np.linalg.inv(matrix_indep_rows[:, plus_basis])
+
+        for j, m in enumerate(minus):
+            # add the minus ray into the basis
+            plus_minus_basis = add_second_ray(matrix_indep_rows, plus_basis_inv, plus_basis, p, m)
+
+            res = determine_adjacency(matrix_indep_rows, p, m, plus_minus_basis)
+            if res == 1:
+                adjacency.append((p, m))
+
+            it = j + len(minus) * i
+            if it % 100 == 0:
+                mpi_print("Process %d is on adjacency test %d of %d (%f %%)" % (mpi_rank, it, nr_tests, i/nr_tests*100))
+
+    # bases = get_bases(matrix_indep_rows, plus, minus)
+    # for i in range(mpi_rank, nr_tests, mpi_size):
+    #     plus_index = i // len(minus)
+    #     minus_index = i % len(minus)
+    #     basis = bases[plus_index, minus_index]
+    #     res = determine_adjacency(matrix_indep_rows, plus[plus_index], minus[minus_index], basis)
+    #     if res == 1:
+    #         adjacency.append((plus[plus_index], minus[minus_index]))
+    #     if i % 100 == 0:
+    #         mpi_print("Process %d is now on adjacency test %d" % (mpi_rank, i))
 
     # MPI communication step
     adj_sets = comm.allgather(adjacency)
@@ -808,7 +811,7 @@ def geometric_ray_adjacency(R, plus=[-1], minus=[-1], tol=1e-3, verbose=True, re
     adjacency.sort()
 
     end = time()
-    mpi_print("Did LPs in %f seconds" % (end - start_time))
+    mpi_print("Did LPs in %f seconds" % (end - start))
     return adjacency
 
 
