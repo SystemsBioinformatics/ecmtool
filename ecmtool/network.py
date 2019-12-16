@@ -130,7 +130,8 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
         external_metabolites = list(zip(*cbmpy.CBTools.findDeadEndMetabolites(cbmpy_model)))[0]
 
     # Catch any metabolites that were not recognised automatically, but are likely external
-    external_metabolites = [item.id for item in species if item.compartment == external_compartment]
+    external_metabolites = list(external_metabolites) + [item.id for item in species if item.compartment == external_compartment]
+    # external_metabolites = [item.id for item in species if item.compartment == external_compartment]
 
     network = Network()
     network.metabolites = [Metabolite(item.id, item.name, item.compartment, item.id in external_metabolites) for item in species]
