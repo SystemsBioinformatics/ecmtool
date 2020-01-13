@@ -27,15 +27,15 @@ def print_ecms_direct(R, metabolite_ids):
         obj_id = metabolite_ids.index("objective_out")
 
     mpi_print("\n--%d ECMs found by intersecting directly--\n" % R.shape[1])
-    # for i in range(R.shape[1]):
-    #     mpi_print("ECM #%d:" % i)
-    #     div = 1
-    #     if obj_id != -1 and R[obj_id][i] != 0:
-    #         div = R[obj_id][i]
-    #     for j in range(R.shape[0]):
-    #         if R[j][i] != 0:
-    #             mpi_print("%s: %f" % (metabolite_ids[j].replace("_in", "").replace("_out", ""), float(R[j][i]) / div))
-    #     mpi_print("")
+    for i in range(R.shape[1]):
+        mpi_print("ECM #%d:" % i)
+        div = 1
+        if obj_id != -1 and R[obj_id][i] != 0:
+            div = R[obj_id][i]
+        for j in range(R.shape[0]):
+            if R[j][i] != 0:
+                mpi_print("%s: %f" % (metabolite_ids[j].replace("_in", "").replace("_out", ""), float(R[j][i]) / div))
+        mpi_print("")
 
 
 def get_more_basis_columns(A, basis):
@@ -259,6 +259,7 @@ def cancel_with_cycle(R, met, cycle_ind, network, removable_reactions, verbose=T
     next_R = np.delete(next_R, to_be_dropped, axis=1)
 
     removable_reactions.append(to_be_dropped)
+    network.drop_reactions(to_be_dropped)
     # delete all-zero row
     next_R = np.delete(next_R, met, 0)
     network.drop_metabolites([met])
@@ -499,8 +500,8 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
     R = np.transpose(R)
 
     network.N = R
-    network.drop_reactions(removable_reactions)
-    network.drop_metabolites(removable_metabolites)
+    # network.drop_reactions(removable_reactions)
+    # network.drop_metabolites(removable_metabolites)
     R = network.N
 
     return R, network
@@ -790,7 +791,7 @@ def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose
 
             it = j + len(minus) * i
             if it % 100 == 0:
-                mpi_print("Process %d is on adjacency test %d of %d (%f %%)" % (mpi_rank, it, nr_tests, i/nr_tests*100))
+                mpi_print("Process %d is on adjacency test %d of %d (%f %%)" % (mpi_rank, it, nr_tests, it/nr_tests*100))
 
     # bases = get_bases(matrix_indep_rows, plus, minus)
     # for i in range(mpi_rank, nr_tests, mpi_size):

@@ -1,4 +1,7 @@
 from setuptools import setup
+import numpy as np
+from distutils.extension import Extension
+from Cython.Build import cythonize
 
 setup(
     name='ecmtool',
@@ -12,6 +15,8 @@ setup(
                       'pycddlib',
                       'psutil',
                       'sklearn'],
+    ext_modules=cythonize(Extension("bglu_dense", ["ecmtool/_bglu_dense.pyx"], include_dirs=[np.get_include()])),
+    include_dirs=[np.get_include()],
     url='https://github.com/tjclement/ecmtool',
     license='MIT',
     author='Tom Clement',
