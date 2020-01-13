@@ -125,16 +125,13 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     reactions = cbmpy_model.reactions
     objective_reaction_column = None
     pairs = cbmpy.CBTools.findDeadEndReactions(cbmpy_model)
-    external_metabolites, external_reactions = list(zip(*pairs)) if len(pairs) else ([], [])
-    if not len(pairs) and len(list(zip(*cbmpy.CBTools.findDeadEndMetabolites(cbmpy_model)))):
-        external_metabolites = list(zip(*cbmpy.CBTools.findDeadEndMetabolites(cbmpy_model)))[0]
+    external_metabolites, external_reactions = list(zip(*pairs)) if len(pairs) else (list(zip(*cbmpy.CBTools.findDeadEndMetabolites(cbmpy_model)))[0], [])
 
     # Catch any metabolites that were not recognised automatically, but are likely external
     external_metabolites = list(external_metabolites) + [item.id for item in species if item.compartment == external_compartment]
-    # external_metabolites = [item.id for item in species if item.compartment == external_compartment]
 
     network = Network()
-    network.metabolites = [Metabolite(item.id, item.name, item.compartment, item.id in external_metabolites) for item in species]
+    network.metabolites = [Metabolite(item.id, item.name, item.compartment, item.compartment == external_compartment) for item in species]
 
     if add_objective:
         objective_name = cbmpy_model.getActiveObjective().fluxObjectives[0].reaction
@@ -158,15 +155,17 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
 
             if reaction.reversible:
                 # Check if the reaction is truly bidirectional
-                if lowerBound.value == 0 or upperBound.value == 0:
+                if (lowerBound is not None and lowerBound.value == 0) or \
+                        (upperBound is not None and upperBound.value == 0):
                     reaction.reversible = False
                 else:
                     # Reversible reactions are both inputs and outputs, so don't mark as either
                     continue
 
-                if upperBound.value == 0 and lowerBound.value < 0:
-                    # Reaction can only happen in reverse
-                    mpi_print('Swapping direction of reversible reaction %s that can only run in reverse direction.' % reaction_id)
+                if lowerBound.value < 0 and upperBound.value == 0:
+                    # Direction of model is inverted (substrates are products and vice versa. This happens sometimes,
+                    # e.g. https://github.com/SBRG/bigg_models/issues/324
+                    print('Swapping direction of reversible reaction %s that can only run in reverse direction.' % reaction_id)
                     stoichiometry *= -1
                     reagents = cbmpy_model.getReaction(reaction_id).reagents
                     for met in reagents:
@@ -209,10 +208,6 @@ def add_debug_tags(network, reactions=[]):
                                               compartment='e', is_external=True,
                                               direction='both' if network.reactions[reaction].reversible else 'output'))
     network.N = np.append(network.N, np.identity(len(network.reactions))[reactions, :], axis=0)
-
-
-
-
 
 class Reaction:
     id = ''
@@ -597,6 +592,34 @@ class Network:
         if len(self.metabolites):
             self.metabolites = [self.metabolites[index] for index in metabolites_to_keep]
 
+    def add_metabolite(self, id, name, compartment='c', is_external=False, direction='both'):
+        self.metabolites.append(Metabolite(id, name, compartment, is_external, direction))
+        new_row = [0] * self.N.shape[1]
+        self.N = np.append(self.N, [new_row], axis=0)
+
+    def get_or_create_hide_metabolites(self):
+        """
+        Returns the metabolite indices of the two virtual "empty" metabolites that
+        hidden metabolites get sourced from and sink into. If none exist yet, this
+        method creates them before returning.
+        :return: Tuple of metabolite indices as (source, sink)
+        """
+        source, sink = None, None
+        for i, metabolite in enumerate(self.metabolites):
+            if metabolite.id == 'hidden_source':
+                source = i
+            elif metabolite.id == 'hidden_sink':
+                sink = i
+
+        if source is None:
+            self.add_metabolite('hidden_source', 'Hidden metabolite source', 'e', True, 'input')
+            source = self.N.shape[0] - 1
+        if sink is None:
+            self.add_metabolite('hidden_sink', 'Hidden metabolite sink', 'e', True, 'output')
+            sink = self.N.shape[0] - 1
+
+        return source, sink
+
     def hide(self, metabolite_indices):
         """
         Hides external metabolites by transforming them into internal metabolites through the
@@ -604,15 +627,24 @@ class Network:
         :param metabolite_indices: list of metabolite indices
         :return:
         """
+        source, sink = self.get_or_create_hide_metabolites()
         for index in metabolite_indices:
             self.metabolites[index].is_external = False
-            reaction_name = 'R_HIDDEN_EX_%s' % self.metabolites[index].id
-            reversible = self.metabolites[index].direction == 'both'
+            column = to_fractions(np.zeros(shape=(self.N.shape[0], 1)))
 
-            self.reactions.append(Reaction(reaction_name, reaction_name, reversible=reversible))
-            row = to_fractions(np.zeros(shape=(self.N.shape[0], 1)))
-            row[index, 0] += -1 if self.metabolites[index].direction == 'output' else 1
-            self.N = np.append(self.N, row, axis=1)
+            if self.metabolites[index].direction in ['output', 'both']:
+                reaction_name = 'R_HIDDEN_EX_OUT_%s' % self.metabolites[index].id
+                self.reactions.append(Reaction(reaction_name, reaction_name, reversible=False))
+                column[index, 0] = -1
+                # column[sink, 0] = 1
+                self.N = np.append(self.N, column, axis=1)
+            elif self.metabolites[index].direction in ['input', 'both']:
+                reaction_name = 'R_HIDDEN_EX_IN_%s' % self.metabolites[index].id
+                self.reactions.append(Reaction(reaction_name, reaction_name, reversible=False))
+                column[index, 0] = 1
+                # column[source, 0] = -1
+                self.N = np.append(self.N, column, axis=1)
+
 
     def remove_objective_reaction(self):
         reaction_matches = [index for index, reaction in enumerate(self.reactions) if reaction.id == self.objective_reaction_id]

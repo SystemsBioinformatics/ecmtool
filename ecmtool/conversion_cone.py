@@ -243,7 +243,6 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
 
 
     # Merge bidirectional metabolites again, and drop duplicate rows
-    # np.unique() requires non-object matrices, so here we cast our results into float64.
     if not only_rays:
         rays_inflated[:, in_out_metabolites] = np.subtract(rays_inflated[:, in_out_metabolites], rays_inflated[:, G.shape[1]:])
     rays_merged = np.asarray(rays_inflated[:, :G.shape[1]], dtype='object')

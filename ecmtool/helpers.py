@@ -7,17 +7,11 @@ from subprocess import check_call, STDOUT, PIPE
 from os import remove, devnull as os_devnull, system
 
 import cdd
-import sympy
 import numpy as np
 from random import randint
 
 from numpy.linalg import svd
-from numpy.linalg.linalg import LinAlgError
 from sympy import Matrix
-from scipy.optimize import linprog
-from time import time
-
-from mpi4py import MPI
 
 
 def relative_path(file_path):
@@ -252,21 +246,32 @@ def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
 #     return x
 
 def get_efms(N, reversibility, verbose=True):
-    import matlab.engine
-    engine = matlab.engine.start_matlab()
-    engine.cd(relative_path('efmtool'))
-    result = engine.CalculateFluxModes(matlab.double([list(row) for row in N]), matlab.logical(reversibility))
-    if verbose:
-        print('Fetching calculated EFMs')
-    size = result['efms'].size
-    efms_T = np.reshape(np.array(result['efms']._data), size)
-    if verbose:
-        print('Turning calculated EFMs into fractions')
-    # efms = to_fractions(np.transpose(efms_T))
-    efms = np.transpose(efms_T)
-    if verbose:
-        print('Finishing fetching calculated EFMs')
-    return efms
+   import matlab.engine
+   engine = matlab.engine.start_matlab()
+   engine.cd(relative_path('efmtool'))
+   result = engine.CalculateFluxModes(matlab.double([list(row) for row in N]), matlab.logical(reversibility))
+   if verbose:
+       print('Fetching calculated EFMs')
+   size = result['efms'].size
+   shape = size[1], size[0] # _data is in transposed form w.r.t. the result matrix
+   efms = np.reshape(np.array(result['efms']._data), shape)
+   if verbose:
+       print('Finishing fetching calculated EFMs')
+   return efms
+
+# def get_efms(N, reversibility, verbose=True):
+#     N_ex = N
+#     n_reactions = N.shape[1]
+#     for index,rev in enumerate(reversibility):
+#         N_ex = np.append(N_ex, np.transpose([-N[:,index]]), axis=1)
+#     efms_redund = nullspace(N_ex, symbolic=True)
+#     efms = efms_redund
+#     i = 0
+#     for index,rev in enumerate(reversibility):
+#         if rev:
+#             efms[:, index] -= efms[:, n_reactions+i]
+#             i += 1
+#     return efms[:, :n_reactions]
 
 
 def get_extreme_rays_cdd(inequality_matrix):
@@ -387,11 +392,10 @@ def get_redund_binary():
 
 
 def redund(matrix, verbose=False):
-    rank = str(MPI.COMM_WORLD.Get_rank())
     matrix = to_fractions(matrix)
     binary = get_redund_binary()
-    matrix_path = relative_path('tmp' + os.sep + 'matrix' + rank + '.ine')
-    matrix_nonredundant_path = relative_path('tmp' + os.sep + 'matrix_nored' + rank + '.ine')
+    matrix_path = relative_path('tmp' + os.sep + 'matrix.ine')
+    matrix_nonredundant_path = relative_path('tmp' + os.sep + 'matrix_nored.ine')
 
     if matrix.shape[0] <= 1:
         return matrix
