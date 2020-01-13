@@ -630,19 +630,21 @@ class Network:
         source, sink = self.get_or_create_hide_metabolites()
         for index in metabolite_indices:
             self.metabolites[index].is_external = False
-            column = to_fractions(np.zeros(shape=(self.N.shape[0], 1)))
 
+            column = to_fractions(np.zeros(shape=(self.N.shape[0], 1)))
             if self.metabolites[index].direction in ['output', 'both']:
                 reaction_name = 'R_HIDDEN_EX_OUT_%s' % self.metabolites[index].id
                 self.reactions.append(Reaction(reaction_name, reaction_name, reversible=False))
                 column[index, 0] = -1
                 # column[sink, 0] = 1
                 self.N = np.append(self.N, column, axis=1)
-            elif self.metabolites[index].direction in ['input', 'both']:
+
+            column = to_fractions(np.zeros(shape=(self.N.shape[0], 1)))
+            if self.metabolites[index].direction in ['input', 'both']:
                 reaction_name = 'R_HIDDEN_EX_IN_%s' % self.metabolites[index].id
                 self.reactions.append(Reaction(reaction_name, reaction_name, reversible=False))
                 column[index, 0] = 1
-                # column[source, 0] = -1
+                column[source, 0] = -1
                 self.N = np.append(self.N, column, axis=1)
 
 
