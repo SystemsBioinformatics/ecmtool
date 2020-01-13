@@ -6,7 +6,7 @@ from sklearn.preprocessing import normalize
 
 from ecmtool.helpers import get_efms, get_metabolite_adjacency, redund
 from ecmtool.network import extract_sbml_stoichiometry
-from ecmtool.conversion_cone import get_conversion_cone, iterative_conversion_cone, unique
+from ecmtool.conversion_cone import get_extreme_rays, get_conversion_cone, iterative_conversion_cone, unique
 
 
 def str2bool(v):
@@ -16,6 +16,13 @@ def str2bool(v):
         return False
     else:
         raise ArgumentTypeError('Boolean value expected.')
+
+
+def ecm_satisfies_stoichiometry(stoichiometry, ecm):
+    allowed_error = 10 ** -6
+    solution = linprog(c=[0] * stoichiometry.shape[1], A_eq=stoichiometry, b_eq=ecm,
+                       bounds=[(-1000, 1000)] * stoichiometry.shape[1], options={'tol': allowed_error})
+    return solution.status == 0
 
 
 def print_ECMs(cone, debug_tags, network, orig_N, add_objective_metabolite, check_feasibility):
@@ -28,17 +35,14 @@ def print_ECMs(cone, debug_tags, network, orig_N, add_objective_metabolite, chec
 
         metabolite_ids = [met.id for met in network.metabolites] if not network.compressed else network.uncompressed_metabolite_ids
 
-        print('\nECM #%d:' % index)
+        print('\nECM #%d:' % (index+1))
         for metabolite_index, stoichiometry_val in enumerate(ecm):
             if stoichiometry_val != 0.0:
                 print('%s\t\t->\t%.4f' % (metabolite_ids[metabolite_index], stoichiometry_val))
 
         if check_feasibility:
-            allowed_error = 10**-6
-            solution = linprog(c=[0] * orig_N.shape[1], A_eq=orig_N, b_eq=cone[index, :],
-                               bounds=[(-1000, 1000)] * orig_N.shape[1], options={'tol': allowed_error})
-            print('ECM satisfies stoichiometry' if solution.status == 0 else 'ECM does not satisfy stoichiometry')
-
+            satisfied = ecm_satisfies_stoichiometry(orig_N, cone[index, :])
+            print('ECM satisfies stoichiometry' if satisfied else 'ECM does not satisfy stoichiometry')
 
 def remove_close_vectors(matrix, threshold=10**-6, verbose=True):
     i = 0
@@ -79,8 +83,51 @@ def find_matching_vector_indices(vector, matrix, near=True, threshold=10 ** -6, 
     return matching_indices
 
 
+def vectors_in_cone(vector_matrix, cone_matrix, network, verbose=True):
+    cone_trans = cone_matrix.transpose()
+    in_cone = True
+    for index, vector in enumerate(vector_matrix):
+        if verbose:
+            print('Checking %d/%d' % (index+1, len(vector_matrix)))
+
+        allowed_error = 10 ** -6
+        solution = linprog(c=[1] * cone_trans.shape[1], A_eq=cone_trans, b_eq=vector,
+                           bounds=[(0, 1000)] * cone_trans.shape[1], options={'tol': allowed_error})
+        if solution.status != 0:
+            print('EFM conversion does not fit inside conversion cone:')
+            for metabolite_index, stoichiometry_val in enumerate(vector):
+                if stoichiometry_val != 0.0:
+                    print('%d %s\t\t->\t%.4f' % (
+                    metabolite_index, network.metabolites[metabolite_index].id, stoichiometry_val))
+            in_cone = False
+        elif verbose:
+            print('Support: ' + str([index for index,_ in enumerate(solution['x']) if abs(solution['x'][index]) > 1e-6]))
+
+    return in_cone
+
+
+# def vectors_in_cone(vector_matrix, cone_matrix, network, verbose=True):
+#     cone_trans = cone_matrix.transpose()
+#     in_cone = True
+#     for index, vector in enumerate(vector_matrix):
+#         if verbose:
+#             print('Checking %d/%d' % (index+1, len(vector_matrix)))
+#
+#         matches = find_matching_vector_indices(vector, cone_matrix, near=True)
+#         if len(matches) != 0:
+#             print('EFM conversion does not fit inside conversion cone:')
+#             for metabolite_index, stoichiometry_val in enumerate(vector):
+#                 if stoichiometry_val != 0.0:
+#                     print('%d %s\t\t->\t%.4f' % (
+#                     metabolite_index, network.metabolites[metabolite_index].id, stoichiometry_val))
+#             in_cone = False
+#         elif verbose:
+#             print('Support: ' + str([index for index,_ in enumerate(solution['x']) if abs(solution['x'][index]) > 1e-6]))
+#
+#     return in_cone
+
+
 def check_bijection(conversion_cone, network, model_path, args, verbose=True):
-    # Add exchange reactions because EFMtool needs them
     full_model = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite,
                                             determine_inputs_outputs=args.auto_direction,
                                             skip_external_reactions=True)
@@ -91,30 +138,50 @@ def check_bijection(conversion_cone, network, model_path, args, verbose=True):
     identity = np.identity(len(full_model.metabolites))
     reversibilities = [reaction.reversible for reaction in full_model.reactions]
 
+    # Add exchange reactions so efmtool can calculate EFMs in steady state
+    n_exchanges = 0
     for index, metabolite in enumerate(full_model.metabolites):
         if metabolite.is_external:
             reaction = identity[:, index] if metabolite.direction != 'output' else -identity[index]
             ex_N = np.append(ex_N, np.transpose([reaction]), axis=1)
             reversibilities.append(True if metabolite.direction == 'both' else False)
+            n_exchanges += 1
 
     efms = get_efms(ex_N, reversibilities)
     if verbose:
         print('Calculating ECMs from EFMs')
-    efm_ecms = np.transpose(np.dot(np.asarray(ex_N, dtype='float'), np.transpose(efms)))
+
+    # Remove exchange reactions again from EFMs
+    efms = efms[:,:-n_exchanges]
+    efm_ecms = np.transpose(np.dot(np.asarray(full_model.N, dtype='object'), np.transpose(efms)))
     if verbose:
         print('Removing non-unique ECMs')
-    efm_ecms_normalised = normalize(efm_ecms, axis=1)
-    efm_ecms_normalised = remove_close_vectors(efm_ecms_normalised)
+    efm_ecms_rounded = efm_ecms.round(decimals=6)
+    efm_ecms_normalised = normalize(efm_ecms_rounded, axis=1)
     efm_ecms_unique = unique(efm_ecms_normalised)
-    efm_ecms_unique = redund(efm_ecms_unique)
+    # efm_ecms_unique = redund(efm_ecms_unique)
 
     ecmtool_ecms_normalised = normalize(conversion_cone, axis=1)
 
     if verbose:
         print('Found %d efmtool-calculated ECMs, and %d ecmtool ones' % (len(efm_ecms_unique), len(ecmtool_ecms_normalised)))
-        print('Checking bijection')
 
     is_bijection = True
+
+    # if verbose:
+    #     print('Checking if efmtool ECMs satisfy stoichiometry')
+    #
+    # for index, ecm in enumerate(efm_ecms_unique):
+    #     if verbose:
+    #         print('Checking %d/%d' % (index+1, len(efm_ecms_unique)))
+    #     if not ecm_satisfies_stoichiometry(full_model.N, ecm):
+    #         print('efmtool ECM does not satisfy stoichiometry')
+
+    if verbose:
+        print('Checking bijection')
+
+    if not vectors_in_cone(efm_ecms_unique, ecmtool_ecms_normalised, full_model, verbose):
+        print('Calculated ECMs do not agree with EFM conversions')
 
     for index, ecm in enumerate(efm_ecms_unique):
         if verbose:
@@ -126,7 +193,7 @@ def check_bijection(conversion_cone, network, model_path, args, verbose=True):
             for metabolite_index, stoichiometry_val in enumerate(ecm):
                 if stoichiometry_val != 0.0:
                     print('%d %s\t\t->\t%.4f' % (
-                    metabolite_index, network.uncompressed_metabolite_names[metabolite_index], stoichiometry_val))
+                    metabolite_index, network.uncompressed_metabolite_ids[metabolite_index], stoichiometry_val))
 
     for index, ecm in enumerate(ecmtool_ecms_normalised):
         if verbose:
@@ -167,6 +234,7 @@ if __name__ == '__main__':
     parser.add_argument('--check_bijection', type=str2bool, default=False, help='Verify completeness of found ECMs by calculating ECMs from EFMs and proving bijection (don\'t use on large networks) (default: false)')
     parser.add_argument('--print_metabolites', type=str2bool, default=True, help='Print the names and IDs of metabolites in the (compressed) metabolic network (default: true)')
     parser.add_argument('--print_reactions', type=str2bool, default=True, help='Print the names and IDs of reactions in the (compressed) metabolic network (default: true)')
+    parser.add_argument('--print_conversions', type=str2bool, default=True, help='Print the calculated conversion modes (default: true)')
     parser.add_argument('--auto_direction', type=str2bool, default=True, help='Automatically determine external metabolites that can only be consumed or produced (default: true)')
     parser.add_argument('--inputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be consumed')
     parser.add_argument('--outputs', type=str, default='', help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be produced')
@@ -242,7 +310,8 @@ if __name__ == '__main__':
 
     np.savetxt(args.out_path, cone, delimiter=',')
 
-    print_ECMs(cone, debug_tags, network, orig_N, args.add_objective_metabolite, args.check_feasibility)
+    if args.print_conversions:
+        print_ECMs(cone, debug_tags, network, orig_N, args.add_objective_metabolite, args.check_feasibility)
 
     if args.check_bijection:
         check_bijection(cone, network, model_path, args)
