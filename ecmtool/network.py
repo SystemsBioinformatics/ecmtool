@@ -627,7 +627,7 @@ class Network:
         :param metabolite_indices: list of metabolite indices
         :return:
         """
-        source, sink = self.get_or_create_hide_metabolites()
+        # source, sink = self.get_or_create_hide_metabolites()
         for index in metabolite_indices:
             self.metabolites[index].is_external = False
 
@@ -644,7 +644,7 @@ class Network:
                 reaction_name = 'R_HIDDEN_EX_IN_%s' % self.metabolites[index].id
                 self.reactions.append(Reaction(reaction_name, reaction_name, reversible=False))
                 column[index, 0] = 1
-                column[source, 0] = -1
+                # column[source, 0] = -1
                 self.N = np.append(self.N, column, axis=1)
 
 
