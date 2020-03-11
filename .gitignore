@@ -1,2 +1,7 @@
 .idea
 build
+
+venv/bin/
+venv/
+venv/lib/python3.7/site-packages/__pycache__/
+
