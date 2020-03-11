@@ -735,7 +735,7 @@ class Network:
             if i > start_metabolites - 1: # dont re-split _in and _out virtual metabolites
                 break
             if metabolite.is_external:
-                if metabolite.direction == 'both' or metabolite.direction == 'input':
+                if metabolite.direction == 'both':
                     new_in = Metabolite(metabolite.id + "_in", metabolite.name + "_in", metabolite.compartment, is_external=True, direction = 'input')
                     self.metabolites.append(new_in)
                     exchange_in = Reaction(metabolite.id + " exch_in", metabolite.id + " exch_in", reversible=False)
@@ -747,7 +747,6 @@ class Network:
                     new_column[-1] = [int(-1)]
                     self.N = np.append(self.N, np.asarray(new_column), axis=1)
 
-                if metabolite.direction == 'both' or metabolite.direction == 'output':
                     new_out = Metabolite(metabolite.id + "_out", metabolite.name + "_out", metabolite.compartment, is_external=True, direction = 'output')
                     self.metabolites.append(new_out)
                     exchange_out = Reaction(metabolite.id + " exch_out", metabolite.id + " exch_out", reversible=False)
@@ -759,8 +758,9 @@ class Network:
                     new_column[-1] = [int(1)]
                     self.N = np.append(self.N, np.asarray(new_column), axis=1)
 
-                metabolite.is_external = False
-                metabolite.compartment = 'virtual'
-                count += 1
+                    metabolite.is_external = False
+                    metabolite.compartment = 'virtual'
+                    count += 1
+
         self.N = to_fractions(self.N)
         mpi_print("Split %d input/output external metabolites" % count)

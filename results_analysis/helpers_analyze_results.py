@@ -90,9 +90,13 @@ def check_bijection_csvs(ecms_first, ecms_second):
         print("Watch out. The second set of ECMs has duplicates")
 
     # Normalize both sets of ECMs
-    normalization_order = determine_normalization_order(ecms_first, network)
-    ecms_first = normalize_ECMS_Erik(ecms_first, network, normalization_order=normalization_order)
-    ecms_second = normalize_ECMS_Erik(ecms_second, network, normalization_order=normalization_order)
+    sum_columns_first = np.sum(np.abs(ecms_first), axis=0)
+    sum_columns_first = sum_columns_first[np.newaxis,:]
+    ecms_first = ecms_first / np.repeat(sum_columns_first, ecms_first.shape[0], axis=0)
+
+    sum_columns_second = np.sum(np.abs(ecms_second), axis=0)
+    sum_columns_second = sum_columns_second[np.newaxis,:]
+    ecms_second = ecms_second / np.repeat(sum_columns_second, ecms_second.shape[0], axis=0)
 
     found_match_ecms_first = [False] * n_ecms_first
     no_match_ecms_second = list(range(n_ecms_second))
