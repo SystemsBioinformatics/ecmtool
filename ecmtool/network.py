@@ -729,6 +729,8 @@ class Network:
 
     def split_in_out(self):
         # Add virtual input and output metabolites for external metabolites that are both input and output
+        # Add virtual input metabolites for input metabolites, to enforce that they can't be used as output
+        # Similar for output metabolites
         count = 0
         start_metabolites = len(self.metabolites)
         for i, metabolite in enumerate(self.metabolites):
