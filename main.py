@@ -376,7 +376,7 @@ if __name__ == '__main__':
 
         # save to file
         if MPI.COMM_WORLD.Get_rank() == 0:
-            np.savetxt(args.out_path, np.transpose(T_intersected), delimiter=',')
+            np.savetxt(args.out_path, np.transpose(T_intersected), delimiter=',', header=','.join(ids), comments='')
 
         end = time()
         mpi_print('Ran (direct) in %f seconds with %d processes' % (end - start, MPI.COMM_WORLD.Get_size()))
@@ -442,7 +442,6 @@ if __name__ == '__main__':
                                                           output_metabolites=network.output_metabolite_indices(),
                                                           verbose=args.verbose, only_rays=args.only_rays))
 
-        # TODO: Sort metabolites in alphabetic order first
         np.savetxt(args.out_path, cone, delimiter=',')
 
         print_ECMs(cone, debug_tags, network, orig_N, args.add_objective_metabolite, args.check_feasibility)

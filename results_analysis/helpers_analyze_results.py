@@ -64,12 +64,12 @@ def check_bijection_Erik(ecms_first, ecms_second, network):
     return bijection_YN, ecms_first_min_ecms_second, ecms_second_min_ecms_first
 
 
-def check_bijection_csvs(ecms_first, ecms_second):
+def check_bijection_csvs(ecms_first_df, ecms_second_df):
     """
-    :param ecms_first: np.array
-            Matrix with ecms as columns, metabolites as rows
-    :param ecms_second: np.array
-            Matrix with ecms as columns, metabolites as rows
+    :param ecms_first_df: DataFrame
+            Matrix with ecms as rows, metabolites as cols
+    :param ecms_second_df: DatFrame
+            Matrix with ecms as rows, metabolites as cols
     :return bijection_YN: Boolean
     :return ecms_second_min_ecms_first: np.array
             Matrix with as columns the ECMs that were in the second but not in the first set
@@ -77,12 +77,25 @@ def check_bijection_csvs(ecms_first, ecms_second):
             Matrix with as columns the ECMs that were in the first but not in the second set
     """
     # We first remove duplicates from both
+    metab_ids_first = list(ecms_first_df.columns)
+    metab_ids_second = list(ecms_second_df.columns)
+    ecms_first = np.transpose(ecms_first_df.values)
+    ecms_second = np.transpose(ecms_second_df.values)
     n_ecms_first_non_unique = ecms_first.shape[1]
     n_ecms_second_non_unique = ecms_second.shape[1]
     ecms_first = np.transpose(unique_Erik(np.transpose(ecms_first)))
     ecms_second = np.transpose(unique_Erik(np.transpose(ecms_second)))
     n_ecms_first = ecms_first.shape[1]
     n_ecms_second = ecms_second.shape[1]
+
+    # Find matching of metab_ids
+    matching_inds =np.zeros(len(metab_ids_first))
+    for id_ind, id in enumerate(metab_ids_first):
+        matching_inds[id_ind] = [id_ind_sec for id_ind_sec, id_sec in enumerate(metab_ids_second) if id_sec == id][0]
+
+    # Make sure that second ecms metabolites are in the same order
+    matching_inds = matching_inds.astype(int)
+    ecms_second = ecms_second[matching_inds, :]
 
     if n_ecms_first_non_unique - n_ecms_first > 0:
         print("Watch out. The first set of ECMs has duplicates")
@@ -107,7 +120,7 @@ def check_bijection_csvs(ecms_first, ecms_second):
         for index, ecm_second_ind in enumerate(no_match_ecms_second):
             ecm_second = ecms_second[:, ecm_second_ind]
 
-            if max(ecm_first - ecm_second) <= 10 ** -6:
+            if max(ecm_first - ecm_second) <= 10 ** -3:
                 found_match_ecms_first[ecm_first_ind] = True
                 del no_match_ecms_second[index]
                 break
