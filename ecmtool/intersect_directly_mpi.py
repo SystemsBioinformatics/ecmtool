@@ -871,12 +871,12 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12
     internal.sort()
     rows_removed_redund = 0
 
-    sorting = 'min_adj'  # Determine if we choose minimal adjacency, minimal_LP, or maximal_LP_per_adj
-    # sorting = 'min_lp'
-    # sorting = 'max_lp_per_adj'
-    # sorting = 'min_connections'
-
     while len(internal) > 0:
+        sorting = 'min_adj'  # Determine if we choose minimal adjacency, minimal_LP, or maximal_LP_per_adj
+        # sorting = 'min_lp'
+        # sorting = 'max_lp_per_adj'
+        # sorting = 'min_connections'
+        # TODO: Make the following cleaner
         # For each internal metabolite, calculate the number of producing reactions times the number of consuming
         # R[j-len(deleted[deleted<j]) is the current row for the metabolite that was once at the j-th place
         n_lps = [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0) for j in

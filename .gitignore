@@ -8,4 +8,22 @@ venv/lib/python3.7/site-packages/__pycache__/
 
 conversion_cone.csv
 
-*.csv
+results_analysis/test1.csv
+
+results_analysis/test2.csv
+
+results_analysis/KO8_new_inout_conversion_cone.csv
+
+results_analysis/models/iAB_RBC_283.xml
+
+results_analysis/models/e_coli_core_rounded.xml
+
+results_analysis/models/e_coli_core.xml
+
+results_analysis/models/active_subnetwork_KO_1.xml
+
+results_analysis/models/active_subnetwork_KO_0.xml
+
+results_analysis/KO8_old_inout_conversion_cone.csv
+
+*.pyc
