@@ -9,6 +9,8 @@ venv/lib/python3.7/site-packages/__pycache__/
 conversion_cone.csv
 
 results_analysis/test1.csv
+*.txt
+*.csv
 
 results_analysis/test2.csv
 
