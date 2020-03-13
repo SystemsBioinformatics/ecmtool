@@ -1,7 +1,26 @@
 from fractions import Fraction
-
+import os
 import numpy as np
 from ecmtool.helpers import to_fractions
+
+
+def relative_path(file_path):
+    return os.path.join(os.path.dirname(__file__), file_path)
+
+
+def get_efms(N, reversibility, verbose=True):
+   import matlab.engine
+   engine = matlab.engine.start_matlab()
+   engine.cd(relative_path('efmtool'))
+   result = engine.CalculateFluxModes(matlab.double([list(row) for row in N]), matlab.logical(reversibility))
+   if verbose:
+       print('Fetching calculated EFMs')
+   size = result['efms'].size
+   shape = size[1], size[0] # _data is in transposed form w.r.t. the result matrix
+   efms = np.reshape(np.array(result['efms']._data), shape)
+   if verbose:
+       print('Finishing fetching calculated EFMs')
+   return efms
 
 
 def check_bijection_Erik(ecms_first, ecms_second, network):
