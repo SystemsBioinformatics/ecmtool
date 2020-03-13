@@ -340,6 +340,7 @@ if __name__ == '__main__':
             #         if nr != 0:
             #             mpi_print("%s: %d" % (network.metabolites[j].id, nr))
 
+            # TODO: Change this, this should also partly be done when only_rays=True
             if not args.only_rays:
                 network.split_in_out()
 

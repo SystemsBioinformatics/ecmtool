@@ -874,13 +874,23 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12
     sorting = 'min_adj'  # Determine if we choose minimal adjacency, minimal_LP, or maximal_LP_per_adj
     # sorting = 'min_lp'
     # sorting = 'max_lp_per_adj'
+    # sorting = 'min_connections'
 
     while len(internal) > 0:
         # For each internal metabolite, calculate the number of producing reactions times the number of consuming
-        # R[j-len(deleted[deleted<j]) is the current row for the metabolite that was once at the jth place
-        i = internal[np.argmin(
-            [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0) for j in
-             internal])]
+        # R[j-len(deleted[deleted<j]) is the current row for the metabolite that was once at the j-th place
+        n_lps = [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0) for j in
+             internal]
+        i = internal[np.argmin(n_lps)]
+        if np.min(n_lps) == 0:
+            sorting = 'min_lp'
+
+        # Alternative way of choosing metabolite, choose the one that is minimally connected
+        connections = []
+        adj = get_metabolite_adjacency(R)
+        for met in internal:
+            curr_ind = met - len(deleted[deleted < met])
+            connections.append(int(np.sum(adj[:,curr_ind])))
 
         # Alternative way of choosing metabolite, choose the one that increases adjacencies the least
         adj_added = []
@@ -907,24 +917,29 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12
                  in min_adj_inds])]
         elif sorting == 'max_lp_per_adj':
             i = internal[np.argmax(lp_per_adj)]
+        elif sorting == 'min_connections':
+            min_connect_inds = np.array(internal)[np.where(connections == np.min(connections))[0]]
+            i = min_connect_inds[np.argmin(
+                [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0) for j
+                 in min_connect_inds])]
 
         # i - len(deleted[deleted<i] is the current row for the metabolite that was once at the ith place
         to_remove = i - len(deleted[deleted < i])
         if verbose:
             mpi_print("\n\nIteration %d (internal metabolite = %d: %s) of %d" % (
                 it, to_remove, [m.id for m in network.metabolites][to_remove], len(internal_metabolites)))
-            mpi_print("Possible LP amounts for this step:\n" + ", ".join(np.array(
-                [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0) for j
-                 in internal]).astype(str)))
-            mpi_print("Total: %d" % sum(
-                [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0) for j
-                 in internal]))
+            mpi_print("Possible LP amounts for this step:\n" + ", ".join(np.array(n_lps).astype(str)))
+            mpi_print("Total: %d" % sum(n_lps))
             mpi_print("Possible adjacencies added for this step:\n" + ", ".join(np.array(adj_added).astype(str)))
             mpi_print("Possible lps per adjacency added for this step:\n" + ", ".join(np.round(np.array(lp_per_adj),2).astype(str)))
+            mpi_print("Possible connectedness of metabolites for this sstep:\n" + ", ".join(
+                np.array(connections).astype(str)))
             if sorting == 'min_adj':
                 mpi_print("Minimal adjacency option chosen.\n")
             elif sorting == 'max_lp_per_adj':
                 mpi_print("Rescaled maximal LPs per added adjacency option chosen.\n")
+            elif sorting == 'min_connections':
+                mpi_print("Minimally connected option chosen.\n")
             else:
                 mpi_print("Minimal LPs chosen.\n")
             it += 1
