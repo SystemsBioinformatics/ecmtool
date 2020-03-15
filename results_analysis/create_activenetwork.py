@@ -9,6 +9,7 @@ model_dir = os.path.join(os.getcwd(), "models")
 model_path = os.path.join(model_dir, model_name + ".xml")
 original_cmod = cbm.readSBML3FBC(model_path)
 cbm.doFBA(original_cmod)
+cbm.MinimizeSumOfAbsFluxes(original_cmod)
 
 delete_reaction = []  # Initializes list for reactions that need to be deleted
 opt_obj = original_cmod.getObjFuncValue()  # Needed for checking if we did not remove too much
