@@ -131,7 +131,7 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     external_metabolites = list(external_metabolites) + [item.id for item in species if item.compartment == external_compartment]
 
     network = Network()
-    network.metabolites = [Metabolite(item.id, item.name, item.compartment, item.compartment == external_compartment) for item in species]
+    network.metabolites = [Metabolite(item.id, item.name, item.compartment, item.id in external_metabolites) for item in species]
 
     if add_objective:
         objective_name = cbmpy_model.getActiveObjective().fluxObjectives[0].reaction
