@@ -81,7 +81,7 @@ def remove_close_vectors(matrix, threshold=10 ** -6, verbose=True):
 
         if verbose:
             print('%.2f%% (removed %d/%d)' % (
-            100 * float(i) / new_matrix.shape[0], matrix.shape[0] - new_matrix.shape[0], matrix.shape[0]))
+                100 * float(i) / new_matrix.shape[0], matrix.shape[0] - new_matrix.shape[0], matrix.shape[0]))
 
         new_matrix = temp_matrix[unique_indices, :]
         i += 1
@@ -191,7 +191,7 @@ def check_bijection(conversion_cone, network, model_path, args, verbose=True):
 
     if verbose:
         print('Found %d efmtool-calculated ECMs, and %d ecmtool ones' % (
-        len(efm_ecms_unique), len(ecmtool_ecms_normalised)))
+            len(efm_ecms_unique), len(ecmtool_ecms_normalised)))
 
     is_bijection = True
 
@@ -291,6 +291,7 @@ if __name__ == '__main__':
     parser.add_argument('--compare', type=str2bool, default=False,
                         help='Enable to compare output of direct vs indirect')
     parser.add_argument('--job_size', type=int, default=1, help='Number of LPs per multiprocessing job')
+    parser.add_argument('--sort_order', type=str, default='min_adj', help='Order in which internal metabolites should be set to zero. Default is to minimize the added adjacencies, other options are: min_lp, max_lp_per_adj, min_connections')
     parser.add_argument('--print_conversions', type=str2bool, default=True,
                         help='Print the calculated conversion modes (default: true)')
     args = parser.parse_args()
@@ -380,7 +381,8 @@ if __name__ == '__main__':
             external = np.asarray(network.external_metabolite_indices())
             internal = np.setdiff1d(range(R.shape[0]), external)
 
-        T_intersected, ids = intersect_directly(R, internal, network, verbose=args.verbose, lps_per_job=args.job_size)
+        T_intersected, ids = intersect_directly(R, internal, network, verbose=args.verbose, lps_per_job=args.job_size,
+                                                sort_order=args.sort_order)
 
         print_ecms_direct(T_intersected, ids)
 

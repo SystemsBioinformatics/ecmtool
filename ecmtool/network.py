@@ -9,7 +9,8 @@ from .helpers import to_fractions, redund
 from ecmtool.intersect_directly_mpi import mpi_print
 
 
-def clementine_equality_compression(N, external_metabolites=[], reversible_reactions=[], input_metabolites=[], output_metabolites=[],
+def clementine_equality_compression(N, external_metabolites=[], reversible_reactions=[], input_metabolites=[],
+                                    output_metabolites=[],
                                     verbose=True):
     """
     Compresses a metabolic network using Superior Clementine Equality Intersection (all rights reserved).
@@ -44,19 +45,21 @@ def clementine_equality_compression(N, external_metabolites=[], reversible_react
 
         # Find reactions that use this metabolite
         active_reactions = np.asarray([reaction_index for reaction_index in range(G.shape[0])
-                              if G[reaction_index, internal_metabolite] != 0])
+                                       if G[reaction_index, internal_metabolite] != 0])
 
         # Skip internal metabolites that aren't used anywhere
         if len(active_reactions) == 0:
             if verbose:
-                mpi_print('Skipping internal metabolite #%d, since it is not used by any reaction\n' % internal_metabolite)
+                mpi_print(
+                    'Skipping internal metabolite #%d, since it is not used by any reaction\n' % internal_metabolite)
             continue
 
         # Skip internal metabolites that are used too often (>= busy_threshold)
         busy_threshold = 10
         if len(active_reactions) >= busy_threshold:
             if verbose:
-                mpi_print('Skipping internal metabolite #%d, since it is used by too many reactions\n' % internal_metabolite)
+                mpi_print(
+                    'Skipping internal metabolite #%d, since it is used by too many reactions\n' % internal_metabolite)
             continue
 
         # Project conversions that use this metabolite onto the hyperplane internal_metabolite = 0
@@ -99,8 +102,6 @@ def clementine_equality_compression(N, external_metabolites=[], reversible_react
     return G
 
 
-
-
 def get_sbml_model(path):
     doc = sbml.readSBMLFromFile(path)
     model = doc.getModel()
@@ -108,7 +109,8 @@ def get_sbml_model(path):
     return model
 
 
-def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions=True, determine_inputs_outputs=False, external_compartment='e'):
+def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions=True, determine_inputs_outputs=False,
+                               external_compartment='e'):
     """
     Parses an SBML file containing a metabolic network, and returns a Network instance
     with the metabolites, reactions, and stoichiometry initialised. By default will look
@@ -125,13 +127,20 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     reactions = cbmpy_model.reactions
     objective_reaction_column = None
     pairs = cbmpy.CBTools.findDeadEndReactions(cbmpy_model)
-    external_metabolites, external_reactions = list(zip(*pairs)) if len(pairs) else (list(zip(*cbmpy.CBTools.findDeadEndMetabolites(cbmpy_model)))[0], [])
+    external_metabolites, external_reactions = list(zip(*pairs)) if len(pairs) else (
+    list(zip(*cbmpy.CBTools.findDeadEndMetabolites(cbmpy_model)))[0], [])
 
     # Catch any metabolites that were not recognised automatically, but are likely external
-    external_metabolites = list(external_metabolites) + [item.id for item in species if item.compartment == external_compartment]
+    external_metabolites = list(external_metabolites) + [item.id for item in species if
+                                                         item.compartment == external_compartment]
 
     network = Network()
-    network.metabolites = [Metabolite(item.id, item.name, item.compartment, item.id in external_metabolites) for item in species]
+    network.metabolites = [Metabolite(item.id, item.name, item.compartment, item.id in external_metabolites) for item
+                           in species]
+    # The following alternative is choosing only the metabolites ending with '_e' as external. This does not always work
+    # because sometimes there are metabolites in the cytosol that still have a source or sink reaction
+    # network.metabolites = [Metabolite(item.id, item.name, item.compartment, item.compartment == external_compartment)
+    #                        for item in species]
 
     if add_objective:
         objective_name = cbmpy_model.getActiveObjective().fluxObjectives[0].reaction
@@ -144,7 +153,8 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
         for metabolite in [network.metabolites[index] for index in network.external_metabolite_indices()]:
             index = external_metabolites.index(metabolite.id)
             if index >= len(external_reactions):
-                mpi_print('Warning: missing exchange reaction for metabolite %s. Skipping marking this metabolite as input or output.' % metabolite.id)
+                mpi_print(
+                    'Warning: missing exchange reaction for metabolite %s. Skipping marking this metabolite as input or output.' % metabolite.id)
                 continue
 
             reaction_id = external_reactions[index]
@@ -165,7 +175,8 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
                 if lowerBound.value < 0 and upperBound.value == 0:
                     # Direction of model is inverted (substrates are products and vice versa. This happens sometimes,
                     # e.g. https://github.com/SBRG/bigg_models/issues/324
-                    print('Swapping direction of reversible reaction %s that can only run in reverse direction.' % reaction_id)
+                    print(
+                        'Swapping direction of reversible reaction %s that can only run in reverse direction.' % reaction_id)
                     stoichiometry *= -1
                     reagents = cbmpy_model.getReaction(reaction_id).reagents
                     for met in reagents:
@@ -188,7 +199,8 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
 
     # Add objective metabolite from objective reaction
     if add_objective and objective_reaction_column is not None:
-        network.metabolites.append(Metabolite('objective', 'Virtual objective metabolite', 'e', is_external=True, direction='output'))
+        network.metabolites.append(
+            Metabolite('objective', 'Virtual objective metabolite', 'e', is_external=True, direction='output'))
         N = np.append(N, to_fractions(np.zeros(shape=(1, N.shape[1]))), axis=0)
         N[-1, objective_reaction_column] = 1
 
@@ -208,6 +220,7 @@ def add_debug_tags(network, reactions=[]):
                                               compartment='e', is_external=True,
                                               direction='both' if network.reactions[reaction].reversible else 'output'))
     network.N = np.append(network.N, np.identity(len(network.reactions))[reactions, :], axis=0)
+
 
 class Reaction:
     id = ''
@@ -262,10 +275,12 @@ class Network:
             self.metabolites[index].direction = 'output'
 
     def input_metabolite_indices(self):
-        return [index for index, metabolite in enumerate(self.metabolites) if metabolite.direction == 'input' and metabolite.is_external]
+        return [index for index, metabolite in enumerate(self.metabolites) if
+                metabolite.direction == 'input' and metabolite.is_external]
 
     def output_metabolite_indices(self):
-        return [index for index, metabolite in enumerate(self.metabolites) if metabolite.direction == 'output' and metabolite.is_external]
+        return [index for index, metabolite in enumerate(self.metabolites) if
+                metabolite.direction == 'output' and metabolite.is_external]
 
     def compress(self, verbose=False, SCEI=True):
         if verbose:
@@ -283,14 +298,14 @@ class Network:
         self.cancel_compounds(verbose=verbose)
         if verbose:
             mpi_print('Removed %d reactions and %d metabolites' %
-                  (reaction_count_intermediate - self.N.shape[1], metabolite_count_intermediate - self.N.shape[0]))
+                      (reaction_count_intermediate - self.N.shape[1], metabolite_count_intermediate - self.N.shape[0]))
 
         metabolite_count_intermediate, reaction_count_intermediate = self.N.shape
         self.cancel_singly(verbose=verbose)
-        #self.cancel_dead_ends(verbose=verbose)
+        # self.cancel_dead_ends(verbose=verbose)
         if verbose:
             mpi_print('Removed %d reactions and %d metabolites' %
-                  (reaction_count_intermediate - self.N.shape[1], metabolite_count_intermediate - self.N.shape[0]))
+                      (reaction_count_intermediate - self.N.shape[1], metabolite_count_intermediate - self.N.shape[0]))
 
         ## This does not seem to do anything on the tested metabolic networks
         # if not self.right_nullspace:
@@ -300,26 +315,26 @@ class Network:
         #
         # self.remove_infeasible_irreversible_reactions(verbose=verbose)
 
-
         metabolite_count_intermediate, reaction_count_intermediate = self.N.shape
         if SCEI:
             self.cancel_clementine(verbose=verbose)
         if verbose:
             mpi_print('Removed %d reactions and %d metabolites' %
-                  (reaction_count_intermediate - self.N.shape[1], metabolite_count_intermediate - self.N.shape[0]))
+                      (reaction_count_intermediate - self.N.shape[1], metabolite_count_intermediate - self.N.shape[0]))
 
         if verbose:
             mpi_print('Removed %d reactions and %d metabolites in total' %
-                  (original_reaction_count - self.N.shape[1], original_metabolite_count - self.N.shape[0]))
+                      (original_reaction_count - self.N.shape[1], original_metabolite_count - self.N.shape[0]))
 
             internal = len(self.metabolites) - len(self.external_metabolite_indices())
             reversible = len(self.reversible_reaction_indices())
             metabolite_count, reaction_count = self.N.shape
             mpi_print('Original: %d metabolites (%d internal), %d reactions (%d reversible)' %
-                  (original_metabolite_count, original_internal, original_reaction_count, original_reversible))
+                      (original_metabolite_count, original_internal, original_reaction_count, original_reversible))
             mpi_print('Compressed: %d metabolites (%d internal), %d reactions (%d reversible)' %
-                  (metabolite_count, internal, reaction_count, reversible))
-            mpi_print('Compressed size: %.2f%%' % (((float(reaction_count) * metabolite_count) / (original_reaction_count * original_metabolite_count)) * 100))
+                      (metabolite_count, internal, reaction_count, reversible))
+            mpi_print('Compressed size: %.2f%%' % (((float(reaction_count) * metabolite_count) / (
+                        original_reaction_count * original_metabolite_count)) * 100))
 
         pass
 
@@ -335,7 +350,8 @@ class Network:
             return matrix
 
         # expanded = to_fractions(np.zeros(shape=(matrix.shape[0], len(self.uncompressed_metabolite_ids))))
-        expanded = np.repeat(np.repeat(to_fractions(np.zeros(shape=(1, 1))), matrix.shape[0], axis=0), len(self.uncompressed_metabolite_ids), axis=1)
+        expanded = np.repeat(np.repeat(to_fractions(np.zeros(shape=(1, 1))), matrix.shape[0], axis=0),
+                             len(self.uncompressed_metabolite_ids), axis=1)
 
         for column, id in enumerate([m.id for m in self.metabolites]):
             orig_column = [index for index, orig_id in
@@ -390,13 +406,15 @@ class Network:
                 reaction_index = producing_reactions[0]
                 reactions_to_cancel = consuming_reactions
                 if verbose:
-                    mpi_print('Metabolite %s is only produced in reaction %s. It will be cancelled through addition' % (self.metabolites[index].id, self.reactions[reaction_index].id))
+                    mpi_print('Metabolite %s is only produced in reaction %s. It will be cancelled through addition' % (
+                    self.metabolites[index].id, self.reactions[reaction_index].id))
             elif len(consuming_reactions) == 1:
                 # This internal metabolite is consumed by only 1 reaction
                 reaction_index = consuming_reactions[0]
                 reactions_to_cancel = producing_reactions
                 if verbose:
-                    mpi_print('Metabolite %s is only consumed in reaction %s. It will be cancelled through addition' % (self.metabolites[index].id, self.reactions[reaction_index].id))
+                    mpi_print('Metabolite %s is only consumed in reaction %s. It will be cancelled through addition' % (
+                    self.metabolites[index].id, self.reactions[reaction_index].id))
             else:
                 continue
 
@@ -419,7 +437,7 @@ class Network:
         self.drop_reactions(removable_reactions)
         self.drop_metabolites(removable_metabolites)
 
-    def cancel_dead_ends(self, verbose = False):
+    def cancel_dead_ends(self, verbose=False):
         """
         Cancel metabolites that are either only produced or only consumed
         :param verbose:
@@ -504,7 +522,8 @@ class Network:
             nonzero_count = np.count_nonzero(self.N[metabolite_index, :])
             if nonzero_count == 1:
                 # This metabolite is used in only one reaction
-                reaction_index = [index for index in range(len(self.reactions)) if self.N[metabolite_index, index] != 0][0]
+                reaction_index = \
+                [index for index in range(len(self.reactions)) if self.N[metabolite_index, index] != 0][0]
                 removable_reactions.append(reaction_index)
 
         self.drop_reactions(removable_reactions)
@@ -516,13 +535,13 @@ class Network:
 
         self.drop_metabolites(removable_metabolites)
 
-
     def cancel_clementine(self, verbose=False):
         if verbose:
             mpi_print('Compressing with SCEI')
 
         compressed_G = clementine_equality_compression(self.N, self.external_metabolite_indices(),
-                                                       self.reversible_reaction_indices(), self.input_metabolite_indices(),
+                                                       self.reversible_reaction_indices(),
+                                                       self.input_metabolite_indices(),
                                                        self.output_metabolite_indices())
         self.N = np.transpose(compressed_G)
         self.reactions = [Reaction('R_%d' % i, 'Reaction %d' % i, reversible=False) for i in range(self.N.shape[1])]
@@ -579,11 +598,13 @@ class Network:
 
     def drop_metabolites(self, metabolite_indices, force_external=False):
 
-        #TODO: debug line
+        # TODO: debug line
         if not force_external:
             for index in metabolite_indices:
                 if self.metabolites[index].is_external:
-                    mpi_print('Tried to remove external metabolite %s, which was denied. External metabolites must remain.' % self.metabolites[index].id)
+                    mpi_print(
+                        'Tried to remove external metabolite %s, which was denied. External metabolites must remain.' %
+                        self.metabolites[index].id)
                     return
 
         metabolites_to_keep = [row for row in range(self.N.shape[0]) if row not in metabolite_indices]
@@ -627,7 +648,10 @@ class Network:
         :param metabolite_indices: list of metabolite indices
         :return:
         """
+        # This 'get_or_create hide_metabolites' can be used to keep track of metabolites that are hidden, but makes
+        # the code a bit slower. Therefore, it is outcommented.
         # source, sink = self.get_or_create_hide_metabolites()
+
         for index in metabolite_indices:
             self.metabolites[index].is_external = False
 
@@ -647,9 +671,9 @@ class Network:
                 # column[source, 0] = -1
                 self.N = np.append(self.N, column, axis=1)
 
-
     def remove_objective_reaction(self):
-        reaction_matches = [index for index, reaction in enumerate(self.reactions) if reaction.id == self.objective_reaction_id]
+        reaction_matches = [index for index, reaction in enumerate(self.reactions) if
+                            reaction.id == self.objective_reaction_id]
         if len(reaction_matches) == 0:
             return
 
@@ -706,13 +730,11 @@ class Network:
         products = list(np.where(stoich > 0)[0])
         return reactants, products
 
-
     def split_reversible(self):
         for i in self.reversible_reaction_indices():
             self.N = np.append(self.N, np.transpose([-self.N[:, i]]), axis=1)
             self.reactions[i].reversible = False
             self.reactions.append(Reaction(self.reactions[i].id + "_rev", self.reactions[i].name + "_rev", False))
-
 
     def in_out(self, ind, metabolite):
         # determine if metabolite is both an input and output to the network
@@ -726,7 +748,6 @@ class Network:
 
         return input and output
 
-
     def split_in_out(self):
         # Add virtual input and output metabolites for external metabolites that are both input and output
         # Add virtual input metabolites for input metabolites, to enforce that they can't be used as output
@@ -734,11 +755,12 @@ class Network:
         count = 0
         start_metabolites = len(self.metabolites)
         for i, metabolite in enumerate(self.metabolites):
-            if i > start_metabolites - 1: # dont re-split _in and _out virtual metabolites
+            if i > start_metabolites - 1:  # dont re-split _in and _out virtual metabolites
                 break
             if metabolite.is_external:
                 if metabolite.direction == 'both' or metabolite.direction == 'input':
-                    new_in = Metabolite(metabolite.id + "_in", metabolite.name + "_in", metabolite.compartment, is_external=True, direction = 'input')
+                    new_in = Metabolite(metabolite.id + "_in", metabolite.name + "_in", metabolite.compartment,
+                                        is_external=True, direction='input')
                     self.metabolites.append(new_in)
                     exchange_in = Reaction(metabolite.id + " exch_in", metabolite.id + " exch_in", reversible=False)
                     self.reactions.append(exchange_in)
@@ -750,7 +772,8 @@ class Network:
                     self.N = np.append(self.N, np.asarray(new_column), axis=1)
 
                 if metabolite.direction == 'both' or metabolite.direction == 'output':
-                    new_out = Metabolite(metabolite.id + "_out", metabolite.name + "_out", metabolite.compartment, is_external=True, direction = 'output')
+                    new_out = Metabolite(metabolite.id + "_out", metabolite.name + "_out", metabolite.compartment,
+                                         is_external=True, direction='output')
                     self.metabolites.append(new_out)
                     exchange_out = Reaction(metabolite.id + " exch_out", metabolite.id + " exch_out", reversible=False)
                     self.reactions.append(exchange_out)

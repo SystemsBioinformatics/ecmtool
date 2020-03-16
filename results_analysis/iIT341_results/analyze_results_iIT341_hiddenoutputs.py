@@ -53,4 +53,6 @@ metab_ids = list(ecms_transposed_df)
 ecms = normalize_columns_fractions(np.transpose(ecms_transposed_df.values))
 ecms_df = pd.DataFrame(data=ecms, index=metab_ids)
 
+np.savetxt('20200316_ecms_iIT341_hidden_outputs.csv', np.transpose(ecms), delimiter=',', header=','.join(metab_ids), comments='')
+
 pass
