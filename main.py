@@ -23,7 +23,7 @@ class HiddenPrints:
 with HiddenPrints():
     from ecmtool.helpers import get_efms, get_metabolite_adjacency, redund
     from ecmtool.intersect_directly_mpi import intersect_directly, print_ecms_direct, remove_cycles, \
-        compress_after_cycle_removing, mpi_print
+        compress_after_cycle_removing, mpi_print, normalize_columns
     from ecmtool.network import extract_sbml_stoichiometry
     from ecmtool.conversion_cone import get_conversion_cone, iterative_conversion_cone, unique
     from ecmtool.functions_for_Erik import check_bijection_Erik
@@ -53,9 +53,10 @@ def print_ECMs(cone, debug_tags, network, orig_N, add_objective_metabolite, chec
         if add_objective_metabolite and objective > 0:
             ecm /= objective
 
-        metabolite_ids = [met.id for met in network.metabolites] if not network.compressed else network.uncompressed_metabolite_ids
+        metabolite_ids = [met.id for met in
+                          network.metabolites] if not network.compressed else network.uncompressed_metabolite_ids
 
-        print('\nECM #%d:' % (index+1))
+        print('\nECM #%d:' % (index + 1))
         for metabolite_index, stoichiometry_val in enumerate(ecm):
             if stoichiometry_val != 0.0:
                 print('%s\t\t->\t%.4f' % (metabolite_ids[metabolite_index], stoichiometry_val))
@@ -64,7 +65,8 @@ def print_ECMs(cone, debug_tags, network, orig_N, add_objective_metabolite, chec
             satisfied = ecm_satisfies_stoichiometry(orig_N, cone[index, :])
             print('ECM satisfies stoichiometry' if satisfied else 'ECM does not satisfy stoichiometry')
 
-def remove_close_vectors(matrix, threshold=10**-6, verbose=True):
+
+def remove_close_vectors(matrix, threshold=10 ** -6, verbose=True):
     i = 0
     new_matrix = matrix
 
@@ -73,10 +75,13 @@ def remove_close_vectors(matrix, threshold=10**-6, verbose=True):
 
     while i < new_matrix.shape[0]:
         temp_matrix = new_matrix
-        unique_indices = range(i + 1) + [index + i + 1 for index in find_matching_vector_indices(temp_matrix[i, :], temp_matrix[i + 1:, :], near=False, threshold=threshold)]
+        unique_indices = range(i + 1) + [index + i + 1 for index in
+                                         find_matching_vector_indices(temp_matrix[i, :], temp_matrix[i + 1:, :],
+                                                                      near=False, threshold=threshold)]
 
         if verbose:
-            print('%.2f%% (removed %d/%d)' % (100*float(i)/new_matrix.shape[0], matrix.shape[0] - new_matrix.shape[0], matrix.shape[0]))
+            print('%.2f%% (removed %d/%d)' % (
+            100 * float(i) / new_matrix.shape[0], matrix.shape[0] - new_matrix.shape[0], matrix.shape[0]))
 
         new_matrix = temp_matrix[unique_indices, :]
         i += 1
@@ -108,7 +113,7 @@ def vectors_in_cone(vector_matrix, cone_matrix, network, verbose=True):
     in_cone = True
     for index, vector in enumerate(vector_matrix):
         if verbose:
-            print('Checking %d/%d' % (index+1, len(vector_matrix)))
+            print('Checking %d/%d' % (index + 1, len(vector_matrix)))
 
         allowed_error = 10 ** -6
         solution = linprog(c=[1] * cone_trans.shape[1], A_eq=cone_trans, b_eq=vector,
@@ -118,10 +123,11 @@ def vectors_in_cone(vector_matrix, cone_matrix, network, verbose=True):
             for metabolite_index, stoichiometry_val in enumerate(vector):
                 if stoichiometry_val != 0.0:
                     print('%d %s\t\t->\t%.4f' % (
-                    metabolite_index, network.metabolites[metabolite_index].id, stoichiometry_val))
+                        metabolite_index, network.metabolites[metabolite_index].id, stoichiometry_val))
             in_cone = False
         elif verbose:
-            print('Support: ' + str([index for index,_ in enumerate(solution['x']) if abs(solution['x'][index]) > 1e-6]))
+            print(
+                'Support: ' + str([index for index, _ in enumerate(solution['x']) if abs(solution['x'][index]) > 1e-6]))
 
     return in_cone
 
@@ -172,7 +178,7 @@ def check_bijection(conversion_cone, network, model_path, args, verbose=True):
         print('Calculating ECMs from EFMs')
 
     # Remove exchange reactions again from EFMs
-    efms = efms[:,:-n_exchanges]
+    efms = efms[:, :-n_exchanges]
     efm_ecms = np.transpose(np.dot(np.asarray(full_model.N, dtype='object'), np.transpose(efms)))
     if verbose:
         print('Removing non-unique ECMs')
@@ -184,7 +190,8 @@ def check_bijection(conversion_cone, network, model_path, args, verbose=True):
     ecmtool_ecms_normalised = normalize(conversion_cone, axis=1)
 
     if verbose:
-        print('Found %d efmtool-calculated ECMs, and %d ecmtool ones' % (len(efm_ecms_unique), len(ecmtool_ecms_normalised)))
+        print('Found %d efmtool-calculated ECMs, and %d ecmtool ones' % (
+        len(efm_ecms_unique), len(ecmtool_ecms_normalised)))
 
     is_bijection = True
 
@@ -205,26 +212,27 @@ def check_bijection(conversion_cone, network, model_path, args, verbose=True):
 
     for index, ecm in enumerate(efm_ecms_unique):
         if verbose:
-            print('Checking %d/%d (round 1/2)' % (index+1, len(efm_ecms_unique)))
+            print('Checking %d/%d (round 1/2)' % (index + 1, len(efm_ecms_unique)))
         close_vectors = find_matching_vector_indices(ecm, ecmtool_ecms_normalised, near=True)
         if len(close_vectors) != 1:
             is_bijection = False
-            print('\nCalculated ECM #%d not uniquely in enumerated list (got %d matches):' % (index, len(close_vectors)))
+            print(
+                '\nCalculated ECM #%d not uniquely in enumerated list (got %d matches):' % (index, len(close_vectors)))
             for metabolite_index, stoichiometry_val in enumerate(ecm):
                 if stoichiometry_val != 0.0:
                     print('%d %s\t\t->\t%.4f' % (
-                    metabolite_index, network.uncompressed_metabolite_ids[metabolite_index], stoichiometry_val))
+                        metabolite_index, network.uncompressed_metabolite_ids[metabolite_index], stoichiometry_val))
 
     for index, ecm in enumerate(ecmtool_ecms_normalised):
         if verbose:
-            print('Checking %d/%d (round 2/2)' % (index+1, len(ecmtool_ecms_normalised)))
+            print('Checking %d/%d (round 2/2)' % (index + 1, len(ecmtool_ecms_normalised)))
         if ecm not in efm_ecms_unique:
             is_bijection = False
             print('\nEnumerated ECM #%d not in calculated list:' % index)
             for metabolite_index, stoichiometry_val in enumerate(ecm):
                 if stoichiometry_val != 0.0:
                     print('%d %s\t\t->\t%.4f' % (
-                    metabolite_index, network.uncompressed_metabolites_names[metabolite_index], stoichiometry_val))
+                        metabolite_index, network.uncompressed_metabolites_names[metabolite_index], stoichiometry_val))
 
     print('Enumerated ECMs and calculated ECMs are%s bijective' % ('' if is_bijection else ' not'))
 
@@ -283,7 +291,8 @@ if __name__ == '__main__':
     parser.add_argument('--compare', type=str2bool, default=False,
                         help='Enable to compare output of direct vs indirect')
     parser.add_argument('--job_size', type=int, default=1, help='Number of LPs per multiprocessing job')
-    parser.add_argument('--print_conversions', type=str2bool, default=True, help='Print the calculated conversion modes (default: true)')
+    parser.add_argument('--print_conversions', type=str2bool, default=True,
+                        help='Print the calculated conversion modes (default: true)')
     args = parser.parse_args()
 
     with HiddenPrints():
@@ -377,7 +386,12 @@ if __name__ == '__main__':
 
         # save to file
         if MPI.COMM_WORLD.Get_rank() == 0:
-            np.savetxt(args.out_path, np.transpose(T_intersected), delimiter=',', header=','.join(ids), comments='')
+            try:
+                np.savetxt(args.out_path, np.transpose(T_intersected), delimiter=',', header=','.join(ids), comments='')
+            except OverflowError:
+                norm_T_intersected = normalize_columns(T_intersected)
+                np.savetxt(args.out_path, np.transpose(norm_T_intersected), delimiter=',', header=','.join(ids),
+                           comments='')
 
         end = time()
         mpi_print('Ran (direct) in %f seconds with %d processes' % (end - start, MPI.COMM_WORLD.Get_size()))

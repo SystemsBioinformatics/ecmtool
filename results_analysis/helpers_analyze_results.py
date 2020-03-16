@@ -250,3 +250,15 @@ def unique_Erik(matrix):
     # Tom made this function and seems to use some set properties
     unique_set = {tuple(row) for row in matrix if np.count_nonzero(row) > 0}
     return np.vstack(unique_set) if len(unique_set) else to_fractions(np.ndarray(shape=(0, matrix.shape[1])))
+
+
+def normalize_columns_fractions(R):
+    result = np.zeros(R.shape)
+    for i in range(result.shape[1]):
+        if np.max(R[:, i]) > 1e100:
+            part_normalized_column = np.array(R[:, i] / np.max(R[:, i]), dtype='float')
+            result[:, i] = part_normalized_column / np.linalg.norm(part_normalized_column)
+        else:
+            norm_column = np.linalg.norm(np.array(R[:, i], dtype='float'))
+            result[:, i] = np.array(R[:, i], dtype='float') / norm_column
+    return result
