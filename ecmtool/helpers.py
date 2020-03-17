@@ -392,10 +392,11 @@ def get_redund_binary():
 
 
 def redund(matrix, verbose=False):
+    rank = str(MPI.COMM_WORLD.Get_rank())
     matrix = to_fractions(matrix)
     binary = get_redund_binary()
-    matrix_path = relative_path('tmp' + os.sep + 'matrix.ine')
-    matrix_nonredundant_path = relative_path('tmp' + os.sep + 'matrix_nored.ine')
+    matrix_path = relative_path('tmp' + os.sep + 'matrix' + rank + '.ine')
+    matrix_nonredundant_path = relative_path('tmp' + os.sep + 'matrix_nored' + rank + '.ine')
 
     if matrix.shape[0] <= 1:
         return matrix
