@@ -13,6 +13,8 @@ from random import randint
 from numpy.linalg import svd
 from sympy import Matrix
 
+from mpi4py import MPI
+
 
 def relative_path(file_path):
     return os.path.join(os.path.dirname(__file__), file_path)
