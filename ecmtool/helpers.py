@@ -246,18 +246,18 @@ def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
 #     return x
 
 def get_efms(N, reversibility, verbose=True):
-   import matlab.engine
-   engine = matlab.engine.start_matlab()
-   engine.cd(relative_path('efmtool'))
-   result = engine.CalculateFluxModes(matlab.double([list(row) for row in N]), matlab.logical(reversibility))
-   if verbose:
-       print('Fetching calculated EFMs')
-   size = result['efms'].size
-   shape = size[1], size[0] # _data is in transposed form w.r.t. the result matrix
-   efms = np.reshape(np.array(result['efms']._data), shape)
-   if verbose:
-       print('Finishing fetching calculated EFMs')
-   return efms
+    import matlab.engine
+    engine = matlab.engine.start_matlab()
+    engine.cd(relative_path('efmtool'))
+    result = engine.CalculateFluxModes(matlab.double([list(row) for row in N]), matlab.logical(reversibility))
+    if verbose:
+        print('Fetching calculated EFMs')
+    size = result['efms'].size
+    shape = size[1], size[0] # _data is in transposed form w.r.t. the result matrix
+    efms = np.reshape(np.array(result['efms']._data), shape)
+    if verbose:
+        print('Finishing fetching calculated EFMs')
+    return efms
 
 # def get_efms(N, reversibility, verbose=True):
 #     N_ex = N
