@@ -12,7 +12,6 @@ try:
     from time import process_time as timer
 except ImportError:
     from time import clock as timer
-
 __all__ = ['LU', 'BGLU']
 
 @cython.boundscheck(False)

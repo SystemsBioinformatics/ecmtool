@@ -64,6 +64,64 @@ def check_bijection_Erik(ecms_first, ecms_second, network):
     return bijection_YN, ecms_first_min_ecms_second, ecms_second_min_ecms_first
 
 
+def check_bijection_csvs(ecms_first, ecms_second):
+    """
+    :param ecms_first: np.array
+            Matrix with ecms as columns, metabolites as rows
+    :param ecms_second: np.array
+            Matrix with ecms as columns, metabolites as rows
+    :return bijection_YN: Boolean
+    :return ecms_second_min_ecms_first: np.array
+            Matrix with as columns the ECMs that were in the second but not in the first set
+    :return ecms_first_min_ecms_second: np.array
+            Matrix with as columns the ECMs that were in the first but not in the second set
+    """
+    # We first remove duplicates from both
+    n_ecms_first_non_unique = ecms_first.shape[1]
+    n_ecms_second_non_unique = ecms_second.shape[1]
+    ecms_first = np.transpose(unique_Erik(np.transpose(ecms_first)))
+    ecms_second = np.transpose(unique_Erik(np.transpose(ecms_second)))
+    n_ecms_first = ecms_first.shape[1]
+    n_ecms_second = ecms_second.shape[1]
+
+    if n_ecms_first_non_unique - n_ecms_first > 0:
+        print("Watch out. The first set of ECMs has duplicates")
+    if n_ecms_second_non_unique - n_ecms_second > 0:
+        print("Watch out. The second set of ECMs has duplicates")
+
+    # Normalize both sets of ECMs
+    normalization_order = determine_normalization_order(ecms_first, network)
+    ecms_first = normalize_ECMS_Erik(ecms_first, network, normalization_order=normalization_order)
+    ecms_second = normalize_ECMS_Erik(ecms_second, network, normalization_order=normalization_order)
+
+    found_match_ecms_first = [False] * n_ecms_first
+    no_match_ecms_second = list(range(n_ecms_second))
+    for ecm_first_ind in range(n_ecms_first):
+        if ecm_first_ind % 100 == 0:
+            print('%d/%d ECMs checked for matches' % (ecm_first_ind, n_ecms_first))
+        ecm_first = ecms_first[:, ecm_first_ind]
+        for index, ecm_second_ind in enumerate(no_match_ecms_second):
+            ecm_second = ecms_second[:, ecm_second_ind]
+
+            if max(ecm_first - ecm_second) <= 10 ** -6:
+                found_match_ecms_first[ecm_first_ind] = True
+                del no_match_ecms_second[index]
+                break
+
+    ecms_first_min_ecms_second_inds = np.where([not found for found in found_match_ecms_first])[0]
+    ecms_second_min_ecms_first_inds = no_match_ecms_second
+
+    ecms_first_min_ecms_second = ecms_first[:, ecms_first_min_ecms_second_inds]
+    ecms_second_min_ecms_first = ecms_second[:, ecms_second_min_ecms_first_inds]
+
+    if not (ecms_first_min_ecms_second.shape[1] > 0 or ecms_second_min_ecms_first.shape[1] > 0):
+        bijection_YN = True
+    else:
+        bijection_YN = False
+
+    return bijection_YN, ecms_first_min_ecms_second, ecms_second_min_ecms_first
+
+
 def determine_normalization_order(ecms_matrix, network):
     """
     Determine order of metabolites to which we are going to normalize.

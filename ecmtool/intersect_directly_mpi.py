@@ -7,7 +7,7 @@ from scipy.linalg import LinAlgError
 from scipy.optimize import linprog
 
 from ecmtool._bglu_dense import BGLU
-from ecmtool.helpers import redund
+from ecmtool.helpers import redund, get_metabolite_adjacency
 
 
 def mpi_print(s):
@@ -19,6 +19,7 @@ def mpi_print(s):
     if MPI.COMM_WORLD.Get_rank() == 0:
         print(s)
 
+
 def print_ecms_direct(R, metabolite_ids):
     obj_id = -1
     if "objective" in metabolite_ids:
@@ -29,12 +30,17 @@ def print_ecms_direct(R, metabolite_ids):
     mpi_print("\n--%d ECMs found by intersecting directly--\n" % R.shape[1])
     for i in range(R.shape[1]):
         mpi_print("ECM #%d:" % i)
+        if np.max(R[:, i]) > 1e100:  # If numbers become too large, they can't be printed, therefore we make them smaller first
+            ecm = np.array(R[:, i] / np.max(R[:, i]), dtype='float')
+        else:
+            ecm = np.array(R[:, i], dtype='float')
+
         div = 1
         if obj_id != -1 and R[obj_id][i] != 0:
-            div = R[obj_id][i]
+            div = ecm[obj_id]
         for j in range(R.shape[0]):
-            if R[j][i] != 0:
-                mpi_print("%s: %f" % (metabolite_ids[j].replace("_in", "").replace("_out", ""), float(R[j][i]) / div))
+            if ecm[j] != 0:
+                mpi_print("%s: %f" % (metabolite_ids[j].replace("_in", "").replace("_out", ""), ecm[j] / div))
         mpi_print("")
 
 
@@ -48,7 +54,7 @@ def get_more_basis_columns(A, basis):
 
     if not len(basis):
         rank = 0
-        new_basis = np.array([],dtype = 'int')
+        new_basis = np.array([], dtype='int')
     else:
         rank = np.linalg.matrix_rank(A[:, basis])
         new_basis = basis.copy()
@@ -264,7 +270,7 @@ def cancel_with_cycle(R, met, cycle_ind, network, removable_reactions, verbose=T
     next_R = np.delete(next_R, met, 0)
     network.drop_metabolites([met])
     mpi_print("After removing this metabolite, we have %d metabolites and %d rays" %
-          (next_R.shape[0], next_R.shape[1]))
+              (next_R.shape[0], next_R.shape[1]))
 
     return next_R, removable_reactions
 
@@ -279,10 +285,15 @@ def iteration_without_lps(R, met, network):
     next_matrix = np.transpose(next_matrix)
 
     # delete all-zero row
-    next_matrix = np.delete(next_matrix, met, 0)
+    if next_matrix.shape[0]:  # Only if there is still something to remove
+        next_matrix = np.delete(next_matrix, met, 0)
+
     network.drop_metabolites([met])
-    mpi_print("After removing this metabolite, we have %d metabolites and %d rays" %
-          (next_matrix.shape[0], next_matrix.shape[1]))
+    if next_matrix.shape[0]:
+        mpi_print("After removing this metabolite, we have %d metabolites and %d rays" %
+                  (next_matrix.shape[0], next_matrix.shape[1]))
+    else:
+        mpi_print("After removing this metabolite, we have no rays left")
 
     return next_matrix
 
@@ -323,10 +334,10 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, v
             nr_adjacent += 1
             rp = R[met, p]
             rm = R[met, m]
-            new_row = rp * R[:, m] - rm * R[:, p]
+            new_row = (rp * R[:, m] - rm * R[:, p]) / np.gcd(rp, rm)
             if sum(abs(new_row)) > tol:
                 next_matrix.append(new_row)
-    else:   # calculate_adjacency is off
+    else:  # calculate_adjacency is off
         for p in plus:
             for m in minus:
                 nr_adjacent += 1
@@ -367,7 +378,7 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, v
     next_matrix = np.delete(next_matrix, met, 0)
     network.drop_metabolites([met])
     mpi_print("After removing this metabolite, we have %d metabolites and %d rays" %
-          (next_matrix.shape[0], next_matrix.shape[1]))
+              (next_matrix.shape[0], next_matrix.shape[1]))
 
     return next_matrix, rows_removed_redund
 
@@ -385,11 +396,11 @@ def get_remove_metabolite(R, network, reaction, verbose=True):
 def compress_after_cycle_removing(network, verbose=True):
     original_metabolite_count, original_reaction_count = network.N.shape
     network.cancel_singly(verbose=verbose)
-    #network.cancel_dead_ends(verbose=verbose)
+    # network.cancel_dead_ends(verbose=verbose)
 
     if verbose:
         mpi_print('Removed %d reactions and %d metabolites in total' %
-              (original_reaction_count - network.N.shape[1], original_metabolite_count - network.N.shape[0]))
+                  (original_reaction_count - network.N.shape[1], original_metabolite_count - network.N.shape[0]))
 
     return network
 
@@ -400,7 +411,7 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
     removable_metabolites = []
     removable_reactions = []
     count_since_last_redund = 0
-    A_ub, b_ub, A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))))
+    A_ub, b_ub, A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(R)))
 
     basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [])
     b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, 1e-10)
@@ -457,7 +468,7 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
 
             R = np.transpose(R)
 
-        A_ub, b_ub, A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))))
+        A_ub, b_ub, A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(R)))
 
         # Do new LP to check if there is still a cycle present.
         basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [])
@@ -508,9 +519,14 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
 
 
 def normalize_columns(R):
-    result = R.copy()
+    result = np.zeros(R.shape)
     for i in range(result.shape[1]):
-        result[:, i] /= np.linalg.norm(np.array(R[:, i], dtype='float'))
+        if np.max(R[:, i]) > 1e100:  # If numbers are very large, converting to float might give issues, therefore we first divide by another int
+            part_normalized_column = np.array(R[:, i] / np.max(R[:, i]), dtype='float')
+            result[:, i] = part_normalized_column / np.linalg.norm(part_normalized_column)
+        else:
+            norm_column = np.linalg.norm(np.array(R[:, i], dtype='float'))
+            result[:, i] = np.array(R[:, i], dtype='float') / norm_column
     return result
 
 
@@ -757,7 +773,7 @@ def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose
     """
     start = time()
 
-    matrix_normalized = normalize_columns(np.array(ray_matrix, dtype='float'))
+    matrix_normalized = normalize_columns(ray_matrix)
     matrix_indep_rows = independent_rows(matrix_normalized)
 
     # set default plus and minus
@@ -791,7 +807,8 @@ def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose
 
             it = j + len(minus) * i
             if it % 100 == 0:
-                mpi_print("Process %d is on adjacency test %d of %d (%f %%)" % (mpi_rank, it, nr_tests, it/nr_tests*100))
+                mpi_print(
+                    "Process %d is on adjacency test %d of %d (%f %%)" % (mpi_rank, it, nr_tests, it / nr_tests * 100))
 
     # bases = get_bases(matrix_indep_rows, plus, minus)
     # for i in range(mpi_rank, nr_tests, mpi_size):
@@ -861,8 +878,21 @@ def in_cone(R, tar):
     return A_ub, b_ub, A_eq, b_eq, c
 
 
-def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12, lps_per_job=1):
-    # rows are rays
+def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12, lps_per_job=1, sort_order='min_adj'):
+    """
+
+    :param R:
+    :param internal_metabolites:
+    :param network:
+    :param verbose:
+    :param tol:
+    :param lps_per_job:
+    :param sort_order: Different options for determining metabolite intersection order. As a default we will intersect
+    the metabolite that adds the minimal number of adjacencies in the model. Other options are 'min_lp',
+    'max_lp_per_adj', and 'min_connections'.
+    :return:
+    """
+    # rows are metabolites
     deleted = np.array([])
     it = 1
     internal = list(internal_metabolites)
@@ -870,19 +900,79 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12
     rows_removed_redund = 0
 
     while len(internal) > 0:
-        i = internal[np.argmin(
-            [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0) for j in
-             internal])]
+        sorting = sort_order
+
+        # For each internal metabolite, calculate the number of producing reactions times the number of consuming
+        # R[j-len(deleted[deleted<j]) is the current row for the metabolite that was once at the j-th place
+        n_lps = [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0) for j
+                 in internal]
+        # If there is a metabolite that can be deleted without any lps being done, we will do it immediately
+        if np.min(n_lps) == 0:
+            sorting = 'min_lp'
+
+        if sorting == 'min_lp':
+            i = internal[np.argmin(n_lps)]
+        elif sorting == 'min_connections':
+            # Alternative way of choosing metabolite, choose the one that is minimally connected
+            connections = []
+            adj = get_metabolite_adjacency(R)
+            for met in internal:
+                curr_ind = met - len(deleted[deleted < met])
+                connections.append(int(np.sum(adj[:, curr_ind])))
+
+            min_connect_inds = np.array(internal)[np.where(connections == np.min(connections))[0]]
+            # Pick the one with least LPs to be done, if equally connected
+            i = min_connect_inds[np.argmin(
+                [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0)
+                 for j in min_connect_inds])]
+
+        elif sorting == 'min_adj' or sorting == 'max_lp_per_adj':
+            # Alternative way of choosing metabolite, choose the one that increases adjacencies the least
+            adj_added = []  # This will contain for each metabolite the number connections between metabs removal adds
+            adj = get_metabolite_adjacency(R)
+            old_n_adjs = np.sum(adj)
+            for met in internal:
+                new_adj = adj.copy()
+                curr_ind = met - len(deleted[deleted < met])
+                new_adj[np.where(adj[:, curr_ind] != 0), :] += new_adj[curr_ind, :]
+                np.fill_diagonal(new_adj, 0)
+                new_adj = np.minimum(new_adj, 1)
+                new_adj = np.delete(np.delete(new_adj, curr_ind, axis=0), curr_ind, axis=1)
+                new_n_adjs = np.sum(new_adj)
+                adj_added.append(int(new_n_adjs - old_n_adjs))
+
+            if sorting == 'min_adj':
+                min_adj_inds = np.array(internal)[np.where(adj_added == np.min(adj_added))[0]]
+                # Pick the one with least LPs to be done, if adding equal adjacencies
+                i = min_adj_inds[np.argmin(
+                    [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(
+                        R[j - len(deleted[deleted < j]), :] < 0) for j in min_adj_inds])]
+            elif sorting == 'max_lp_per_adj':
+                lp_per_adj = np.array(
+                    [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0)
+                     for j in internal]) / (np.array(adj_added) - np.min(adj_added) + 1)
+                i = internal[np.argmax(lp_per_adj)]
+
+        # i - len(deleted[deleted<i] is the current row for the metabolite that was once at the ith place
         to_remove = i - len(deleted[deleted < i])
         if verbose:
             mpi_print("\n\nIteration %d (internal metabolite = %d: %s) of %d" % (
                 it, to_remove, [m.id for m in network.metabolites][to_remove], len(internal_metabolites)))
-            mpi_print("Possible LP amounts for this step:\n" + ", ".join(np.sort(
-                [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0) for j
-                 in internal]).astype(str)))
-            mpi_print("Total: %d" % sum(
-                [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0) for j
-                 in internal]))
+            mpi_print("Possible LP amounts for this step:\n" + ", ".join(np.array(n_lps).astype(str)))
+            mpi_print("Total: %d" % sum(n_lps))
+            if sorting == 'min_adj':
+                mpi_print("Possible adjacencies added for this step:\n" + ", ".join(np.array(adj_added).astype(str)))
+                mpi_print("Minimal adjacency option chosen.\n")
+            elif sorting == 'max_lp_per_adj':
+                mpi_print("Possible lps per adjacency added for this step:\n" + ", ".join(
+                    np.round(np.array(lp_per_adj), 2).astype(str)))
+                mpi_print("Rescaled maximal LPs per added adjacency option chosen.\n")
+            elif sorting == 'min_connections':
+                mpi_print("Possible connectedness of metabolites for this sstep:\n" + ", ".join(
+                    np.array(connections).astype(str)))
+                mpi_print("Minimally connected option chosen.\n")
+            elif sorting == 'min_lp':
+                mpi_print("Minimal LPs chosen.\n")
             it += 1
 
         # input("waiting")

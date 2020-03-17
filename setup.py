@@ -15,7 +15,7 @@ setup(
                       'pycddlib',
                       'psutil',
                       'sklearn'],
-    ext_modules=cythonize(Extension("bglu_dense", ["ecmtool/_bglu_dense.pyx"], include_dirs=[np.get_include()])),
+    ext_modules=cythonize(Extension("_bglu_dense", ["ecmtool/_bglu_dense.pyx"], include_dirs=[np.get_include()]), compiler_directives={'language_level' : "3"}),
     include_dirs=[np.get_include()],
     url='https://github.com/tjclement/ecmtool',
     license='MIT',
