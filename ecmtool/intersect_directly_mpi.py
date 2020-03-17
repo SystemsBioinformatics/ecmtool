@@ -798,17 +798,18 @@ def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose
         plus_basis_inv = np.linalg.inv(matrix_indep_rows[:, plus_basis])
 
         for j, m in enumerate(minus):
-            # add the minus ray into the basis
-            plus_minus_basis = add_second_ray(matrix_indep_rows, plus_basis_inv, plus_basis, p, m)
-
-            res = determine_adjacency(matrix_indep_rows, p, m, plus_minus_basis)
-            if res == 1:
-                adjacency.append((p, m))
-
             it = j + len(minus) * i
-            if it % 100 == 0:
-                mpi_print(
-                    "Process %d is on adjacency test %d of %d (%f %%)" % (mpi_rank, it, nr_tests, it / nr_tests * 100))
+            if it % mpi_size == mpi_rank:
+                # add the minus ray into the basis
+                plus_minus_basis = add_second_ray(matrix_indep_rows, plus_basis_inv, plus_basis, p, m)
+
+                res = determine_adjacency(matrix_indep_rows, p, m, plus_minus_basis)
+                if res == 1:
+                    adjacency.append((p, m))
+
+                if it % 100 == 0:
+                    mpi_print("Process %d is on adjacency test %d of %d (%f %%)" %
+                              (mpi_rank, it, nr_tests, it / nr_tests * 100))
 
     # bases = get_bases(matrix_indep_rows, plus, minus)
     # for i in range(mpi_rank, nr_tests, mpi_size):

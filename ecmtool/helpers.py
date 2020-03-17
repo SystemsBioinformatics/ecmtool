@@ -13,6 +13,8 @@ from random import randint
 from numpy.linalg import svd
 from sympy import Matrix
 
+from mpi4py import MPI
+
 
 def relative_path(file_path):
     return os.path.join(os.path.dirname(__file__), file_path)
@@ -246,18 +248,18 @@ def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
 #     return x
 
 def get_efms(N, reversibility, verbose=True):
-   import matlab.engine
-   engine = matlab.engine.start_matlab()
-   engine.cd(relative_path('efmtool'))
-   result = engine.CalculateFluxModes(matlab.double([list(row) for row in N]), matlab.logical(reversibility))
-   if verbose:
-       print('Fetching calculated EFMs')
-   size = result['efms'].size
-   shape = size[1], size[0] # _data is in transposed form w.r.t. the result matrix
-   efms = np.reshape(np.array(result['efms']._data), shape)
-   if verbose:
-       print('Finishing fetching calculated EFMs')
-   return efms
+    import matlab.engine
+    engine = matlab.engine.start_matlab()
+    engine.cd(relative_path('efmtool'))
+    result = engine.CalculateFluxModes(matlab.double([list(row) for row in N]), matlab.logical(reversibility))
+    if verbose:
+        print('Fetching calculated EFMs')
+    size = result['efms'].size
+    shape = size[1], size[0] # _data is in transposed form w.r.t. the result matrix
+    efms = np.reshape(np.array(result['efms']._data), shape)
+    if verbose:
+        print('Finishing fetching calculated EFMs')
+    return efms
 
 # def get_efms(N, reversibility, verbose=True):
 #     N_ex = N
@@ -392,10 +394,11 @@ def get_redund_binary():
 
 
 def redund(matrix, verbose=False):
+    rank = str(MPI.COMM_WORLD.Get_rank())
     matrix = to_fractions(matrix)
     binary = get_redund_binary()
-    matrix_path = relative_path('tmp' + os.sep + 'matrix.ine')
-    matrix_nonredundant_path = relative_path('tmp' + os.sep + 'matrix_nored.ine')
+    matrix_path = relative_path('tmp' + os.sep + 'matrix' + rank + '.ine')
+    matrix_nonredundant_path = relative_path('tmp' + os.sep + 'matrix_nored' + rank + '.ine')
 
     if matrix.shape[0] <= 1:
         return matrix
