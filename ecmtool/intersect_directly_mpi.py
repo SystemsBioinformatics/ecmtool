@@ -10,13 +10,15 @@ from ecmtool._bglu_dense import BGLU
 from ecmtool.helpers import redund, get_metabolite_adjacency
 
 
-def mpi_print(s):
+def mpi_print(s, PRINT_IF_RANK_NONZERO = False):
     """
     Print s, but only on process 0
     :param s: string to print
     :return:
     """
     if MPI.COMM_WORLD.Get_rank() == 0:
+        print(s)
+    elif PRINT_IF_RANK_NONZERO:
         print(s)
 
 
@@ -807,9 +809,9 @@ def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose
                 if res == 1:
                     adjacency.append((p, m))
 
-                if it % 100 == 0:
+                if it % 10*mpi_size == mpi_rank:
                     mpi_print("Process %d is on adjacency test %d of %d (%f %%)" %
-                              (mpi_rank, it, nr_tests, it / nr_tests * 100))
+                              (mpi_rank, it, nr_tests, it / nr_tests * 100), PRINT_IF_RANK_NONZERO = True)
 
     # bases = get_bases(matrix_indep_rows, plus, minus)
     # for i in range(mpi_rank, nr_tests, mpi_size):
