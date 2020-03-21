@@ -16,13 +16,8 @@ def mpi_print(s):
     :param s: string to print
     :return:
     """
-    rank = MPI.COMM_WORLD.Get_rank()
-    if rank == 0:
+    if MPI.COMM_WORLD.Get_rank() == 0:
         print(s)
-    size = MPI.COMM_WORLD.Get_size()
-    if size % 2 == 0:
-        if rank == size/2+1:
-            print(s)
 
 
 def print_ecms_direct(R, metabolite_ids):
@@ -813,9 +808,6 @@ def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose
                     adjacency.append((p, m))
 
                 if it % 100 == 0:
-                    mpi_print("Process %d is on adjacency test %d of %d (%f %%)" %
-                              (mpi_rank, it, nr_tests, it / nr_tests * 100))
-                elif it % 100 == mpi_size/2+1:
                     mpi_print("Process %d is on adjacency test %d of %d (%f %%)" %
                               (mpi_rank, it, nr_tests, it / nr_tests * 100))
 
