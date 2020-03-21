@@ -815,7 +815,7 @@ def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose
                 if it % 100 == 0:
                     mpi_print("Process %d is on adjacency test %d of %d (%f %%)" %
                               (mpi_rank, it, nr_tests, it / nr_tests * 100))
-                elif it % 100+mpi_size/2+1 == 0:
+                elif it % 100 == mpi_size/2+1:
                     mpi_print("Process %d is on adjacency test %d of %d (%f %%)" %
                               (mpi_rank, it, nr_tests, it / nr_tests * 100))
 
