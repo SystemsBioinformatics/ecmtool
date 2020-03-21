@@ -809,9 +809,9 @@ def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose
                 if res == 1:
                     adjacency.append((p, m))
 
-                if it % 10*mpi_size == mpi_rank:
+                if it % (10*mpi_size) == mpi_rank:
                     mpi_print("Process %d is on adjacency test %d of %d (%f %%)" %
-                              (mpi_rank, it, nr_tests, it / nr_tests * 100), PRINT_IF_RANK_NONZERO = True)
+                              (mpi_rank, it, nr_tests, it / nr_tests * 100), PRINT_IF_RANK_NONZERO=True)
 
     # bases = get_bases(matrix_indep_rows, plus, minus)
     # for i in range(mpi_rank, nr_tests, mpi_size):
