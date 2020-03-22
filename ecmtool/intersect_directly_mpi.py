@@ -77,11 +77,13 @@ def get_more_basis_columns(A, basis):
     return new_basis
 
 
-def kkt_check(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=100000, verbose=True):
+def kkt_check(c, A, x, basis, i, j, tol=1e-8, threshold=1e-3, max_iter=100000, verbose=True):
     """
     Determine whether KKT conditions hold for x0.
     Take size 0 steps if available.
     """
+    improvement = False
+    init_actives = [i,j]
     ab = np.arange(A.shape[0])
     a = np.arange(A.shape[1])
 
@@ -119,6 +121,9 @@ def kkt_check(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=100000, verbose
 
         th = xb[i] / u[i]
         l = np.argmin(th)  # implicitly selects smallest subscript
+        if basis[i][l] in init_actives:  # if either plus or minus leaves basis, LP has made significant improvement
+            improvement = True
+
         step_size = th[l]  # step size
 
         # Do pivot
@@ -128,7 +133,10 @@ def kkt_check(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=100000, verbose
         B.update(ab[i][l], entering)  # modify basis
         basis = B.b
 
-        if np.dot(c, x) < -threshold:  # found a better solution, so not adjacent
+        # if np.dot(c, x) < -threshold:  # found a better solution, so not adjacent
+        if improvement:
+            if not np.dot(c, x) < -threshold:
+                mpi_print('Original way of finding non-adjacents does not say these are non-adjacent', True)
             # if verbose:
             #     mpi_print("Did %d steps in kkt_check, found False - c*x %.8f" % (iteration, np.dot(c, x)))
             return False, 0
@@ -646,7 +654,7 @@ def perturb_LP(b_eq, x0, A_eq, basis, epsilon):
 def determine_adjacency(R, i, j, basis, tol=1e-10):
     A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP(R, i, j)
     b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, 1e-10)
-    KKT, status = kkt_check(c, A_eq, x0, basis)
+    KKT, status = kkt_check(c, A_eq, x0, basis, i, j)
 
     if status == 0:
         return 1 if KKT else 0
