@@ -281,6 +281,8 @@ if __name__ == '__main__':
                         help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be produced')
     parser.add_argument('--hide', type=str, default='',
                         help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that are transformed into internal metabolites by adding bidirectional exchange reactions')
+    parser.add_argument('--hide_all_in_or_outputs', type=str, default='',
+                        help='String that is either empty, input, or output. If it is inputs or outputs, after splitting metabolites, all inputs or outputs are hidden (objective is always excluded)')
     parser.add_argument('--iterative', type=str2bool, default=False,
                         help='Enable iterative conversion mode enumeration (helps on large, dense networks) (default: false)')
     parser.add_argument('--only_rays', type=str2bool, default=False,
@@ -291,7 +293,8 @@ if __name__ == '__main__':
     parser.add_argument('--compare', type=str2bool, default=False,
                         help='Enable to compare output of direct vs indirect')
     parser.add_argument('--job_size', type=int, default=1, help='Number of LPs per multiprocessing job')
-    parser.add_argument('--sort_order', type=str, default='min_adj', help='Order in which internal metabolites should be set to zero. Default is to minimize the added adjacencies, other options are: min_lp, max_lp_per_adj, min_connections')
+    parser.add_argument('--sort_order', type=str, default='min_adj',
+                        help='Order in which internal metabolites should be set to zero. Default is to minimize the added adjacencies, other options are: min_lp, max_lp_per_adj, min_connections')
     parser.add_argument('--print_conversions', type=str2bool, default=True,
                         help='Print the calculated conversion modes (default: true)')
     args = parser.parse_args()
@@ -353,6 +356,12 @@ if __name__ == '__main__':
             # TODO: Change this, this should also partly be done when only_rays=True
             if not args.only_rays:
                 network.split_in_out()
+            # TODO: Add this option to the other intersection nmethods too
+            if args.hide_all_in_or_outputs:
+                hide_indices = [ind for ind, metab in enumerate(network.metabolites) if
+                                (metab.is_external) & (metab.direction == args.hide_all_in_or_outputs) & (
+                                    not metab.id == 'objective_out')]
+                network.hide(hide_indices)
 
             if args.compress:
                 network.compress(verbose=args.verbose, SCEI=args.scei)
