@@ -295,6 +295,9 @@ if __name__ == '__main__':
     parser.add_argument('--job_size', type=int, default=1, help='Number of LPs per multiprocessing job')
     parser.add_argument('--sort_order', type=str, default='min_adj',
                         help='Order in which internal metabolites should be set to zero. Default is to minimize the added adjacencies, other options are: min_lp, max_lp_per_adj, min_connections')
+    parser.add_argument('--intermediate_cone_path', type=str, default='',
+                        help='Filename where intermediate cone result can be found. If an empty string is given (default), then no intermediate result is picked up and the calculation is done in full')
+
     parser.add_argument('--print_conversions', type=str2bool, default=True,
                         help='Print the calculated conversion modes (default: true)')
     args = parser.parse_args()
@@ -391,7 +394,7 @@ if __name__ == '__main__':
             internal = np.setdiff1d(range(R.shape[0]), external)
 
         T_intersected, ids = intersect_directly(R, internal, network, verbose=args.verbose, lps_per_job=args.job_size,
-                                                sort_order=args.sort_order)
+                                                sort_order=args.sort_order, intermediate_cone_path=args.intermediate_cone_path)
 
         print_ecms_direct(T_intersected, ids)
 

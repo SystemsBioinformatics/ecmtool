@@ -3,14 +3,15 @@ from time import time
 
 from mpi4py import MPI
 import numpy as np
+import os
 from scipy.linalg import LinAlgError
 from scipy.optimize import linprog
 
 from ecmtool._bglu_dense import BGLU
-from ecmtool.helpers import redund, get_metabolite_adjacency
+from ecmtool.helpers import redund, get_metabolite_adjacency, to_fractions
 
 
-def mpi_print(s, PRINT_IF_RANK_NONZERO = False):
+def mpi_print(s, PRINT_IF_RANK_NONZERO=False):
     """
     Print s, but only on process 0
     :param s: string to print
@@ -32,7 +33,8 @@ def print_ecms_direct(R, metabolite_ids):
     mpi_print("\n--%d ECMs found by intersecting directly--\n" % R.shape[1])
     for i in range(R.shape[1]):
         mpi_print("ECM #%d:" % i)
-        if np.max(R[:, i]) > 1e100:  # If numbers become too large, they can't be printed, therefore we make them smaller first
+        if np.max(R[:,
+                  i]) > 1e100:  # If numbers become too large, they can't be printed, therefore we make them smaller first
             ecm = np.array(R[:, i] / np.max(R[:, i]), dtype='float')
         else:
             ecm = np.array(R[:, i], dtype='float')
@@ -83,7 +85,7 @@ def kkt_check(c, A, x, basis, i, j, tol=1e-8, threshold=1e-3, max_iter=100000, v
     Take size 0 steps if available.
     """
     improvement = False
-    init_actives = [i,j]
+    init_actives = [i, j]
     ab = np.arange(A.shape[0])
     a = np.arange(A.shape[1])
 
@@ -531,7 +533,8 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
 def normalize_columns(R):
     result = np.zeros(R.shape)
     for i in range(result.shape[1]):
-        if np.max(R[:, i]) > 1e100:  # If numbers are very large, converting to float might give issues, therefore we first divide by another int
+        if np.max(R[:,
+                  i]) > 1e100:  # If numbers are very large, converting to float might give issues, therefore we first divide by another int
             part_normalized_column = np.array(R[:, i] / np.max(R[:, i]), dtype='float')
             result[:, i] = part_normalized_column / np.linalg.norm(part_normalized_column)
         else:
@@ -817,7 +820,7 @@ def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose
                 if res == 1:
                     adjacency.append((p, m))
 
-                if it % (100*mpi_size) == mpi_rank:
+                if it % (100 * mpi_size) == mpi_rank:
                     mpi_print("Process %d is on adjacency test %d of %d (%f %%)" %
                               (mpi_rank, it, nr_tests, it / nr_tests * 100), PRINT_IF_RANK_NONZERO=True)
 
@@ -889,7 +892,32 @@ def in_cone(R, tar):
     return A_ub, b_ub, A_eq, b_eq, c
 
 
-def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12, lps_per_job=1, sort_order='min_adj'):
+def pick_up_intermediate_cone(internal_metabolites, network, intermediate_cone_path):
+    import csv
+
+    with open(intermediate_cone_path) as file:
+        header = file.readline()
+        metab_ids_intermediate = header.split(',')
+
+    if metab_ids_intermediate[-1][-1:] == '\n':
+        metab_ids_intermediate[-1] = metab_ids_intermediate[-1][:-1]
+
+    R_transpose = np.genfromtxt(intermediate_cone_path, dtype='str', delimiter=',', skip_header=1)
+    R = np.transpose(to_fractions(R_transpose))
+
+    new_netw_metabs = []
+    for metab_id in metab_ids_intermediate:
+        new_netw_metabs.append([metab for metab in network.metabolites if metab.id == metab_id][0])
+
+    network.metabolites = new_netw_metabs
+    internal_metabolites = [ind for ind, metab in enumerate(network.metabolites) if not metab.is_external]
+    network.N = R
+
+    return R, internal_metabolites, network
+
+
+def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12, lps_per_job=1, sort_order='min_adj',
+                       intermediate_cone_path=''):
     """
 
     :param R:
@@ -903,6 +931,10 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12
     'max_lp_per_adj', and 'min_connections'.
     :return:
     """
+    if intermediate_cone_path:
+        R, internal_metabolites, network = pick_up_intermediate_cone(internal_metabolites, network,
+                                                                     intermediate_cone_path)
+
     # rows are metabolites
     deleted = np.array([])
     it = 1
@@ -994,6 +1026,14 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12
             rows_removed_redund += removed
         deleted = np.append(deleted, i)
         internal.remove(i)
+
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            try:
+                metab_ids = [metab.id for metab in network.metabolites]
+                np.savetxt('intermediate_conversion_cone.csv', np.transpose(R), delimiter=',',
+                           header=','.join(metab_ids), comments='')
+            except OverflowError:
+                mpi_print('Intermediate result cannot be stored due to too large numbers.')
 
     # remove artificial rays introduced by splitting metabolites
     R, ids = unsplit_metabolites(R, network)
