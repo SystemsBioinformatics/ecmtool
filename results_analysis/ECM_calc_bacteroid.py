@@ -1,9 +1,7 @@
 import os
 import cbmpy as cbm
 import csv
-from results_analysis.helpers_analyze_results import *
 from results_analysis.helpers_ECM_calc_bacteroid import *
-import pandas as pd
 
 """CONSTANTS"""
 model_name = "bacteroid"
