@@ -6,7 +6,7 @@ from scipy.optimize import linprog
 
 
 def calc_ECMs(file_path, print_results=False, hide_metabs=[], input_metabs=[], output_metabs=[],
-              both_metabs = [], external_metabs=[]):
+              both_metabs=[], external_metabs=[]):
     """
     Calculates ECMs using ECMtool
     :return ecms: np.array
@@ -24,22 +24,37 @@ def calc_ECMs(file_path, print_results=False, hide_metabs=[], input_metabs=[], o
     external_inds = [ind for ind, metab in enumerate(network.metabolites) if metab.is_external]
 
     """The following are just for checking the inputs to this program."""
-    metab_info_ext = [(ind, metab.id, metab.direction) for ind, metab in
+    metab_info_ext = [(ind, metab.id, metab.name, metab.direction) for ind, metab in
                       enumerate(network.metabolites) if metab.is_external]
 
     """I extract some information about the external metabolites for checking"""
-    metab_info_ext_df = pd.DataFrame(metab_info_ext, columns=['metab_ind','metab_id', 'Direction'])
+    metab_info_ext_df = pd.DataFrame(metab_info_ext, columns=['metab_ind', 'metab_id', 'metab_name', 'Direction'])
 
     """You can choose to save this information, but I use the same file for inputting information, so it is not very practical at the moment."""
-#    metab_info_ext_df.to_csv(path_or_buf='external_info_iJR904.csv', index=False)
+    #    metab_info_ext_df.to_csv(path_or_buf='external_info_iJR904.csv', index=False)
 
     """Read in input, output, and hide information"""
-    # info_metabs_df = pd.read_csv('external_info_iJR904.csv')
-    # hide_metabs = [metab for ind, metab in enumerate(info_metabs_df['metab_ind']) if info_metabs_df['hideYN'][ind]]
+    info_metabs_df = pd.read_csv('Carolin_ECMinput.csv')
+    info_metabs_input = info_metabs_df[info_metabs_df.Input == 1]
+    info_metabs_output = info_metabs_df[info_metabs_df.Output == 1]
+    info_metabs_hidden = info_metabs_df[info_metabs_df.Hidden == 1]
 
-    """Get the indices that correspond to the metabolites that need to be hidden, and then hide them."""
-    # if len(hide_metabs) > 0:
-    #    network.hide(hide_metabs)
+    """Get the indices that correspond to the metabolites that are inputs, outputs, or hidden, and then hide them."""
+    input_inds = list(info_metabs_input.Index.values)
+    output_inds = list(info_metabs_output.Index.values) + [ind for ind, metab in enumerate(network.metabolites) if
+                                                           metab.id == 'objective']
+    hide_inds = list(info_metabs_hidden.Index.values)
+    prohibit_inds = [ind for ind, metab in enumerate(network.metabolites) if
+                     (metab.is_external) & (not ind in input_inds + output_inds + hide_inds) & (
+                         not metab.id == 'objective')]
+
+    print(','.join(map(str, input_inds)))
+    print(','.join(map(str, output_inds)))
+    print(','.join(map(str, hide_inds)))
+    print(','.join(map(str, prohibit_inds)))
+
+    # if len(info_metabs_hidden) > 0:
+    #     network.hide(hide_metabs)
 
     """Keep a copy of the full network before compression. This can be nice for later."""
     full_network = copy.deepcopy(network)
