@@ -248,6 +248,10 @@ def set_inoutputs(inputs, outputs, network):
 
     network.set_inputs(inputs)
     network.set_outputs(outputs)
+    if len(np.intersect1d(inputs,outputs)):
+        for ind in np.intersect1d(inputs,outputs):
+            mpi_print('Metabolite %s was marked as both only input and only output, which is impossible. It is set to both, for now.' % (network.metabolites[ind].id))
+        network.set_both(np.intersect1d(inputs,outputs))
     return
 
 
@@ -278,9 +282,14 @@ if __name__ == '__main__':
     parser.add_argument('--inputs', type=str, default='',
                         help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be consumed')
     parser.add_argument('--outputs', type=str, default='',
-                        help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be produced')
+                        help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be produced. '
+                             'If inputs are given, but no outputs, then everything not marked as input is marked as output.'
+                             'If inputs and outputs are given, the possible remainder of external metabolites is marked as both')
     parser.add_argument('--hide', type=str, default='',
                         help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that are transformed into internal metabolites by adding bidirectional exchange reactions')
+    parser.add_argument('--prohibit', type=str, default='',
+                        help='EXPERIMENTAL. Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that are transformed into internal metabolites without adding bidirectional exchange reactions.'
+                             'This metabolite can therefore not be used as input nor output.')
     parser.add_argument('--hide_all_in_or_outputs', type=str, default='',
                         help='String that is either empty, input, or output. If it is inputs or outputs, after splitting metabolites, all inputs or outputs are hidden (objective is always excluded)')
     parser.add_argument('--iterative', type=str2bool, default=False,
@@ -335,6 +344,10 @@ if __name__ == '__main__':
             if args.hide:
                 hide_indices = [int(index) for index in args.hide.split(',') if len(index)]
                 network.hide(hide_indices)
+
+            if args.prohibit:
+                prohibit_indices = [int(index) for index in args.prohibit.split(',') if len(index)]
+                network.prohibit(prohibit_indices)
 
             if args.print_reactions:
                 mpi_print('Reactions%s:' % (' before compression' if args.compress else ''))
