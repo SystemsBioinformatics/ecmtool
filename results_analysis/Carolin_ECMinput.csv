@@ -1,0 +1,22 @@
+﻿Compound,Description,Index,Input,Output,Hidden
+cpd00001[e0] ,H2O[e0] ,1,1,1,0
+cpd00007[e0] ,O2[e0] ,8,1,0,0
+cpd00009[e0] ,Pi[e0] ,11,1,0,0
+cpd00011[e0] ,CO2[e0] ,14,1,1,0
+cpd00107[e0] ,L-leucine[e0] ,85,1,0,0
+cpd00130[e0] ,L-malate[e0] ,99,1,0,0
+cpd00048[e0] ,SO4[e0] ,42,1,0,0
+cpd00067[e0] ,H+[e0] ,59,1,0,0
+cpd00227[e0] ,homoserine[e0] ,124,1,0,0
+cpd00528[e0] ,N2[e0],156,1,0,0
+cpd00421[c0],PolyP[c0],144,0,1,0
+cpd00214[c0],hexadecanoate[c0],119,0,1,0
+cpd03802[c0],homospermidine[c0],217,0,1,1
+cpd12836[c0],PHB[c0],231,0,1,0
+cpdPG6[c0],Phosphatidylglycerol-1-palmitoleoyl-2-palmitic[c0],234,0,1,0
+cpd00111[c0],oxidized_glutathione[c0],88,0,1,1
+cpd00155[c0],glycogen[c0],105,0,1,0
+cpd00013[e0] ,NH3[e0] ,17,0,1,0
+cpd00035[e0] ,L-alanine[e0],32,0,1,0
+cpd00041[e0] ,L-aspartate[e0],38,0,1,0
+cpd11640[e0] ,H2[e0] ,226,0,1,0

@@ -274,6 +274,11 @@ class Network:
             self.metabolites[index].is_external = True
             self.metabolites[index].direction = 'output'
 
+    def set_both(self, both_indices):
+        for index in both_indices:
+            self.metabolites[index].is_external = True
+            self.metabolites[index].direction = 'both'
+
     def input_metabolite_indices(self):
         return [index for index, metabolite in enumerate(self.metabolites) if
                 metabolite.direction == 'input' and metabolite.is_external]
@@ -670,6 +675,21 @@ class Network:
                 column[index, 0] = 1
                 # column[source, 0] = -1
                 self.N = np.append(self.N, column, axis=1)
+
+
+    def prohibit(self, metabolite_indices):
+        """
+        Prohibits input or output of external metabolites by marking them as internal metabolites.
+        :param metabolite_indices: list of metabolite indices
+        :return:
+        """
+        # This 'get_or_create hide_metabolites' can be used to keep track of metabolites that are hidden, but makes
+        # the code a bit slower. Therefore, it is outcommented.
+        # source, sink = self.get_or_create_hide_metabolites()
+
+        for index in metabolite_indices:
+            self.metabolites[index].is_external = False
+
 
     def remove_objective_reaction(self):
         reaction_matches = [index for index, reaction in enumerate(self.reactions) if
