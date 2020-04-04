@@ -768,44 +768,80 @@ class Network:
 
         return input and output
 
-    def split_in_out(self):
+    def split_in_out(self, only_rays=False):
         # Add virtual input and output metabolites for external metabolites that are both input and output
         # Add virtual input metabolites for input metabolites, to enforce that they can't be used as output
         # Similar for output metabolites
+        # The latter two should still be done if only_rays = True
         count = 0
         start_metabolites = len(self.metabolites)
         for i, metabolite in enumerate(self.metabolites):
             if i > start_metabolites - 1:  # dont re-split _in and _out virtual metabolites
                 break
             if metabolite.is_external:
-                if metabolite.direction == 'both' or metabolite.direction == 'input':
-                    new_in = Metabolite(metabolite.id + "_in", metabolite.name + "_in", metabolite.compartment,
-                                        is_external=True, direction='input')
-                    self.metabolites.append(new_in)
-                    exchange_in = Reaction(metabolite.id + " exch_in", metabolite.id + " exch_in", reversible=False)
-                    self.reactions.append(exchange_in)
-                    new_row = [[int(x)] for x in np.zeros(self.N.shape[1])]
-                    self.N = np.append(self.N, np.transpose(np.asarray(new_row)), axis=0)
-                    new_column = [[int(x)] for x in np.zeros(self.N.shape[0])]
-                    new_column[i] = [int(1)]
-                    new_column[-1] = [int(-1)]
-                    self.N = np.append(self.N, np.asarray(new_column), axis=1)
+                make_internal = False  # boolean indicating if we have added virtual metabolite, and if we should thus make the original metab internal
+                if not only_rays:
+                    if metabolite.direction == 'both' or metabolite.direction == 'input':
+                        make_internal = True
+                        new_in = Metabolite(metabolite.id + "_in", metabolite.name + "_in", metabolite.compartment,
+                                            is_external=True, direction='input')
+                        self.metabolites.append(new_in)
+                        exchange_in = Reaction(metabolite.id + " exch_in", metabolite.id + " exch_in", reversible=False)
+                        self.reactions.append(exchange_in)
+                        new_row = [[int(x)] for x in np.zeros(self.N.shape[1])]
+                        self.N = np.append(self.N, np.transpose(np.asarray(new_row)), axis=0)
+                        new_column = [[int(x)] for x in np.zeros(self.N.shape[0])]
+                        new_column[i] = [int(1)]
+                        new_column[-1] = [int(-1)]
+                        self.N = np.append(self.N, np.asarray(new_column), axis=1)
 
-                if metabolite.direction == 'both' or metabolite.direction == 'output':
-                    new_out = Metabolite(metabolite.id + "_out", metabolite.name + "_out", metabolite.compartment,
-                                         is_external=True, direction='output')
-                    self.metabolites.append(new_out)
-                    exchange_out = Reaction(metabolite.id + " exch_out", metabolite.id + " exch_out", reversible=False)
-                    self.reactions.append(exchange_out)
-                    new_row = [[int(x)] for x in np.zeros(self.N.shape[1])]
-                    self.N = np.append(self.N, np.transpose(np.asarray(new_row)), axis=0)
-                    new_column = [[int(x)] for x in np.zeros(self.N.shape[0])]
-                    new_column[i] = [int(-1)]
-                    new_column[-1] = [int(1)]
-                    self.N = np.append(self.N, np.asarray(new_column), axis=1)
+                    if metabolite.direction == 'both' or metabolite.direction == 'output':
+                        make_internal = True
+                        new_out = Metabolite(metabolite.id + "_out", metabolite.name + "_out", metabolite.compartment,
+                                             is_external=True, direction='output')
+                        self.metabolites.append(new_out)
+                        exchange_out = Reaction(metabolite.id + " exch_out", metabolite.id + " exch_out", reversible=False)
+                        self.reactions.append(exchange_out)
+                        new_row = [[int(x)] for x in np.zeros(self.N.shape[1])]
+                        self.N = np.append(self.N, np.transpose(np.asarray(new_row)), axis=0)
+                        new_column = [[int(x)] for x in np.zeros(self.N.shape[0])]
+                        new_column[i] = [int(-1)]
+                        new_column[-1] = [int(1)]
+                        self.N = np.append(self.N, np.asarray(new_column), axis=1)
+                else:  # if only_rays
+                    if metabolite.direction == 'input':
+                        make_internal = True
+                        new_in = Metabolite(metabolite.id + "_in", metabolite.name + "_in", metabolite.compartment,
+                                            is_external=True, direction='input')
+                        self.metabolites.append(new_in)
+                        exchange_in = Reaction(metabolite.id + " exch_in", metabolite.id + " exch_in", reversible=False)
+                        self.reactions.append(exchange_in)
+                        new_row = [[int(x)] for x in np.zeros(self.N.shape[1])]
+                        self.N = np.append(self.N, np.transpose(np.asarray(new_row)), axis=0)
+                        new_column = [[int(x)] for x in np.zeros(self.N.shape[0])]
+                        new_column[i] = [int(1)]
+                        new_column[-1] = [int(-1)]
+                        self.N = np.append(self.N, np.asarray(new_column), axis=1)
 
-                metabolite.is_external = False
-                metabolite.compartment = 'virtual'
-                count += 1
+                    if metabolite.direction == 'output':
+                        make_internal = True
+                        new_out = Metabolite(metabolite.id + "_out", metabolite.name + "_out", metabolite.compartment,
+                                             is_external=True, direction='output')
+                        self.metabolites.append(new_out)
+                        exchange_out = Reaction(metabolite.id + " exch_out", metabolite.id + " exch_out",
+                                                reversible=False)
+                        self.reactions.append(exchange_out)
+                        new_row = [[int(x)] for x in np.zeros(self.N.shape[1])]
+                        self.N = np.append(self.N, np.transpose(np.asarray(new_row)), axis=0)
+                        new_column = [[int(x)] for x in np.zeros(self.N.shape[0])]
+                        new_column[i] = [int(-1)]
+                        new_column[-1] = [int(1)]
+                        self.N = np.append(self.N, np.asarray(new_column), axis=1)
+
+                if make_internal:
+                    metabolite.is_external = False
+                    metabolite.compartment = 'virtual'
+                    count += 1
+
         self.N = to_fractions(self.N)
         mpi_print("Split %d input/output external metabolites" % count)

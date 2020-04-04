@@ -156,7 +156,8 @@ def vectors_in_cone(vector_matrix, cone_matrix, network, verbose=True):
 def check_bijection(conversion_cone, network, model_path, args, verbose=True):
     full_model = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite,
                                             determine_inputs_outputs=args.auto_direction,
-                                            skip_external_reactions=True)
+                                            skip_external_reactions=True,
+                                            external_compartment=args.external_compartment)
     if args.check_bijection:
         set_inoutputs(args.inputs, args.outputs, full_model)
 
@@ -248,10 +249,12 @@ def set_inoutputs(inputs, outputs, network):
 
     network.set_inputs(inputs)
     network.set_outputs(outputs)
-    if len(np.intersect1d(inputs,outputs)):
-        for ind in np.intersect1d(inputs,outputs):
-            mpi_print('Metabolite %s was marked as both only input and only output, which is impossible. It is set to both, for now.' % (network.metabolites[ind].id))
-        network.set_both(np.intersect1d(inputs,outputs))
+    if len(np.intersect1d(inputs, outputs)):
+        for ind in np.intersect1d(inputs, outputs):
+            mpi_print(
+                'Metabolite %s was marked as both only input and only output, which is impossible. It is set to both, for now.' % (
+                    network.metabolites[ind].id))
+        network.set_both(np.intersect1d(inputs, outputs))
     return
 
 
@@ -277,6 +280,8 @@ if __name__ == '__main__':
                         help='Print the names and IDs of metabolites in the (compressed) metabolic network (default: true)')
     parser.add_argument('--print_reactions', type=str2bool, default=False,
                         help='Print the names and IDs of reactions in the (compressed) metabolic network (default: true)')
+    parser.add_argument('--external_compartment', type=str, default='e',
+                        help='String indicating how the external compartment in metabolite_ids of SBML-file is marked. Please check if external compartment detection works by checking metabolite information before compression and with --primt metabolites true')
     parser.add_argument('--auto_direction', type=str2bool, default=True,
                         help='Automatically determine external metabolites that can only be consumed or produced (default: true)')
     parser.add_argument('--inputs', type=str, default='',
@@ -331,7 +336,8 @@ if __name__ == '__main__':
         with HiddenPrints():
             network = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite,
                                                  determine_inputs_outputs=args.auto_direction,
-                                                 skip_external_reactions=True)
+                                                 skip_external_reactions=True,
+                                                 external_compartment=args.external_compartment)
 
             debug_tags = []
             # add_debug_tags(network)
@@ -369,10 +375,9 @@ if __name__ == '__main__':
             #         if nr != 0:
             #             mpi_print("%s: %d" % (network.metabolites[j].id, nr))
 
-            # TODO: Change this, this should also partly be done when only_rays=True
-            if not args.only_rays:
-                network.split_in_out()
-            # TODO: Add this option to the other intersection nmethods too
+            # Split metabolites in input and output
+            network.split_in_out(args.only_rays)
+            # TODO: Add this option to the other intersection methods too
             if args.hide_all_in_or_outputs:
                 hide_indices = [ind for ind, metab in enumerate(network.metabolites) if
                                 (metab.is_external) & (metab.direction == args.hide_all_in_or_outputs) & (
@@ -407,7 +412,8 @@ if __name__ == '__main__':
             internal = np.setdiff1d(range(R.shape[0]), external)
 
         T_intersected, ids = intersect_directly(R, internal, network, verbose=args.verbose, lps_per_job=args.job_size,
-                                                sort_order=args.sort_order, intermediate_cone_path=args.intermediate_cone_path)
+                                                sort_order=args.sort_order,
+                                                intermediate_cone_path=args.intermediate_cone_path)
 
         print_ecms_direct(T_intersected, ids)
 
@@ -427,7 +433,8 @@ if __name__ == '__main__':
     if args.compare or not args.direct:
         network = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite,
                                              determine_inputs_outputs=args.auto_direction,
-                                             skip_external_reactions=True)
+                                             skip_external_reactions=True,
+                                             external_compartment=args.external_compartment)
 
         debug_tags = []
         # add_debug_tags(network)
