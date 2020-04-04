@@ -34,7 +34,7 @@ def calc_ECMs(file_path, print_results=False, hide_metabs=[], input_metabs=[], o
     #    metab_info_ext_df.to_csv(path_or_buf='external_info_iJR904.csv', index=False)
 
     """Read in input, output, and hide information"""
-    info_metabs_df = pd.read_csv('Carolin_ECMinput.csv')
+    info_metabs_df = pd.read_csv('Carolin_ECMinputAll.csv')
     info_metabs_input = info_metabs_df[info_metabs_df.Input == 1]
     info_metabs_output = info_metabs_df[info_metabs_df.Output == 1]
     info_metabs_hidden = info_metabs_df[info_metabs_df.Hidden == 1]
