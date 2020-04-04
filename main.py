@@ -23,7 +23,7 @@ class HiddenPrints:
 with HiddenPrints():
     from ecmtool.helpers import get_efms, get_metabolite_adjacency, redund
     from ecmtool.intersect_directly_mpi import intersect_directly, print_ecms_direct, remove_cycles, \
-        compress_after_cycle_removing, mpi_print, normalize_columns
+        compress_after_cycle_removing, mpi_print, normalize_columns, check_if_intermediate_cone_exists
     from ecmtool.network import extract_sbml_stoichiometry
     from ecmtool.conversion_cone import get_conversion_cone, iterative_conversion_cone, unique
     from ecmtool.functions_for_Erik import check_bijection_Erik
@@ -331,6 +331,9 @@ if __name__ == '__main__':
             args.compress = False
 
         model_path = args.model_path
+
+    if args.intermediate_cone_path:
+        check_if_intermediate_cone_exists(args.intermediate_cone_path)
 
     if args.compare or args.direct:
         with HiddenPrints():
