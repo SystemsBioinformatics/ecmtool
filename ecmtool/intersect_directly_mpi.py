@@ -25,9 +25,9 @@ def mpi_print(s, PRINT_IF_RANK_NONZERO=False):
 
 def check_if_intermediate_cone_exists(intermediate_cone_path):
     if os.path.exists(intermediate_cone_path):
-        mpi_print('Will try to pick up intermediate cone, file found.', True)
+        mpi_print('Will try to pick up intermediate cone, file found.')
     else:
-        mpi_print('Tries to pick up intermediate cone, but file not found.', True)
+        mpi_print('Tries to pick up intermediate cone, but file not found.')
 
 
 def print_ecms_direct(R, metabolite_ids):
