@@ -115,8 +115,6 @@ df_EXreact_directions = pandas.concat([df_EXreact_input,df_EXreact_output, df_EX
 hide_list = [metab not in MetListKin for metab in df_EXreact_directions[0]]
 df_EXreact_directions['hide'] = hide_list
 
-df_EXreact_directions.to_csv("df_EXreact_Lactis_directions.csv", sep=',', index=False)
-
 for irR in mod.getReactionIds():  # Get rid of reactions with minimal velocities
     Bounds = mod.getReactionBounds(irR)
     if Bounds[1] > 0:
@@ -146,6 +144,26 @@ InconsEX = cbmpy.CBTools.checkExchangeReactions(mod, autocorrect=False)
 InconsBounds = cbmpy.CBTools.checkFluxBoundConsistency(mod)
 
 cbmpy.CBWrite.writeSBML3FBC(mod, os.path.join('models','LactisFULLWOGlycolysis.xml'))
+
+"""Find FBA-conversion"""
+fba_dict = {}
+for metab in df_EXreact_directions[0]:
+    fba_dict.update({metab: 0})
+
+for metab_reac_tuple in DERred:
+    m_id = metab_reac_tuple[0]
+    r_id = metab_reac_tuple[1]
+    reac = mod.getReaction(r_id)
+    val = reac.getValue()
+    stoich_coeff = reac.reagents[0].coefficient
+    metab_prod = - val * stoich_coeff
+    fba_dict[m_id] += metab_prod
+
+df_EXreact_directions['FBA_result'] = 0
+for ind, metab in enumerate(df_EXreact_directions[0]):
+    df_EXreact_directions['FBA_result'].values[ind] = fba_dict[metab]
+
+df_EXreact_directions.to_csv("df_EXreact_Lactis_directions.csv", sep=',', index=False)
 # cbmpy.CBWrite.writeSBML3FBC(mod, 'LactisFULLECM.xml')
 
 # import pysces
