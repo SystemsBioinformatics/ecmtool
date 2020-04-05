@@ -409,7 +409,7 @@ def get_remove_metabolite(R, network, reaction, verbose=True):
             if column[i] != 0:
                 return i
     mpi_print("\tWarning: reaction to augment has only external metabolites")
-    return 0
+    return -1
 
 
 def compress_after_cycle_removing(network, verbose=True):
@@ -640,8 +640,8 @@ def setup_cycle_LP(R_indep):
 def setup_LP(R_indep, i, j):
     number_rays = R_indep.shape[1]
 
-    A_ub = -np.identity(number_rays)
-    b_ub = np.zeros(number_rays)
+    # A_ub = -np.identity(number_rays)
+    # b_ub = np.zeros(number_rays)
     b_eq = R_indep[:, i] / 2 + R_indep[:, j] / 2
     c = -np.ones(number_rays)
     c[i] = 0
@@ -650,7 +650,8 @@ def setup_LP(R_indep, i, j):
     x0[i] = 0.5
     x0[j] = 0.5
 
-    return A_ub, b_ub, R_indep, b_eq, c, x0
+    # return A_ub, b_ub, R_indep, b_eq, c, x0
+    return R_indep, b_eq, c, x0
 
 
 def perturb_LP(b_eq, x0, A_eq, basis, epsilon):
@@ -662,7 +663,8 @@ def perturb_LP(b_eq, x0, A_eq, basis, epsilon):
 
 
 def determine_adjacency(R, i, j, basis, tol=1e-10):
-    A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP(R, i, j)
+    # A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP(R, i, j) # We don't need A_ub, and its causing memory issues
+    A_eq, b_eq, c, x0 = setup_LP(R, i, j)
     b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, 1e-10)
     KKT, status = kkt_check(c, A_eq, x0, basis, i, j)
 
