@@ -21,7 +21,7 @@ class HiddenPrints:
 
 
 with HiddenPrints():
-    from ecmtool.helpers import get_efms, get_metabolite_adjacency, redund
+    from ecmtool.helpers import get_efms, get_metabolite_adjacency, redund, to_fractions
     from ecmtool.intersect_directly_mpi import intersect_directly, print_ecms_direct, remove_cycles, \
         compress_after_cycle_removing, mpi_print, normalize_columns, check_if_intermediate_cone_exists
     from ecmtool.network import extract_sbml_stoichiometry
@@ -336,7 +336,7 @@ if __name__ == '__main__':
         check_if_intermediate_cone_exists(args.intermediate_cone_path)
 
     if args.compare or args.direct:
-        with HiddenPrints():
+        with HiddenPrints():  # Store original network, for unhide step
             network = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite,
                                                  determine_inputs_outputs=args.auto_direction,
                                                  skip_external_reactions=True,
@@ -393,14 +393,18 @@ if __name__ == '__main__':
             removed = 0
             for i in np.flip(range(network.N.shape[0]), 0):
                 if sum(abs(network.N[i])) == 0:
-                    network.drop_metabolites([i], force_external=True)
-                    removed += 1
+                    if not network.metabolites[i].is_external:
+                        network.drop_metabolites([i], force_external=True)
+                        removed += 1
             mpi_print("Removed %d metabolites that were not in any reactions" % removed)
 
             network.split_reversible()
             network.N = np.transpose(redund(np.transpose(network.N)))
 
-            R, network = remove_cycles(network.N, network)
+            # TODO: remove_cycles could run into cycle with only external metabolites. This cycle should then be
+            # removed by cancelling one of the external metabolites, but the cycle should be stored and added to R
+            # in the end.
+            R, network, external_cycles = remove_cycles(network.N, network)
             R = network.N
             # TODO: Make this cleaner
             # After this we do not use network.reactions anymore? I will now delete any superfluous reaction in network.
@@ -417,6 +421,15 @@ if __name__ == '__main__':
         T_intersected, ids = intersect_directly(R, internal, network, verbose=args.verbose, lps_per_job=args.job_size,
                                                 sort_order=args.sort_order,
                                                 intermediate_cone_path=args.intermediate_cone_path)
+        # TODO: Cycles with external metabolites should be added in here!
+        if len(external_cycles):
+            external_cycles_array = to_fractions(np.zeros((T_intersected.shape[0],len(external_cycles))))
+            for ind, cycle in enumerate(external_cycles):
+                for cycle_metab in cycle:
+                    metab_ind = [ind for ind, metab in enumerate(ids) if metab == cycle_metab][0]
+                    external_cycles_array[metab_ind, ind] = cycle[cycle_metab]
+
+            T_intersected = np.concatenate((T_intersected, external_cycles_array, -external_cycles_array), axis=1)
 
         print_ecms_direct(T_intersected, ids)
 

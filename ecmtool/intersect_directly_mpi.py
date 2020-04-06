@@ -264,7 +264,7 @@ def independent_rows(A):
     return A[basis]
 
 
-def cancel_with_cycle(R, met, cycle_ind, network, removable_reactions, verbose=True, tol=1e-12):
+def cancel_with_cycle(R, met, cycle_ind, network, removable_reactions, verbose=True, tol=1e-12, removable_is_ext=False):
     cancelling_reaction = R[:, cycle_ind]
     reactions_using_met = [i for i in range(R.shape[1]) if R[met, i] != 0 and i != cycle_ind]
 
@@ -274,7 +274,7 @@ def cancel_with_cycle(R, met, cycle_ind, network, removable_reactions, verbose=T
     for reac_ind in reactions_using_met:
         coeff_cycle = R[met, cycle_ind]
         coeff_reac = R[met, reac_ind]
-        new_ray = R[:, reac_ind] - (coeff_reac / coeff_cycle) * R[:, cycle_ind]
+        new_ray = (R[:, reac_ind] - (coeff_reac / coeff_cycle) * R[:, cycle_ind]) * abs(coeff_cycle / np.gcd(coeff_cycle, coeff_reac))
         if sum(abs(new_ray)) > tol:
             next_R[:, reac_ind] = new_ray
         else:
@@ -285,13 +285,21 @@ def cancel_with_cycle(R, met, cycle_ind, network, removable_reactions, verbose=T
 
     removable_reactions.append(to_be_dropped)
     network.drop_reactions(to_be_dropped)
-    # delete all-zero row
-    next_R = np.delete(next_R, met, 0)
-    network.drop_metabolites([met])
-    mpi_print("After removing this metabolite, we have %d metabolites and %d rays" %
-              (next_R.shape[0], next_R.shape[1]))
 
-    return next_R, removable_reactions
+    if not removable_is_ext:
+        # delete all-zero row
+        next_R = np.delete(next_R, met, 0)
+        network.drop_metabolites([met])
+        mpi_print("After removing this metabolite, we have %d metabolites and %d rays" %
+                  (next_R.shape[0], next_R.shape[1]))
+        external_cycle_dict = None
+    else:
+        external_cycle_dict = {}
+        for ind, metab in enumerate(network.metabolites):
+            if R[ind, cycle_ind] != 0:
+                external_cycle_dict.update({metab.id: R[ind, cycle_ind]})
+
+    return next_R, removable_reactions, external_cycle_dict
 
 
 def iteration_without_lps(R, met, network):
@@ -402,10 +410,10 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, v
     return next_matrix, rows_removed_redund
 
 
-def get_remove_metabolite(R, network, reaction, verbose=True):
+def get_remove_metabolite(R, network, reaction, verbose=True, allow_external=False):
     column = R[:, reaction]
     for i in range(len(column)):
-        if not network.metabolites[i].is_external:
+        if (not network.metabolites[i].is_external) or (allow_external):
             if column[i] != 0:
                 return i
     mpi_print("\tWarning: reaction to augment has only external metabolites")
@@ -427,6 +435,7 @@ def compress_after_cycle_removing(network, verbose=True):
 def remove_cycles(R, network, tol=1e-12, verbose=True):
     """Detect whether there are cycles, by doing an LP. If LP is unbounded find a minimal cycle. Cancel one metabolite
     with the cycle."""
+    external_cycles = []
     removable_metabolites = []
     removable_reactions = []
     count_since_last_redund = 0
@@ -454,19 +463,29 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
         # Find minimal cycle
         met = -1
         counter = 0
-        while met < 0:
+        removable_is_ext = False
+        while met < 0 and (not removable_is_ext):
             cycle_ind = cycle_indices[counter]
+            # TODO: Solve situation in which met = -1 (only nonzero external metabolites)
             met = get_remove_metabolite(R, network, cycle_ind)
+            if met == -1:  # Only external metabolites used in this ray, delete external and remember the ray
+                removable_is_ext = True
+                met = get_remove_metabolite(R, network, cycle_ind, allow_external=True)
+
             counter = counter + 1
             if counter > len(cycle_indices):
                 mpi_print('No internal metabolite was found that was part of the cycle. This might cause problems.')
 
-        removable_metabolites.append(met)
+        if not removable_is_ext:
+            removable_metabolites.append(met)
         if verbose:
             mpi_print("Found an unbounded LP, cancelling metabolite %d (%s) with reaction %d" % (
                 met, network.metabolites[met].id, cycle_ind))
 
-        R, removable_reactions = cancel_with_cycle(R, met, cycle_ind, network, removable_reactions)
+        R, removable_reactions, external_cycle = cancel_with_cycle(R, met, cycle_ind, network, removable_reactions,
+                                                                   removable_is_ext=removable_is_ext)
+        if external_cycle:
+            external_cycles.append(external_cycle)
         count_since_last_redund = count_since_last_redund + 1
 
         if count_since_last_redund > 10:
@@ -508,7 +527,7 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
                 raise Exception('Remove cycles did not work, because LP-solver had issues. Try to solve this.')
 
     internal_metabolite_indices = [i for i, metab in enumerate(network.metabolites) if not metab.is_external]
-    for metabolite_index in internal_metabolite_indices:
+    for metabolite_index in internal_metabolite_indices: # This does nothing, I think
         nonzero_count = np.count_nonzero(network.N[metabolite_index, :])
         if nonzero_count == 0:
             removable_metabolites.append(metabolite_index)
@@ -534,7 +553,7 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
     # network.drop_metabolites(removable_metabolites)
     R = network.N
 
-    return R, network
+    return R, network, external_cycles
 
 
 def normalize_columns(R):
@@ -581,6 +600,7 @@ def generate_BFS(R, i, j, eps):
 
 
 def setup_LP_perturbed(R, i, j, epsilon):
+    np.random.seed(42)
     m, n = R.shape
 
     A_ub = -np.identity(n + 2 * m)
@@ -655,6 +675,7 @@ def setup_LP(R_indep, i, j):
 
 
 def perturb_LP(b_eq, x0, A_eq, basis, epsilon):
+    np.random.seed(42)
     eps = np.random.uniform(epsilon / 2, epsilon, len(basis))
     b_eq = b_eq + np.dot(A_eq[:, basis], eps)
     x0[basis] += eps
