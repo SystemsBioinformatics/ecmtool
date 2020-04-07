@@ -947,7 +947,7 @@ def pick_up_intermediate_cone(internal_metabolites, network, intermediate_cone_p
 
 
 def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12, lps_per_job=1, sort_order='min_adj',
-                       intermediate_cone_path=''):
+                       intermediate_cone_path='', manual_override = ''):
     """
 
     :param R:
@@ -982,8 +982,9 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12
         # If there is a metabolite that can be deleted without any lps being done, we will do it immediately
         if np.min(n_lps) == 0:
             sorting = 'min_lp'
-
-        if sorting == 'min_lp':
+        if manual_override and (it == 1):
+            i = internal[int(manual_override)]
+        elif sorting == 'min_lp':
             i = internal[np.argmin(n_lps)]
         elif sorting == 'min_connections':
             # Alternative way of choosing metabolite, choose the one that is minimally connected
@@ -1033,7 +1034,9 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12
                 it, to_remove, [m.id for m in network.metabolites][to_remove], len(internal_metabolites)))
             mpi_print("Possible LP amounts for this step:\n" + ", ".join(np.array(n_lps).astype(str)))
             mpi_print("Total: %d" % sum(n_lps))
-            if sorting == 'min_adj':
+            if manual_override and (it == 1):
+                mpi_print("Sorting was manually chosen for this first step.\n")
+            elif sorting == 'min_adj':
                 mpi_print("Possible adjacencies added for this step:\n" + ", ".join(np.array(adj_added).astype(str)))
                 mpi_print("Minimal adjacency option chosen.\n")
             elif sorting == 'max_lp_per_adj':
