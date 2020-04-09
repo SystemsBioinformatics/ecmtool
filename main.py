@@ -401,7 +401,7 @@ if __name__ == '__main__':
 
             network.split_reversible()
             network.N = np.transpose(redund(np.transpose(network.N)))
-.
+
             R, network, external_cycles = remove_cycles(network.N, network)
             R = network.N
             n_reac_according_to_N = network.N.shape[1]
