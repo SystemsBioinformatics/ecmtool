@@ -317,8 +317,7 @@ if __name__ == '__main__':
                         help='Filename where intermediate cone result can be found. If an empty string is given (default), then no intermediate result is picked up and the calculation is done in full')
     parser.add_argument('--manual_override', type=str, default='',
                        help='Index indicating which metabolite should be intersected in first step. Advanced option, can be used in combination with --intermediate_cone_path, to pick a specific intersection at a specific time.')
-    parser.add_argument('--print_conversions', type=str2bool, default=True,
-                        help='Print the calculated conversion modes (default: true)')
+
     args = parser.parse_args()
 
     with HiddenPrints():
