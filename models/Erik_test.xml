@@ -1,0 +1,127 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sbml xmlns="http://www.sbml.org/sbml/level3/version1/core" fbc:required="false" level="3" version="1"
+      xmlns:fbc="http://www.sbml.org/sbml/level3/version1/fbc/version2">
+  <notes>Test model.</notes>
+  <model id="Erik_test" fbc:strict="true" >
+  <fbc:listOfObjectives xmlns:fbc="http://www.sbml.org/sbml/level3/version1/fbc/version2" fbc:activeObjective="obj">
+      <fbc:objective fbc:id="obj" fbc:type="maximize">
+        <fbc:listOfFluxObjectives>
+          <fbc:fluxObjective fbc:coefficient="1" fbc:reaction="v1" />
+        </fbc:listOfFluxObjectives>
+      </fbc:objective>
+    </fbc:listOfObjectives>
+    <listOfCompartments>
+      <compartment id="cell" name="cell" constant="true"/>
+      <compartment id="e" name="e" constant="true"/>
+    </listOfCompartments>
+    <listOfSpecies>
+      <species id="m1" name="m1" compartment="c" hasOnlySubstanceUnits="false" boundaryCondition="false" constant="false"/>
+      <species id="m2" name="m2" compartment="e" hasOnlySubstanceUnits="false" boundaryCondition="false" constant="false"/>
+      <species id="m3" name="m3" compartment="c" hasOnlySubstanceUnits="false" boundaryCondition="false" constant="false"/>
+      <species id="m4" name="m4" compartment="c" hasOnlySubstanceUnits="false" boundaryCondition="false" constant="false"/>
+      <species id="m5" name="m5" compartment="c" hasOnlySubstanceUnits="false" boundaryCondition="false" constant="false"/>
+      <species id="m6" name="m6" compartment="c" hasOnlySubstanceUnits="false" boundaryCondition="false" constant="false"/>
+      <species id="m7" name="m7" compartment="e" hasOnlySubstanceUnits="false" boundaryCondition="false" constant="false"/>
+      <species id="m8" name="m8" compartment="e" hasOnlySubstanceUnits="false" boundaryCondition="false" constant="false"/>
+      <species id="m9" name="m9" compartment="c" hasOnlySubstanceUnits="false" boundaryCondition="false" constant="false"/>
+      <species id="m10" name="m10" compartment="e" hasOnlySubstanceUnits="false" boundaryCondition="false" constant="false"/>
+    </listOfSpecies>
+    <listOfReactions>
+      <reaction id="v1" name="v1" reversible="false" fast="false" compartment="cell">
+        <listOfReactants>
+          <speciesReference species="m6" stoichiometry="2" constant="false"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="m1" stoichiometry="1" constant="false"/>
+          <speciesReference species="m3" stoichiometry="1" constant="false"/>
+          <speciesReference species="m4" stoichiometry="1" constant="false"/>
+          <speciesReference species="m7" stoichiometry="3" constant="false"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="v2" name="v2" reversible="false" fast="false" compartment="cell">
+        <listOfReactants>
+          <speciesReference species="m4" stoichiometry="1" constant="false"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="m5" stoichiometry="1" constant="false"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="v3" name="v3" reversible="false" fast="false" compartment="cell">
+        <listOfReactants>
+          <speciesReference species="m8" stoichiometry="1" constant="false"/>
+          <speciesReference species="m9" stoichiometry="1" constant="false"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="m2" stoichiometry="1" constant="false"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="v4" name="v4" reversible="false" fast="false" compartment="cell">
+        <listOfReactants>
+          <speciesReference species="m2" stoichiometry="1" constant="false"/>
+          <speciesReference species="m10" stoichiometry="1" constant="false"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="m1" stoichiometry="1" constant="false"/>
+          <speciesReference species="m6" stoichiometry="1" constant="false"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="v5" name="v5" reversible="false" fast="false" compartment="cell">
+        <listOfReactants>
+          <speciesReference species="m1" stoichiometry="2" constant="false"/>
+          <speciesReference species="m3" stoichiometry="2" constant="false"/>
+          <speciesReference species="m5" stoichiometry="1" constant="false"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="m8" stoichiometry="1" constant="false"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="v6" name="v6" reversible="false" fast="false" compartment="cell">
+        <listOfReactants>
+          <speciesReference species="m5" stoichiometry="1" constant="false"/>
+          <speciesReference species="m10" stoichiometry="1" constant="false"/>
+        </listOfReactants>
+      </reaction>
+      <reaction id="v7" name="v7" reversible="false" fast="false" compartment="cell">
+        <listOfReactants>
+          <speciesReference species="m1" stoichiometry="1" constant="false"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="m8" stoichiometry="1" constant="false"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="v8" name="v8" reversible="false" fast="false" compartment="cell">
+        <listOfReactants>
+          <speciesReference species="m3" stoichiometry="1" constant="false"/>
+          <speciesReference species="m4" stoichiometry="1" constant="false"/>
+        </listOfReactants>
+      </reaction>
+      <reaction id="v9" name="v9" reversible="false" fast="false" compartment="cell">
+        <listOfReactants>
+          <speciesReference species="m9" stoichiometry="1" constant="false"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="m2" stoichiometry="1" constant="false"/>
+          <speciesReference species="m4" stoichiometry="1" constant="false"/>
+          <speciesReference species="m7" stoichiometry="1" constant="false"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="v10" name="v10" reversible="false" fast="false" compartment="cell">
+        <listOfReactants>
+          <speciesReference species="m3" stoichiometry="1" constant="false"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="m5" stoichiometry="1" constant="false"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="v11" name="v11" reversible="false" fast="false" compartment="cell">
+        <listOfReactants>
+          <speciesReference species="m2" stoichiometry="1" constant="false"/>
+          <speciesReference species="m6" stoichiometry="2" constant="false"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="m9" stoichiometry="2" constant="false"/>
+        </listOfProducts>
+      </reaction>
+    </listOfReactions>
+  </model>
+</sbml>

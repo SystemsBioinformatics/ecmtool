@@ -1,4 +1,5 @@
 numpy
+mpi4py
 scipy
 sympy
 python-libsbml

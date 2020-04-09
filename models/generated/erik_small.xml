@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SBML created with CBMPy (0.7.21.660) on Tue, 01 Oct 2019 12:57:53 -->
+<sbml xmlns="http://www.sbml.org/sbml/level3/version1/core" xmlns:fbc="http://www.sbml.org/sbml/level3/version1/fbc/version1" xmlns:html="http://www.w3.org/1999/xhtml" level="3" version="1" fbc:required="false">
+  <model metaid="meta_core_model_1" id="core_model_1" substanceUnits="mmol_per_gdw" timeUnits="hour" extentUnits="mmol_per_gdw">
+    <notes>
+      <html:p>
+        <html:br/>
+        <html:span size="small">Model &quot;<html:strong>core_model_1</html:strong>&quot; (cbmpy_fbc_model) generated with <html:a href="http://cbmpy.sourceforge.net">CBMPy</html:a> (0.7.21.660) on Tue, 01 Oct 2019 12:57:53.</html:span>
+      </html:p>
+    </notes>
+    <listOfUnitDefinitions>
+      <unitDefinition id="hour" name="hour">
+        <listOfUnits>
+          <unit kind="second" exponent="1" scale="0" multiplier="3600"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="mmol_per_gdw" name="mmol_per_gdw">
+        <listOfUnits>
+          <unit kind="mole" exponent="1" scale="-3" multiplier="1"/>
+          <unit kind="gram" exponent="-1" scale="0" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="mmol_per_hour" name="mmol_per_hour">
+        <listOfUnits>
+          <unit kind="mole" exponent="1" scale="-3" multiplier="1"/>
+          <unit kind="second" exponent="-1" scale="0" multiplier="3600"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="per_hour" name="per_hour">
+        <listOfUnits>
+          <unit kind="second" exponent="-1" scale="0" multiplier="3600"/>
+        </listOfUnits>
+      </unitDefinition>
+    </listOfUnitDefinitions>
+    <listOfCompartments>
+      <compartment metaid="meta_e" id="e" name="e" spatialDimensions="3" size="1" units="dimensionless" constant="true">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="CBMPy_info" value="created by SBML writer"/>
+          </listOfKeyValueData>
+        </annotation>
+      </compartment>
+      <compartment metaid="meta_CELL" id="CELL" name="CELL" spatialDimensions="3" size="1" units="dimensionless" constant="true">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="CBMPy_info" value="created by SBML writer"/>
+          </listOfKeyValueData>
+        </annotation>
+      </compartment>
+    </listOfCompartments>
+    <listOfSpecies>
+      <species metaid="meta_A" id="A" name="A" compartment="e" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_B" id="B" name="B" compartment="CELL" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_C" id="C" name="C" compartment="CELL" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_D" id="D" name="D" compartment="CELL" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_E" id="E" name="E" compartment="CELL" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_F" id="F" name="F" compartment="CELL" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_G" id="G" name="G" compartment="e" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_H" id="H" name="H" compartment="e" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+    </listOfSpecies>
+    <listOfReactions>
+      <reaction metaid="meta_R01" id="R01" name="R01" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="A" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="B" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_R02" id="R02" name="R02" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="A" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="C" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_R03" id="R03" name="R03" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="A" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="D" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_R04" id="R04" name="R04" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="B" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="C" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_R05" id="R05" name="R05" reversible="true" fast="false">
+        <listOfReactants>
+          <speciesReference species="B" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="E" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_R06" id="R06" name="R06" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="C" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="E" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_R07" id="R07" name="R07" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="C" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="F" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_R08" id="R08" name="R08" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="D" stoichiometry="2" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="F" stoichiometry="1" constant="true"/>
+          <speciesReference species="H" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_R09" id="R09" name="R09" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="E" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="G" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_R10" id="R10" name="R10" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="F" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="G" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_R11" id="R11" name="R11" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="H" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="F" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_R12" id="R12" name="R12" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="F" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="E" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+    </listOfReactions>
+    <fbc:listOfFluxBounds>
+      <fbc:fluxBound fbc:id="R01_lb" fbc:reaction="R01" fbc:operation="greaterEqual" fbc:value="-1"/>
+      <fbc:fluxBound fbc:id="R01_ub" fbc:reaction="R01" fbc:operation="lessEqual" fbc:value="1"/>
+      <fbc:fluxBound fbc:id="R02_lb" fbc:reaction="R02" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="R02_ub" fbc:reaction="R02" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="R03_lb" fbc:reaction="R03" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="R03_ub" fbc:reaction="R03" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="R04_lb" fbc:reaction="R04" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="R04_ub" fbc:reaction="R04" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="R05_lb" fbc:reaction="R05" fbc:operation="greaterEqual" fbc:value="-INF"/>
+      <fbc:fluxBound fbc:id="R05_ub" fbc:reaction="R05" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="R06_lb" fbc:reaction="R06" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="R06_ub" fbc:reaction="R06" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="R07_lb" fbc:reaction="R07" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="R07_ub" fbc:reaction="R07" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="R08_lb" fbc:reaction="R08" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="R08_ub" fbc:reaction="R08" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="R09_lb" fbc:reaction="R09" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="R09_ub" fbc:reaction="R09" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="R10_lb" fbc:reaction="R10" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="R10_ub" fbc:reaction="R10" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="R11_lb" fbc:reaction="R11" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="R11_ub" fbc:reaction="R11" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="R12_lb" fbc:reaction="R12" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="R12_ub" fbc:reaction="R12" fbc:operation="lessEqual" fbc:value="INF"/>
+    </fbc:listOfFluxBounds>
+    <fbc:listOfObjectives fbc:activeObjective="objMaxJ25">
+      <fbc:objective fbc:id="objMaxJ25" fbc:type="maximize">
+        <fbc:listOfFluxObjectives>
+          <fbc:fluxObjective fbc:reaction="R09" fbc:coefficient="1"/>
+        </fbc:listOfFluxObjectives>
+      </fbc:objective>
+    </fbc:listOfObjectives>
+  </model>
+</sbml>
