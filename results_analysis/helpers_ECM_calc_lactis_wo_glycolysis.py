@@ -3,7 +3,7 @@ import copy
 import pandas as pd
 from ecmtool import extract_sbml_stoichiometry, get_conversion_cone
 from scipy.optimize import linprog
-
+import numpy as np
 
 def calc_ECMs(file_path, print_results=False, hide_metabs=[], input_metabs=[], output_metabs=[],
               both_metabs=[], external_metabs=[]):
@@ -40,14 +40,16 @@ def calc_ECMs(file_path, print_results=False, hide_metabs=[], input_metabs=[], o
     input_inds = []
     output_inds = []
     hide_inds = []
+    fba_sol = np.zeros(len(network.metabolites))
     for ind, metab in enumerate(network.metabolites):
         if (metab.is_external) & (metab.id != 'objective'):
-            if list(info_metabs_df[info_metabs_df['0'] == metab.id].direction)[0] == 'input':
+            relevant_part_df = info_metabs_df[info_metabs_df['0'] == metab.id]
+            if list(relevant_part_df.direction)[0] == 'input':
                 input_inds.append(ind)
-            elif list(info_metabs_df[info_metabs_df['0'] == metab.id].direction)[0] == 'output':
+            elif list(relevant_part_df.direction)[0] == 'output':
                 output_inds.append(ind)
 
-            if list(info_metabs_df[info_metabs_df['0'] == metab.id].hide)[0]:
+            if list(relevant_part_df.hide)[0]:
                 hide_inds.append(ind)
 
     output_inds.append([ind for ind, metab in enumerate(network.metabolites) if metab.id == 'objective'])
