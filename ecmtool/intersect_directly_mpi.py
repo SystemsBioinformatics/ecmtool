@@ -1,4 +1,3 @@
-import multiprocessing as multi
 from time import time
 
 from mpi4py import MPI
@@ -7,27 +6,16 @@ import os
 from scipy.linalg import LinAlgError
 from scipy.optimize import linprog
 
+from ecmtool.helpers import mp_print
 from ecmtool._bglu_dense import BGLU
 from ecmtool.helpers import redund, get_metabolite_adjacency, to_fractions
 
 
-def mpi_print(s, PRINT_IF_RANK_NONZERO=False):
-    """
-    Print s, but only on process 0
-    :param s: string to print
-    :return:
-    """
-    if MPI.COMM_WORLD.Get_rank() == 0:
-        print(s)
-    elif PRINT_IF_RANK_NONZERO:
-        print(s)
-
-
 def check_if_intermediate_cone_exists(intermediate_cone_path):
     if os.path.exists(intermediate_cone_path):
-        mpi_print('Will try to pick up intermediate cone, file found.')
+        mp_print('Will try to pick up intermediate cone, file found.')
     else:
-        mpi_print('Tries to pick up intermediate cone, but file not found.')
+        mp_print('Tries to pick up intermediate cone, but file not found.')
 
 
 def print_ecms_direct(R, metabolite_ids):
@@ -37,9 +25,9 @@ def print_ecms_direct(R, metabolite_ids):
     elif "objective_out" in metabolite_ids:
         obj_id = metabolite_ids.index("objective_out")
 
-    mpi_print("\n--%d ECMs found by intersecting directly--\n" % R.shape[1])
+    mp_print("\n--%d ECMs found by intersecting directly--\n" % R.shape[1])
     for i in range(R.shape[1]):
-        mpi_print("ECM #%d:" % i)
+        mp_print("ECM #%d:" % i)
         if np.max(R[:,
                   i]) > 1e100:  # If numbers become too large, they can't be printed, therefore we make them smaller first
             ecm = np.array(R[:, i] / np.max(R[:, i]), dtype='float')
@@ -51,8 +39,8 @@ def print_ecms_direct(R, metabolite_ids):
             div = ecm[obj_id]
         for j in range(R.shape[0]):
             if ecm[j] != 0:
-                mpi_print("%s: %f" % (metabolite_ids[j].replace("_in", "").replace("_out", ""), ecm[j] / div))
-        mpi_print("")
+                mp_print("%s: %f" % (metabolite_ids[j].replace("_in", "").replace("_out", ""), ecm[j] / div))
+        mp_print("")
 
 
 def get_more_basis_columns(A, basis):
@@ -115,7 +103,7 @@ def kkt_check(c, A, x, basis, i, j, tol=1e-8, threshold=1e-3, max_iter=100000, v
 
         if np.all(sn >= -tol):  # in this case x is an optimal solution
             # if verbose:
-            #     mpi_print("Did %d steps in kkt_check, found True - smallest sn: %.8f" % (iteration - 1, min(sn)))
+            #     mp_print("Did %d steps in kkt_check, found True - smallest sn: %.8f" % (iteration - 1, min(sn)))
             return True, 0
 
         entering = a[~bl][np.argmin(sn)]
@@ -123,9 +111,9 @@ def kkt_check(c, A, x, basis, i, j, tol=1e-8, threshold=1e-3, max_iter=100000, v
 
         i = u > tol  # if none of the u are positive, unbounded
         if not np.any(i):
-            mpi_print("Warning: unbounded problem in KKT_check")
+            mp_print("Warning: unbounded problem in KKT_check")
             # if verbose:
-            #     mpi_print("Did %d steps in kkt_check2" % iteration - 1)
+            #     mp_print("Did %d steps in kkt_check2" % iteration - 1)
             return True, 1
 
         th = xb[i] / u[i]
@@ -145,15 +133,15 @@ def kkt_check(c, A, x, basis, i, j, tol=1e-8, threshold=1e-3, max_iter=100000, v
         # if np.dot(c, x) < -threshold:  # found a better solution, so not adjacent
         if improvement:
             if not np.dot(c, x) < -threshold:
-                mpi_print('Original way of finding non-adjacents does not say these are non-adjacent', True)
+                mp_print('Original way of finding non-adjacents does not say these are non-adjacent', True)
             # if verbose:
-            #     mpi_print("Did %d steps in kkt_check, found False - c*x %.8f" % (iteration, np.dot(c, x)))
+            #     mp_print("Did %d steps in kkt_check, found False - c*x %.8f" % (iteration, np.dot(c, x)))
             return False, 0
 
         iteration += 1
         if iteration % 10000 == 0:
             print("Warning: reached %d iterations" % iteration)
-    mpi_print("Cycling?")
+    mp_print("Cycling?")
     return True, 1
 
 
@@ -181,7 +169,7 @@ def cycle_check_with_output(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=1
 
         if np.all(sn >= -tol):  # in this case x is an optimal solution
             # if verbose:
-            #     mpi_print("Did %d steps in kkt_check, found True - smallest sn: %.8f" % (iteration - 1, min(sn)))
+            #     mp_print("Did %d steps in kkt_check, found True - smallest sn: %.8f" % (iteration - 1, min(sn)))
             return False, 0, [-1]
 
         entering = a[~bl][np.argmin(sn)]
@@ -189,9 +177,9 @@ def cycle_check_with_output(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=1
 
         i = u > tol  # if none of the u are positive, unbounded
         if not np.any(i):
-            mpi_print("Warning: unbounded problem in KKT_check")
+            mp_print("Warning: unbounded problem in KKT_check")
             # if verbose:
-            #     mpi_print("Did %d steps in kkt_check2" % iteration - 1)
+            #     mp_print("Did %d steps in kkt_check2" % iteration - 1)
             return True, 0, [entering]
 
         th = xb[i] / u[i]
@@ -207,10 +195,10 @@ def cycle_check_with_output(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=1
 
         if np.dot(c, x) < -threshold:  # found a better solution, so not adjacent
             # if verbose:
-            #     mpi_print("Did %d steps in kkt_check, found False - c*x %.8f" % (iteration - 1, np.dot(c, x)))
+            #     mp_print("Did %d steps in kkt_check, found False - c*x %.8f" % (iteration - 1, np.dot(c, x)))
             return True, 0, [np.argmax(x)]
 
-    mpi_print("Cycling?")
+    mp_print("Cycling?")
     return False, 1, [-1]
 
 
@@ -225,7 +213,7 @@ def get_nonsingular_pair(A, basis, entering, leaving, basis_hashes):
                     continue
                 return basis
             basis[leave] = original
-    mpi_print("Did not find non-singular entering+leaving index...")
+    mp_print("Did not find non-singular entering+leaving index...")
     basis[leaving[0]] = entering[0]
     return basis
 
@@ -250,17 +238,17 @@ def independent_rows(A):
         if rank == prev_rank:  # row added did not increase rank
             basis = prev_basis
         # else:
-        #     mpi_print("added row, condition number is now: %f" % np.linalg.cond(A_float[basis]))
+        #     mp_print("added row, condition number is now: %f" % np.linalg.cond(A_float[basis]))
         #     if np.linalg.cond(A_float[basis]) > 1000:
         #         basis = prev_basis
         #         rank = np.linalg.matrix_rank(A_float[basis])
-        #         mpi_print("Rejected column based on condition number...")
+        #         mp_print("Rejected column based on condition number...")
 
         if rank == original_rank:
             break
 
     if rank != original_rank:
-        mpi_print("\t(rows) Rank deficiency! Got rank %d instead of %d" % (rank, m))
+        mp_print("\t(rows) Rank deficiency! Got rank %d instead of %d" % (rank, m))
     return A[basis]
 
 
@@ -290,8 +278,8 @@ def cancel_with_cycle(R, met, cycle_ind, network, removable_reactions, verbose=T
         # delete all-zero row
         next_R = np.delete(next_R, met, 0)
         network.drop_metabolites([met])
-        mpi_print("After removing this metabolite, we have %d metabolites and %d rays" %
-                  (next_R.shape[0], next_R.shape[1]))
+        mp_print("After removing this metabolite, we have %d metabolites and %d rays" %
+                 (next_R.shape[0], next_R.shape[1]))
         external_cycle_dict = None
     else:
         external_cycle_dict = {}
@@ -317,10 +305,10 @@ def iteration_without_lps(R, met, network):
 
     network.drop_metabolites([met])
     if next_matrix.shape[0]:
-        mpi_print("After removing this metabolite, we have %d metabolites and %d rays" %
-                  (next_matrix.shape[0], next_matrix.shape[1]))
+        mp_print("After removing this metabolite, we have %d metabolites and %d rays" %
+                 (next_matrix.shape[0], next_matrix.shape[1]))
     else:
-        mpi_print("After removing this metabolite, we have no rays left")
+        mp_print("After removing this metabolite, we have no rays left")
 
     return next_matrix
 
@@ -342,9 +330,9 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, v
         else:
             zero.append(reaction)
     if verbose:
-        mpi_print("\tNumber of +: %d" % len(plus))
-        mpi_print("\tNumber of -: %d" % len(minus))
-        mpi_print("\tNumber of LP to do: %d" % (len(plus) * len(minus)))
+        mp_print("\tNumber of +: %d" % len(plus))
+        mp_print("\tNumber of -: %d" % len(minus))
+        mp_print("\tNumber of LP to do: %d" % (len(plus) * len(minus)))
 
     # start next matrix with zero rows
     next_matrix = []
@@ -376,10 +364,10 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, v
 
     if verbose:
         if len(plus) * len(minus) > 0:
-            mpi_print("Of %d candidates, %d were adjacent (%.2f percent)" % (
+            mp_print("Of %d candidates, %d were adjacent (%.2f percent)" % (
                 len(plus) * len(minus), nr_adjacent, 100 * nr_adjacent / (len(plus) * len(minus))))
         else:
-            mpi_print("Of %d candidates, %d were adjacent (0 percent)" % (len(plus) * len(minus), nr_adjacent))
+            mp_print("Of %d candidates, %d were adjacent (0 percent)" % (len(plus) * len(minus), nr_adjacent))
 
     next_matrix = np.asarray(next_matrix)
 
@@ -389,23 +377,23 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, v
         rows_before = next_matrix.shape[0]
 
         if verbose:
-            mpi_print("\tDimensions before redund: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
+            mp_print("\tDimensions before redund: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
         start = time()
         next_matrix = redund(next_matrix)
         end = time()
         rows_removed_redund = rows_before - next_matrix.shape[0]
         if verbose:
-            mpi_print("\tDimensions after redund: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
-            mpi_print("\t\tRows removed by redund: %d" % (rows_before - next_matrix.shape[0]))
-            mpi_print("\tRedund took %f seconds" % (end - start))
+            mp_print("\tDimensions after redund: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
+            mp_print("\t\tRows removed by redund: %d" % (rows_before - next_matrix.shape[0]))
+            mp_print("\tRedund took %f seconds" % (end - start))
 
     next_matrix = np.transpose(next_matrix)
 
     # delete all-zero row
     next_matrix = np.delete(next_matrix, met, 0)
     network.drop_metabolites([met])
-    mpi_print("After removing this metabolite, we have %d metabolites and %d rays" %
-              (next_matrix.shape[0], next_matrix.shape[1]))
+    mp_print("After removing this metabolite, we have %d metabolites and %d rays" %
+             (next_matrix.shape[0], next_matrix.shape[1]))
 
     return next_matrix, rows_removed_redund
 
@@ -416,7 +404,7 @@ def get_remove_metabolite(R, network, reaction, verbose=True, allow_external=Fal
         if (not network.metabolites[i].is_external) or (allow_external):
             if column[i] != 0:
                 return i
-    mpi_print("\tWarning: reaction to augment has only external metabolites")
+    mp_print("\tWarning: reaction to augment has only external metabolites")
     return -1
 
 
@@ -426,8 +414,8 @@ def compress_after_cycle_removing(network, verbose=True):
     # network.cancel_dead_ends(verbose=verbose)
 
     if verbose:
-        mpi_print('Removed %d reactions and %d metabolites in total' %
-                  (original_reaction_count - network.N.shape[1], original_metabolite_count - network.N.shape[0]))
+        mp_print('Removed %d reactions and %d metabolites in total' %
+                 (original_reaction_count - network.N.shape[1], original_metabolite_count - network.N.shape[0]))
 
     return network
 
@@ -449,7 +437,7 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
         res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12},
                       x0=x0)
         if res.status == 4:
-            mpi_print("Numerical difficulties with revised simplex, trying interior point method instead")
+            mp_print("Numerical difficulties with revised simplex, trying interior point method instead")
             res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
 
         cycle_present = True if np.max(res.x) > 90 else False
@@ -474,12 +462,12 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
 
             counter = counter + 1
             if counter > len(cycle_indices):
-                mpi_print('No internal metabolite was found that was part of the cycle. This might cause problems.')
+                mp_print('No internal metabolite was found that was part of the cycle. This might cause problems.')
 
         if not removable_is_ext:
             removable_metabolites.append(met)
         if verbose:
-            mpi_print("Found an unbounded LP, cancelling metabolite %d (%s) with reaction %d" % (
+            mp_print("Found an unbounded LP, cancelling metabolite %d (%s) with reaction %d" % (
                 met, network.metabolites[met].id, cycle_ind))
 
         R, removable_reactions, external_cycle = cancel_with_cycle(R, met, cycle_ind, network, removable_reactions,
@@ -494,15 +482,15 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
             rows_before = R.shape[0]
 
             if verbose:
-                mpi_print("\tDimensions before redund: %d %d" % (R.shape[0], R.shape[1]))
+                mp_print("\tDimensions before redund: %d %d" % (R.shape[0], R.shape[1]))
             start = time()
             R = redund(R)
             end = time()
             rows_removed_redund = rows_before - R.shape[0]
             if verbose:
-                mpi_print("\tDimensions after redund: %d %d" % (R.shape[0], R.shape[1]))
-                mpi_print("\t\tRows removed by redund: %d" % (rows_before - R.shape[0]))
-                mpi_print("\tRedund took %f seconds" % (end - start))
+                mp_print("\tDimensions after redund: %d %d" % (R.shape[0], R.shape[1]))
+                mp_print("\t\tRows removed by redund: %d" % (rows_before - R.shape[0]))
+                mp_print("\tRedund took %f seconds" % (end - start))
 
             R = np.transpose(R)
 
@@ -517,7 +505,7 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
             res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12},
                           x0=x0)
             if res.status == 4:
-                mpi_print("Numerical difficulties with revised simplex, trying interior point method instead")
+                mp_print("Numerical difficulties with revised simplex, trying interior point method instead")
                 res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
 
             cycle_present = True if np.max(res.x) > 90 else False
@@ -537,14 +525,14 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
     rows_before = R.shape[0]
 
     if verbose:
-        mpi_print("\tDimensions before redund: %d %d" % (R.shape[0], R.shape[1]))
+        mp_print("\tDimensions before redund: %d %d" % (R.shape[0], R.shape[1]))
     start = time()
     R = redund(R)
     end = time()
     if verbose:
-        mpi_print("\tDimensions after redund: %d %d" % (R.shape[0], R.shape[1]))
-        mpi_print("\t\tRows removed by redund: %d" % (rows_before - R.shape[0]))
-        mpi_print("\tRedund took %f seconds" % (end - start))
+        mp_print("\tDimensions after redund: %d %d" % (R.shape[0], R.shape[1]))
+        mp_print("\t\tRows removed by redund: %d" % (rows_before - R.shape[0]))
+        mp_print("\tRedund took %f seconds" % (end - start))
 
     R = np.transpose(R)
 
@@ -594,7 +582,7 @@ def generate_BFS(R, i, j, eps):
     res = np.where(abs(res) < 1e-20, 0, res)
 
     if len(res[res != 0]) != R.shape[0] * 2:
-        mpi_print("problem in generate_BFS")
+        mp_print("problem in generate_BFS")
 
     return res
 
@@ -771,17 +759,17 @@ def get_start_basis(A):
         if rank == prev_rank:  # column added did not increase rank
             new_basis = prev_basis
         # else:
-        #     mpi_print("added column, condition number is now: %f" % np.linalg.cond(A[:, new_basis]))
+        #     mp_print("added column, condition number is now: %f" % np.linalg.cond(A[:, new_basis]))
         #     if np.linalg.cond(A[:, new_basis]) > 1000:
         #         new_basis = prev_basis
         #         rank = np.linalg.matrix_rank(A[:, new_basis])
-        #         mpi_print("Rejected column based on condition number...")
+        #         mp_print("Rejected column based on condition number...")
 
         if rank == m:
             break
 
     if rank != m:
-        mpi_print("\tRank deficiency! Got rank %d instead of %d" % (rank, m))
+        mp_print("\tRank deficiency! Got rank %d instead of %d" % (rank, m))
     return new_basis
 
 
@@ -851,8 +839,8 @@ def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose
                     adjacency.append((p, m))
 
                 if it % (100 * mpi_size) == mpi_rank:
-                    mpi_print("Process %d is on adjacency test %d of %d (%f %%)" %
-                              (mpi_rank, it, nr_tests, it / nr_tests * 100), PRINT_IF_RANK_NONZERO=True)
+                    mp_print("Process %d is on adjacency test %d of %d (%f %%)" %
+                             (mpi_rank, it, nr_tests, it / nr_tests * 100), PRINT_IF_RANK_NONZERO=True)
 
     # bases = get_bases(matrix_indep_rows, plus, minus)
     # for i in range(mpi_rank, nr_tests, mpi_size):
@@ -863,7 +851,7 @@ def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose
     #     if res == 1:
     #         adjacency.append((plus[plus_index], minus[minus_index]))
     #     if i % 100 == 0:
-    #         mpi_print("Process %d is now on adjacency test %d" % (mpi_rank, i))
+    #         mp_print("Process %d is now on adjacency test %d" % (mpi_rank, i))
 
     # MPI communication step
     adj_sets = comm.allgather(adjacency)
@@ -873,7 +861,7 @@ def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose
     adjacency.sort()
 
     end = time()
-    mpi_print("Did LPs in %f seconds" % (end - start))
+    mp_print("Did LPs in %f seconds" % (end - start))
     return adjacency
 
 
@@ -923,8 +911,6 @@ def in_cone(R, tar):
 
 
 def pick_up_intermediate_cone(internal_metabolites, network, intermediate_cone_path):
-    import csv
-
     with open(intermediate_cone_path) as file:
         header = file.readline()
         metab_ids_intermediate = header.split(',')
@@ -1030,25 +1016,25 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12
         # i - len(deleted[deleted<i] is the current row for the metabolite that was once at the ith place
         to_remove = i - len(deleted[deleted < i])
         if verbose:
-            mpi_print("\n\nIteration %d (internal metabolite = %d: %s) of %d" % (
+            mp_print("\n\nIteration %d (internal metabolite = %d: %s) of %d" % (
                 it, to_remove, [m.id for m in network.metabolites][to_remove], len(internal_metabolites)))
-            mpi_print("Possible LP amounts for this step:\n" + ", ".join(np.array(n_lps).astype(str)))
-            mpi_print("Total: %d" % sum(n_lps))
+            mp_print("Possible LP amounts for this step:\n" + ", ".join(np.array(n_lps).astype(str)))
+            mp_print("Total: %d" % sum(n_lps))
             if manual_override and (it == 1):
-                mpi_print("Sorting was manually chosen for this first step.\n")
+                mp_print("Sorting was manually chosen for this first step.\n")
             elif sorting == 'min_adj':
-                mpi_print("Possible adjacencies added for this step:\n" + ", ".join(np.array(adj_added).astype(str)))
-                mpi_print("Minimal adjacency option chosen.\n")
+                mp_print("Possible adjacencies added for this step:\n" + ", ".join(np.array(adj_added).astype(str)))
+                mp_print("Minimal adjacency option chosen.\n")
             elif sorting == 'max_lp_per_adj':
-                mpi_print("Possible lps per adjacency added for this step:\n" + ", ".join(
+                mp_print("Possible lps per adjacency added for this step:\n" + ", ".join(
                     np.round(np.array(lp_per_adj), 2).astype(str)))
-                mpi_print("Rescaled maximal LPs per added adjacency option chosen.\n")
+                mp_print("Rescaled maximal LPs per added adjacency option chosen.\n")
             elif sorting == 'min_connections':
-                mpi_print("Possible connectedness of metabolites for this sstep:\n" + ", ".join(
+                mp_print("Possible connectedness of metabolites for this sstep:\n" + ", ".join(
                     np.array(connections).astype(str)))
-                mpi_print("Minimally connected option chosen.\n")
+                mp_print("Minimally connected option chosen.\n")
             elif sorting == 'min_lp':
-                mpi_print("Minimal LPs chosen.\n")
+                mp_print("Minimal LPs chosen.\n")
             it += 1
 
         # input("waiting")
@@ -1066,13 +1052,13 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12
                 np.savetxt('intermediate_conversion_cone.csv', np.transpose(R), delimiter=',',
                            header=','.join(metab_ids), comments='')
             except OverflowError:
-                mpi_print('Intermediate result cannot be stored due to too large numbers.')
+                mp_print('Intermediate result cannot be stored due to too large numbers.')
 
     # remove artificial rays introduced by splitting metabolites
     R, ids = unsplit_metabolites(R, network)
 
     if verbose:
-        mpi_print("\n\tRows removed by redund overall: %d\n" % rows_removed_redund)
+        mp_print("\n\tRows removed by redund overall: %d\n" % rows_removed_redund)
         if rows_removed_redund != 0:
             pass
             # input("Waiting...")

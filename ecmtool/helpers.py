@@ -472,3 +472,17 @@ def get_metabolite_adjacency(N):
                 adjacency[adjacent, metabolite_index] = 1
 
     return adjacency
+
+
+def mp_print(*args, **kwargs):
+    """
+    Multiprocessing wrapper for print().
+    Prints the given arguments, but only on process 0 unless
+    named argument PRINT_IF_RANK_NONZERO is set to true.
+    :param s: string to print
+    :return:
+    """
+    if MPI.COMM_WORLD.Get_rank() == 0:
+        print(args)
+    elif 'PRINT_IF_RANK_NONZERO' in kwargs and kwargs['PRINT_IF_RANK_NONZERO']:
+        print(args)
