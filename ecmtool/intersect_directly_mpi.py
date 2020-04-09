@@ -454,7 +454,6 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
         removable_is_ext = False
         while met < 0 and (not removable_is_ext):
             cycle_ind = cycle_indices[counter]
-            # TODO: Solve situation in which met = -1 (only nonzero external metabolites)
             met = get_remove_metabolite(R, network, cycle_ind)
             if met == -1:  # Only external metabolites used in this ray, delete external and remember the ray
                 removable_is_ext = True

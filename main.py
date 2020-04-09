@@ -294,7 +294,7 @@ if __name__ == '__main__':
                         help='EXPERIMENTAL. Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that are transformed into internal metabolites without adding bidirectional exchange reactions.'
                              'This metabolite can therefore not be used as input nor output.')
     parser.add_argument('--hide_all_in_or_outputs', type=str, default='',
-                        help='String that is either empty, input, or output. If it is inputs or outputs, after splitting metabolites, all inputs or outputs are hidden (objective is always excluded)')
+                        help='Option is only available if --direct is chosen. String that is either empty, input, or output. If it is inputs or outputs, after splitting metabolites, all inputs or outputs are hidden (objective is always excluded)')
     parser.add_argument('--iterative', type=str2bool, default=False,
                         help='Enable iterative conversion mode enumeration (helps on large, dense networks) (default: false)')
     parser.add_argument('--only_rays', type=str2bool, default=False,
@@ -381,7 +381,7 @@ if __name__ == '__main__':
 
             # Split metabolites in input and output
             network.split_in_out(args.only_rays)
-            # TODO: Add this option to the other intersection methods too
+
             if args.hide_all_in_or_outputs:
                 hide_indices = [ind for ind, metab in enumerate(network.metabolites) if
                                 (metab.is_external) & (metab.direction == args.hide_all_in_or_outputs) & (
@@ -401,15 +401,9 @@ if __name__ == '__main__':
 
             network.split_reversible()
             network.N = np.transpose(redund(np.transpose(network.N)))
-
-            # TODO: remove_cycles could run into cycle with only external metabolites. This cycle should then be
-            # removed by cancelling one of the external metabolites, but the cycle should be stored and added to R
-            # in the end.
+.
             R, network, external_cycles = remove_cycles(network.N, network)
             R = network.N
-            # TODO: Make this cleaner
-            # After this we do not use network.reactions anymore? I will now delete any superfluous reaction in network.
-            # This is needed for the next compression to work.
             n_reac_according_to_N = network.N.shape[1]
             removable_reacs = np.arange(n_reac_according_to_N, len(network.reactions))
             network.drop_reactions(removable_reacs)
@@ -422,7 +416,7 @@ if __name__ == '__main__':
         T_intersected, ids = intersect_directly(R, internal, network, verbose=args.verbose, lps_per_job=args.job_size,
                                                 sort_order=args.sort_order, manual_override=args.manual_override,
                                                 intermediate_cone_path=args.intermediate_cone_path)
-        # TODO: Cycles with external metabolites should be added in here!
+
         if len(external_cycles):
             external_cycles_array = to_fractions(np.zeros((T_intersected.shape[0],len(external_cycles))))
             for ind, cycle in enumerate(external_cycles):
