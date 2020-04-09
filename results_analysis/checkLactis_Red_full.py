@@ -104,6 +104,7 @@ for metab in input_MetList + both_MetList + output_MetList:
         if metab not in non_dupe_both_MetList:
             non_dupe_both_MetList.append(metab)
 
+non_dupe_output_MetList.append('objective')
 df_EXreact_output = pandas.DataFrame(non_dupe_output_MetList)
 df_EXreact_output['direction'] = 'output'
 df_EXreact_input = pandas.DataFrame(non_dupe_input_MetList)
@@ -112,7 +113,7 @@ df_EXreact_both = pandas.DataFrame(non_dupe_both_MetList)
 df_EXreact_both['direction'] = 'both'
 
 df_EXreact_directions = pandas.concat([df_EXreact_input,df_EXreact_output, df_EXreact_both])
-hide_list = [metab not in MetListKin for metab in df_EXreact_directions[0]]
+hide_list = [metab not in MetListKin + ['objective'] for metab in df_EXreact_directions[0]]
 df_EXreact_directions['hide'] = hide_list
 
 for irR in mod.getReactionIds():  # Get rid of reactions with minimal velocities
@@ -159,16 +160,16 @@ for metab_reac_tuple in DERred:
     metab_prod = - val * stoich_coeff
     fba_dict[m_id] += metab_prod
 
-df_EXreact_directions['FBA_result'] = 0
-for ind, metab in enumerate(df_EXreact_directions[0]):
-    df_EXreact_directions['FBA_result'].values[ind] = fba_dict[metab]
+fba_dict['objective'] += mod.getActiveObjective().value
+
+fba_result_column = []
+for metab in df_EXreact_directions[0]:
+    fba_result_column.append(fba_dict[metab])
+
+df_EXreact_directions['FBA_result'] = fba_result_column
 
 df_EXreact_directions.to_csv("df_EXreact_Lactis_directions.csv", sep=',', index=False)
-# cbmpy.CBWrite.writeSBML3FBC(mod, 'LactisFULLECM.xml')
 
-# import pysces
-
-# pysces.interface.convertSBML2PSC('Ecoli_Chassagnole_org.xml', sbmldir='C:\Users\JNR520\surfdrive\Python\Ikin\yeast', pscfile='Ecoli_Chassagnole_org.psc', pscdir='C:\Users\JNR520\surfdrive\Python\Ikin\yeast')
-# modKin = pysces.model('C:\Users\JNR520\surfdrive\Python\Ikin\yeast\Ecoli_Chassagnole_org.psc')
+"""After this, take only kinetic model. Attach ECMs, and calculate EFMs"""
 
 print('end')

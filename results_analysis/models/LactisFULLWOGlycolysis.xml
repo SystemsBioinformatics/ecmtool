@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- SBML created with CBMPy (0.7.21.660) on Sat, 04 Apr 2020 16:26:01 -->
+<!-- SBML created with CBMPy (0.7.21.660) on Tue, 07 Apr 2020 11:37:54 -->
 <sbml xmlns="http://www.sbml.org/sbml/level3/version1/core" xmlns:fbc="http://www.sbml.org/sbml/level3/version1/fbc/version1" xmlns:html="http://www.w3.org/1999/xhtml" level="3" version="1" fbc:required="false">
   <model metaid="meta_iNF517" id="iNF517" substanceUnits="mmol_per_gdw" timeUnits="hour" extentUnits="mmol_per_gdw">
     <notes>
       <html:p>
         <html:br/>
-        <html:span size="small">Model &quot;<html:strong>iNF517</html:strong>&quot; (cbmpy_fbc_model) generated with <html:a href="http://cbmpy.sourceforge.net">CBMPy</html:a> (0.7.21.660) on Sat, 04 Apr 2020 16:26:00.</html:span>
+        <html:span size="small">Model &quot;<html:strong>iNF517</html:strong>&quot; (cbmpy_fbc_model) generated with <html:a href="http://cbmpy.sourceforge.net">CBMPy</html:a> (0.7.21.660) on Tue, 07 Apr 2020 11:37:54.</html:span>
       </html:p>
     </notes>
     <annotation>
