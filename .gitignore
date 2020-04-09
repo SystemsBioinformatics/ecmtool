@@ -1,3 +1,6 @@
 .idea
 data
 ecmtool.egg-info
+build
+dist
+*.pyc
