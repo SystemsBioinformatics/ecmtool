@@ -459,6 +459,10 @@ if __name__ == '__main__':
             hide_indices = [int(index) for index in args.hide.split(',') if len(index)]
             network.hide(hide_indices)
 
+        if args.prohibit:
+            prohibit_indices = [int(index) for index in args.prohibit.split(',') if len(index)]
+            network.prohibit(prohibit_indices)
+
         if args.print_reactions:
             mp_print('Reactions%s:' % (' before compression' if args.compress else ''))
             for index, item in enumerate(network.reactions):
