@@ -403,7 +403,6 @@ if __name__ == '__main__':
             network.N = np.transpose(redund(np.transpose(network.N)))
 
             R, network, external_cycles = remove_cycles(network.N, network)
-            R = network.N
             n_reac_according_to_N = network.N.shape[1]
             removable_reacs = np.arange(n_reac_according_to_N, len(network.reactions))
             network.drop_reactions(removable_reacs)

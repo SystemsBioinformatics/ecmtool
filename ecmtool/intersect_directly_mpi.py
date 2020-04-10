@@ -536,10 +536,6 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
     R = np.transpose(R)
 
     network.N = R
-    # network.drop_reactions(removable_reactions)
-    # network.drop_metabolites(removable_metabolites)
-    R = network.N
-
     return R, network, external_cycles
 
 

@@ -483,6 +483,6 @@ def mp_print(*args, **kwargs):
     :return:
     """
     if MPI.COMM_WORLD.Get_rank() == 0:
-        print(args)
+        print(*args)
     elif 'PRINT_IF_RANK_NONZERO' in kwargs and kwargs['PRINT_IF_RANK_NONZERO']:
-        print(args)
+        print(*args)
