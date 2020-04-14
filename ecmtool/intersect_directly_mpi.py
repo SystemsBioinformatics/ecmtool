@@ -96,6 +96,8 @@ def kkt_check(c, A, x, basis, i, j, tol=1e-8, threshold=1e-3, max_iter=100000, v
         try:
             l = B.solve(c[basis], transposed=True)  # similar to v = linalg.solve(B.T, c[basis])
         except LinAlgError:
+            print(B)
+            print(c[basis])
             print("LinAlgError in B.solve")
             return True, 1
         sn = c - l.dot(A)  # reduced cost
