@@ -96,8 +96,12 @@ def kkt_check(c, A, x, basis, i, j, tol=1e-8, threshold=1e-3, max_iter=100000, v
         try:
             l = B.solve(c[basis], transposed=True)  # similar to v = linalg.solve(B.T, c[basis])
         except LinAlgError:
-            print(B)
-            print(c[basis])
+            np.set_printoptions(threshold=np.inf)
+            mp_print('This matrix seems to be singular:', PRINT_IF_RANK_NONZERO=True)
+            mp_print(B.B, PRINT_IF_RANK_NONZERO=True)
+            mp_print('Iteration:' + str(iteration), PRINT_IF_RANK_NONZERO=True)
+            mp_print('u:', PRINT_IF_RANK_NONZERO=True)
+            mp_print(u)
             print("LinAlgError in B.solve")
             return True, 1
         sn = c - l.dot(A)  # reduced cost
@@ -677,7 +681,10 @@ def determine_adjacency(R, i, j, basis, tol=1e-10):
     if status == 0:
         return 1 if KKT else 0
     else:
-        raise Exception("KKT check had non-zero exit status")
+        mp_print('LinAlgError in an adjacency test. Check if this happens more often.', PRINT_IF_RANK_NONZERO=True)
+        mp_print('Now assuming that rays are adjacent.', PRINT_IF_RANK_NONZERO=True)
+        return 1
+        # raise Exception("KKT check had non-zero exit status")
 
 
 def multiple_adjacencies(R, pairs, basis):
