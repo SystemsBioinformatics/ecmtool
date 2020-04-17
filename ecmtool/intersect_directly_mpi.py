@@ -74,13 +74,13 @@ def get_more_basis_columns(A, basis):
     return new_basis
 
 
-def kkt_check(c, A, x, basis, i, j, tol=1e-8, threshold=1e-3, max_iter=100000, verbose=True):
+def kkt_check(c, A, x, basis, p, m, tol=1e-8, threshold=1e-3, max_iter=100000, verbose=True):
     """
     Determine whether KKT conditions hold for x0.
     Take size 0 steps if available.
     """
     improvement = False
-    init_actives = [i, j]
+    init_actives = [p, m]
     ab = np.arange(A.shape[0])
     a = np.arange(A.shape[1])
 
@@ -101,9 +101,14 @@ def kkt_check(c, A, x, basis, i, j, tol=1e-8, threshold=1e-3, max_iter=100000, v
             mp_print(B.B, PRINT_IF_RANK_NONZERO=True)
             mp_print('Iteration:' + str(iteration), PRINT_IF_RANK_NONZERO=True)
             mp_print('u:', PRINT_IF_RANK_NONZERO=True)
-            mp_print(u)
+            mp_print(u, PRINT_IF_RANK_NONZERO=True)
+            mp_print('plus, minus:', PRINT_IF_RANK_NONZERO=True)
+            mp_print(p, PRINT_IF_RANK_NONZERO=True)
+            mp_print(m, PRINT_IF_RANK_NONZERO=True)
             print("LinAlgError in B.solve")
+            np.set_printoptions(threshold=1000)
             return True, 1
+
         sn = c - l.dot(A)  # reduced cost
         sn = sn[~bl]
 
