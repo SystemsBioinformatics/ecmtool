@@ -1,16 +1,14 @@
-import os
-
-import numpy as np
+import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-from helpers_analyze_results import *
-
 from ecmtool import extract_sbml_stoichiometry, get_conversion_cone
+
+from helpers_analyze_results import *
 
 models = ['active_subnetwork_KO_' + str(i) for i in range(9)]
 models = models + ['active_subnetwork', 'active_subnetwork_FVA', 'e_coli_core']
 
-number_info_df = pd.DataFrame(columns=['model', 'n_ecms', 'n_efms', 'n_reacs'])
+number_info_df = pd.DataFrame(columns=['model', 'ECMs', 'EFMs', 'n_reacs'])
 
 for model_str in models:
     model_path = os.path.join('models', model_str+'.xml')
@@ -53,14 +51,17 @@ for model_str in models:
 
     n_efms = efms.shape[0]
     n_ecms = cone.shape[1]
-    number_info_df = number_info_df.append({'model':model_str, 'n_ecms': n_ecms, 'n_efms':n_efms, 'n_reacs':ex_N.shape[1]})
+    number_info_df = number_info_df.append(
+        {'model': model_str, 'ECMs': n_ecms, 'EFMs': n_efms, 'n_reacs': ex_N.shape[1]}, ignore_index=True)
 
 number_info_df_td = pd.melt(number_info_df, id_vars=['model','n_reacs'], var_name='type', value_name='number')
 number_info_df_td.n_reacs = number_info_df_td.n_reacs.astype(float)
 number_info_df_td.number = number_info_df_td.number.astype(float)
 
-ax = sns.scatterplot(x='n_reacs', y='number', hue='type')
+ax = sns.scatterplot(x='n_reacs', y='number', hue='type', data=number_info_df_td, s=160)
 ax.set(xlabel='Number of reactions in selected subnetwork', ylabel='Number of modes')
 ax.set(yscale='log')
 
+plt.savefig(os.path.join(os.getcwd(), "comparison_n_ecms_efms.png"))
+plt.savefig(os.path.join(os.getcwd(), "comparison_n_ecms_efms.svg"))
 pass

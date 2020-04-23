@@ -9,3 +9,5 @@ venv/
 venv/lib/python3.7/site-packages/__pycache__/
 conversion_cone.csv
 *.pyc
+*.png
+*.svg
