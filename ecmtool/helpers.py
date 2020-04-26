@@ -15,6 +15,8 @@ from sympy import Matrix
 
 from mpi4py import MPI
 
+from ecmtool.mpi_wrapper import get_process_rank
+
 
 def relative_path(file_path):
     return os.path.join(os.path.dirname(__file__), file_path)
@@ -394,7 +396,7 @@ def get_redund_binary():
 
 
 def redund(matrix, verbose=False):
-    rank = str(MPI.COMM_WORLD.Get_rank())
+    rank = str(get_process_rank())
     matrix = to_fractions(matrix)
     binary = get_redund_binary()
     matrix_path = relative_path('tmp' + os.sep + 'matrix' + rank + '.ine')
@@ -482,7 +484,7 @@ def mp_print(*args, **kwargs):
     :param s: string to print
     :return:
     """
-    if MPI.COMM_WORLD.Get_rank() == 0:
+    if get_process_rank() == 0:
         print(*args)
     elif 'PRINT_IF_RANK_NONZERO' in kwargs and kwargs['PRINT_IF_RANK_NONZERO']:
         print(*args)

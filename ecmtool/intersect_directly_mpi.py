@@ -15,7 +15,7 @@ def check_if_intermediate_cone_exists(intermediate_cone_path):
     if os.path.exists(intermediate_cone_path):
         mp_print('Will try to pick up intermediate cone, file found.')
     else:
-        mp_print('Tries to pick up intermediate cone, but file not found.')
+        mp_print('Tried to pick up intermediate cone, but file not found.')
 
 
 def print_ecms_direct(R, metabolite_ids):
@@ -27,7 +27,7 @@ def print_ecms_direct(R, metabolite_ids):
 
     mp_print("\n--%d ECMs found by intersecting directly--\n" % R.shape[1])
     for i in range(R.shape[1]):
-        mp_print("ECM #%d:" % i)
+        mp_print("ECM #%d:" % (i+1))
         if np.max(R[:,
                   i]) > 1e100:  # If numbers become too large, they can't be printed, therefore we make them smaller first
             ecm = np.array(R[:, i] / np.max(R[:, i]), dtype='float')
@@ -39,7 +39,7 @@ def print_ecms_direct(R, metabolite_ids):
             div = ecm[obj_id]
         for j in range(R.shape[0]):
             if ecm[j] != 0:
-                mp_print("%s: %f" % (metabolite_ids[j].replace("_in", "").replace("_out", ""), ecm[j] / div))
+                mp_print("%s\t\t->\t%.4f" % (metabolite_ids[j].replace("_in", "").replace("_out", ""), ecm[j] / div))
         mp_print("")
 
 
