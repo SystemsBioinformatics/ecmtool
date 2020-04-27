@@ -7,6 +7,7 @@ from helpers_analyze_results import *
 
 models = ['active_subnetwork_KO_' + str(i) for i in range(9)]
 models = models + ['active_subnetwork', 'active_subnetwork_FVA', 'e_coli_core']
+models=['e_coli_core']
 
 number_info_df = pd.DataFrame(columns=['model', 'ECMs', 'EFMs', 'n_reacs'])
 
@@ -48,6 +49,8 @@ for model_str in models:
                             verbose=True))
 
     cone = cone.transpose()
+    ids = network.uncompressed_metabolite_ids
+    np.savetxt('conversion_cone.csv', np.transpose(cone), delimiter=',', header=','.join(ids), comments='')
 
     n_efms = efms.shape[0]
     n_ecms = cone.shape[1]
