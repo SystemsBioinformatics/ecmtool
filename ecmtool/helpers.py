@@ -314,14 +314,14 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True
     if equality_matrix is not None:
         with open_relative('tmp' + os.sep + 'eq_%d.txt' % rand, 'w') as file:
             for row in range(equality_matrix.shape[0]):
-                file.write(' '.join([str(val) for val in equality_matrix[row, :]]) + '\r\n')
+                file.write(' '.join([str(val) for val in equality_matrix[row, :]]) + '\n')
 
     # Write inequalities system to disk as space separated file
     if verbose:
         print('Writing inequalities to file')
     with open_relative('tmp' + os.sep + 'iq_%d.txt' % rand, 'w') as file:
         for row in range(inequality_matrix.shape[0]):
-            file.write(' '.join([str(val) for val in inequality_matrix[row, :]]) + '\r\n')
+            file.write(' '.join([str(val) for val in inequality_matrix[row, :]]) + '\n')
 
     # Run external extreme ray enumeration tool
     min_mem, max_mem = get_min_max_java_memory()
