@@ -13,8 +13,6 @@ from random import randint
 from numpy.linalg import svd
 from sympy import Matrix
 
-from mpi4py import MPI
-
 from ecmtool.mpi_wrapper import get_process_rank
 
 

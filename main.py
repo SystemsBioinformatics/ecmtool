@@ -7,6 +7,10 @@ from argparse import ArgumentParser, ArgumentTypeError
 
 from ecmtool import mpi_wrapper
 
+from ecmtool.helpers import get_efms, get_metabolite_adjacency, redund, to_fractions
+from ecmtool.helpers import mp_print
+from ecmtool.network import extract_sbml_stoichiometry
+from ecmtool.conversion_cone import get_conversion_cone, iterative_conversion_cone, unique
 
 class HiddenPrints:
     def __enter__(self):
@@ -16,15 +20,6 @@ class HiddenPrints:
     def __exit__(self, exc_type, exc_val, exc_tb):
         sys.stdout.close()
         sys.stdout = self._original_stdout
-
-
-with HiddenPrints():
-    from ecmtool.helpers import get_efms, get_metabolite_adjacency, redund, to_fractions
-    from ecmtool.intersect_directly_mpi import intersect_directly, print_ecms_direct, remove_cycles, \
-        compress_after_cycle_removing, normalize_columns, check_if_intermediate_cone_exists
-    from ecmtool.helpers import mp_print
-    from ecmtool.network import extract_sbml_stoichiometry
-    from ecmtool.conversion_cone import get_conversion_cone, iterative_conversion_cone, unique
 
 
 def str2bool(v):
@@ -266,6 +261,8 @@ if __name__ == '__main__':
     orig_N = network.N
 
     if args.direct:
+        from ecmtool.intersect_directly_mpi import intersect_directly, print_ecms_direct, remove_cycles, \
+            compress_after_cycle_removing, normalize_columns
         # Split metabolites in input and output
         network.split_in_out(args.only_rays)
 
