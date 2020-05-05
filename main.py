@@ -223,9 +223,6 @@ if __name__ == '__main__':
 
     model_path = args.model_path
 
-    if args.intermediate_cone_path:
-        check_if_intermediate_cone_exists(args.intermediate_cone_path)
-
     network = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite,
                                          determine_inputs_outputs=args.auto_direction,
                                          skip_external_reactions=True,
@@ -262,7 +259,12 @@ if __name__ == '__main__':
 
     if args.direct:
         from ecmtool.intersect_directly_mpi import intersect_directly, print_ecms_direct, remove_cycles, \
-            compress_after_cycle_removing, normalize_columns
+            compress_after_cycle_removing, normalize_columns, check_if_intermediate_cone_exists
+
+        # Check if intermediate cone exists at the given location
+        if args.intermediate_cone_path:
+            check_if_intermediate_cone_exists(args.intermediate_cone_path)
+
         # Split metabolites in input and output
         network.split_in_out(args.only_rays)
 
