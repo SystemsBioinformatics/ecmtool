@@ -9,7 +9,7 @@ from ecmtool import mpi_wrapper
 
 from ecmtool.helpers import get_efms, get_metabolite_adjacency, redund, to_fractions
 from ecmtool.helpers import mp_print
-from ecmtool.network import extract_sbml_stoichiometry
+from ecmtool.network import extract_sbml_stoichiometry, add_debug_tags
 from ecmtool.conversion_cone import get_conversion_cone, iterative_conversion_cone, unique
 
 class HiddenPrints:
@@ -229,7 +229,7 @@ if __name__ == '__main__':
                                          external_compartment=args.external_compartment)
 
     debug_tags = []
-    # add_debug_tags(network)
+    add_debug_tags(network, debug_tags)
 
     adj = get_metabolite_adjacency(network.N)
 
