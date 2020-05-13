@@ -208,7 +208,7 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     return network
 
 
-def add_debug_tags(network, reactions=[]):
+def add_reaction_tags(network, reactions=[]):
     if len(reactions) == 0:
         reactions = range(len(network.reactions))
 
