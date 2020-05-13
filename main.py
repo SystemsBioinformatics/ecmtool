@@ -9,7 +9,7 @@ from ecmtool import mpi_wrapper
 
 from ecmtool.helpers import get_efms, get_metabolite_adjacency, redund, to_fractions
 from ecmtool.helpers import mp_print
-from ecmtool.network import extract_sbml_stoichiometry, add_debug_tags
+from ecmtool.network import extract_sbml_stoichiometry, add_reaction_tags
 from ecmtool.conversion_cone import get_conversion_cone, iterative_conversion_cone, unique
 
 class HiddenPrints:
@@ -182,6 +182,8 @@ if __name__ == '__main__':
     parser.add_argument('--prohibit', type=str, default='',
                         help='EXPERIMENTAL. Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that are transformed into internal metabolites without adding bidirectional exchange reactions.'
                              'This metabolite can therefore not be used as input nor output.')
+    parser.add_argument('--tag', type=str, default='',
+                        help='Comma-separated list of reaction indices, as given by --print_reactions true (before compression), that will be tagged with new virtual metabolites, such that the reaction flux appears in ECMs.')
     parser.add_argument('--hide_all_in_or_outputs', type=str, default='',
                         help='Option is only available if --direct is chosen. String that is either empty, input, or output. If it is inputs or outputs, after splitting metabolites, all inputs or outputs are hidden (objective is always excluded)')
     parser.add_argument('--iterative', type=str2bool, default=False,
@@ -228,8 +230,7 @@ if __name__ == '__main__':
                                          skip_external_reactions=True,
                                          external_compartment=args.external_compartment)
 
-    debug_tags = []
-    add_debug_tags(network, debug_tags)
+    tagged_reaction_indices = []
 
     adj = get_metabolite_adjacency(network.N)
 
@@ -243,6 +244,10 @@ if __name__ == '__main__':
     if args.prohibit:
         prohibit_indices = [int(index) for index in args.prohibit.split(',') if len(index)]
         network.prohibit(prohibit_indices)
+
+    if args.tag:
+        tagged_reaction_indices = [int(index) for index in args.tag.split(',') if len(index)]
+        add_reaction_tags(network, tagged_reaction_indices)
 
     if args.print_reactions:
         mp_print('Reactions%s:' % (' before compression' if args.compress else ''))
@@ -345,7 +350,7 @@ if __name__ == '__main__':
         if args.direct:
             print_ecms_direct(T_intersected, ids)
         else:
-            print_ECMs(cone, debug_tags, network, orig_N, args.add_objective_metabolite, args.check_feasibility)
+            print_ECMs(cone, tagged_reaction_indices, network, orig_N, args.add_objective_metabolite, args.check_feasibility)
 
     end = time()
     mp_print('Ran in %f seconds' % (end - start))
