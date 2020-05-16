@@ -7,3 +7,4 @@ cbmpy
 pycddlib
 psutil
 sklearn
+cython
