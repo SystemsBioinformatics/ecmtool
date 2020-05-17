@@ -218,10 +218,10 @@ if __name__ == '__main__':
         # Iterative enumeration performs compression after the iteration steps.
         args.compress = False
 
-    if args.direct and sys.platform.startswith('win32'):
-        mp_print('\n!! Direct intersection is not yet supported on Windows, please use run_docker_windows.bat if '
-                 'you want to test direct intersection. This run will now use indirect intersection instead.\n')
-        args.direct = False
+    # if args.direct and sys.platform.startswith('win32'):
+    #     mp_print('\n!! Direct intersection is not yet supported on Windows, please use run_docker_windows.bat if '
+    #              'you want to test direct intersection. This run will now use indirect intersection instead.\n')
+    #     args.direct = False
 
     model_path = args.model_path
 

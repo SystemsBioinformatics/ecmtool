@@ -1,14 +1,12 @@
 from time import time
-
-from mpi4py import MPI
 import numpy as np
-import os
 from scipy.linalg import LinAlgError
 from scipy.optimize import linprog
 
 from ecmtool.helpers import mp_print
 from ecmtool._bglu_dense import BGLU
 from ecmtool.helpers import redund, get_metabolite_adjacency, to_fractions
+from ecmtool.mpi_wrapper import *
 
 
 def check_if_intermediate_cone_exists(intermediate_cone_path):
@@ -822,9 +820,9 @@ def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose
     if len(minus) > 0 and minus[0] == -1:
         minus = [x for x in range(matrix_indep_rows.shape[1])]
 
-    comm = MPI.COMM_WORLD
-    mpi_size = comm.Get_size()
-    mpi_rank = comm.Get_rank()
+
+    mpi_size = get_process_size()
+    mpi_rank = get_process_rank()
 
     adjacency = []
     nr_tests = len(plus) * len(minus)
@@ -863,7 +861,7 @@ def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose
     #         mp_print("Process %d is now on adjacency test %d" % (mpi_rank, i))
 
     # MPI communication step
-    adj_sets = comm.allgather(adjacency)
+    adj_sets = world_allgather(adjacency)
     for i in range(mpi_size):
         if i != mpi_rank:
             adjacency.extend(adj_sets[i])
@@ -1055,7 +1053,7 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12
         deleted = np.append(deleted, i)
         internal.remove(i)
 
-        if MPI.COMM_WORLD.Get_rank() == 0:
+        if get_process_rank() == 0:
             try:
                 metab_ids = [metab.id for metab in network.metabolites]
                 np.savetxt('intermediate_conversion_cone.csv', np.transpose(R), delimiter=',',
