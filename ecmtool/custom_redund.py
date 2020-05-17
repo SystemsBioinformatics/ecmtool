@@ -7,7 +7,10 @@ from scipy.linalg import LinAlgError
 from scipy.optimize import linprog
 
 from ecmtool.helpers import mp_print
-from ecmtool._bglu_dense import BGLU
+try:
+    from ecmtool._bglu_dense import BGLU
+except ImportError:
+    from ecmtool.bglu_dense_uncompiled import BGLU
 from ecmtool.helpers import redund, get_metabolite_adjacency, to_fractions
 from ecmtool.intersect_directly_mpi import perturb_LP, normalize_columns, independent_rows, get_start_basis,\
     add_first_ray
