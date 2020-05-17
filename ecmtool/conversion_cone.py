@@ -3,6 +3,7 @@ from time import time
 from .helpers import *
 from .network import Network, Reaction, Metabolite
 from .nullspace import iterative_nullspace
+from .custom_redund import drop_redundant_rays
 
 
 def normalize_rows(M):
@@ -193,13 +194,36 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     if verbose:
         print('Reducing rows in H with redund')
 
+    # testing
+    print("Size of H_ineq before append:", H_ineq.shape[0], H_ineq.shape[1])
+    H_ineq = np.append(H_ineq, [H_ineq[0, :]+H_ineq[1, :]], axis=0)
+    print("Size of H_ineq after append:", H_ineq.shape[0], H_ineq.shape[1])
+
     count_before_ineq = len(H_ineq)
+    print("Size of H_ineq before redund:", H_ineq.shape[0], H_ineq.shape[1])
+    t1 = time()
+    H_ineq_custom_redund = np.transpose(drop_redundant_rays(np.transpose(H_ineq)))
+    print("Custom redund took %f sec" % (time()-t1))
+    t2 = time()
     H_ineq = redund(H_ineq)
+    print("Redund took %f sec" % (time() - t2))
     count_after_ineq = len(H_ineq)
+    print("Size of H_ineq after redund:", H_ineq.shape[0], H_ineq.shape[1])
+    print("Size of H_ineq_custom_redund:", H_ineq_custom_redund.shape[0], H_ineq_custom_redund.shape[1])
+    input("waiting")
 
     count_before_eq = len(H_eq)
+    print("Size of H_eq before redund:", H_eq.shape[0], H_eq.shape[1])
+    t1 = time()
+    H_eq_custom_redund = np.transpose(drop_redundant_rays(np.transpose(H_eq)))
+    print("Custom redund took %f sec" % (time() - t1))
+    t2 = time()
     H_eq = redund(H_eq)
+    print("Redund took %f sec" % (time() - t2))
     count_after_eq = len(H_eq)
+    print("Size of H_eq after redund:", H_eq.shape[0], H_eq.shape[1])
+    print("Size of H_eq_custom_redund:", H_eq_custom_redund.shape[0], H_eq_custom_redund.shape[1])
+    input("waiting")
 
     if verbose:
         print('Removed %d rows from H' % (count_before_eq + count_before_ineq - count_after_eq - count_after_ineq))
@@ -470,7 +494,9 @@ def get_clementine_conversion_cone(N, external_metabolites=[], reversible_reacti
         G = G[keep, :]
         G = np.append(G, candidates, axis=0)
         # G = drop_nonextreme(G, get_zero_set(G, equalities), verbose=verbose)
+        input("now at redund 486")
         G = redund(G, verbose=verbose)
+
 
     return G
 
@@ -530,6 +556,7 @@ def replace_conversions_into_network(network, temp_network, conversions, active_
 
     if conversions.shape[0] > 400:
         print('Running redund on conversions')
+        input("now at redund 547")
         conversions = redund(conversions)
 
     if verbose:
@@ -554,6 +581,7 @@ def replace_conversions_into_network(network, temp_network, conversions, active_
     natural_reaction_indices = np.setdiff1d(range(network.N.shape[1]), conversion_indices)
     all_conversions = network.N[:, conversion_indices]
     all_naturals = network.N[:, natural_reaction_indices]
+    input("now at redund 574")
     reduced_conversions = np.transpose(redund(np.transpose(all_conversions)))
     network.N = np.append(all_naturals, reduced_conversions, axis=1)
     network.reactions = [r for index, r in enumerate(network.reactions) if index in natural_reaction_indices] + \
