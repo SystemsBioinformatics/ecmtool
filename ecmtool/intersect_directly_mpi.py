@@ -7,7 +7,10 @@ from scipy.linalg import LinAlgError
 from scipy.optimize import linprog
 
 from ecmtool.helpers import mp_print
-from ecmtool._bglu_dense import BGLU
+try:
+    from ecmtool._bglu_dense import BGLU
+except (ImportError, EnvironmentError, OSError):
+    from ecmtool.bglu_dense_uncompiled import BGLU
 from ecmtool.helpers import redund, get_metabolite_adjacency, to_fractions
 
 
