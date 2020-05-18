@@ -201,7 +201,7 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     count_before_ineq = len(H_ineq)
     count_before_eq = len(H_eq)
 
-    use_custom_redund = False  # Set to false if you want to use lrslib redund
+    use_custom_redund = True  # Set to false if you want to use lrslib redund
     if use_custom_redund:
         print('Using custom redundancy removal')
         t1 = time()
