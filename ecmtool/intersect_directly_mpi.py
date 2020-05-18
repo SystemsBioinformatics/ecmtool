@@ -191,7 +191,7 @@ def cycle_check_with_output(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=1
 
         i = u > tol  # if none of the u are positive, unbounded
         if not np.any(i):
-            mp_print("Warning: unbounded problem in KKT_check")
+            mp_print("Unbounded problem in cycle detection, so cycle is present")
             # if verbose:
             #     mp_print("Did %d steps in kkt_check2" % iteration - 1)
             return True, 0, [entering]
@@ -553,9 +553,14 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
     return R, network, external_cycles
 
 
-def normalize_columns(R):
+def normalize_columns(R, verbose=True):
     result = np.zeros(R.shape)
+    number_rays = R.shape[1]
     for i in range(result.shape[1]):
+        if verbose:
+            if i % 10000 == 0:
+                mp_print("Normalize columns is on ray %d of %d (%f %%)" %
+                         (i, number_rays, i / number_rays * 100), PRINT_IF_RANK_NONZERO=True)
         if np.max(R[:,
                   i]) > 1e100:  # If numbers are very large, converting to float might give issues, therefore we first divide by another int
             part_normalized_column = np.array(R[:, i] / np.max(R[:, i]), dtype='float')

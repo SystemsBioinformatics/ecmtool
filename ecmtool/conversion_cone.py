@@ -4,6 +4,7 @@ from .helpers import *
 from .network import Network, Reaction, Metabolite
 from .nullspace import iterative_nullspace
 from .custom_redund import drop_redundant_rays
+from .intersect_directly_mpi import independent_rows
 
 
 def normalize_rows(M):
@@ -117,7 +118,7 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     # TODO: remove debug block
     # G = np.asarray(G * 10**3, dtype=np.int64)
 
-    G_exp = G[:,:]
+    G_exp = G[:, :]
     G_rev = np.ndarray(shape=(0, G.shape[1]), dtype='object')
     G_irrev = np.ndarray(shape=(0, G.shape[1]), dtype='object')
 
@@ -202,31 +203,40 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     count_before_ineq = len(H_ineq)
     print("Size of H_ineq before redund:", H_ineq.shape[0], H_ineq.shape[1])
     t1 = time()
-    H_ineq_custom_redund = np.transpose(drop_redundant_rays(np.transpose(H_ineq)))
+    H_ineq_transpose, cycle_rays = drop_redundant_rays(np.transpose(H_ineq))
+    H_ineq_custom_redund = np.transpose(H_ineq_transpose)
+    H_eq_custom_redund = np.concatenate((H_eq, np.transpose(cycle_rays)), axis=0)
     print("Custom redund took %f sec" % (time()-t1))
+    print("Size of H_ineq_custom_redund:", H_ineq_custom_redund.shape[0], H_ineq_custom_redund.shape[1])
     t2 = time()
-    H_ineq = redund(H_ineq)
+    # H_ineq_conventional = redund(H_ineq)
+    H_ineq_conventional = H_ineq
     print("Redund took %f sec" % (time() - t2))
     count_after_ineq = len(H_ineq)
-    print("Size of H_ineq after redund:", H_ineq.shape[0], H_ineq.shape[1])
-    print("Size of H_ineq_custom_redund:", H_ineq_custom_redund.shape[0], H_ineq_custom_redund.shape[1])
-    input("waiting")
+    print("Size of H_ineq after redund:", H_ineq_conventional.shape[0], H_ineq_conventional.shape[1])
+    # input("waiting")
 
     count_before_eq = len(H_eq)
     print("Size of H_eq before redund:", H_eq.shape[0], H_eq.shape[1])
     t1 = time()
-    H_eq_custom_redund = np.transpose(drop_redundant_rays(np.transpose(H_eq)))
-    print("Custom redund took %f sec" % (time() - t1))
+    # H_eq_custom_redund = np.transpose(drop_redundant_rays(np.transpose(H_eq)))
+    H_eq_custom_redund = independent_rows(H_eq_custom_redund)
+    print("Getting rid of dependent rows in H_eq took %f sec" % (time() - t1))
     t2 = time()
-    H_eq = redund(H_eq)
+    H_eq_conventional = redund(H_eq)
     print("Redund took %f sec" % (time() - t2))
-    count_after_eq = len(H_eq)
-    print("Size of H_eq after redund:", H_eq.shape[0], H_eq.shape[1])
+    count_after_eq = len(H_eq_conventional)
+    print("Size of H_eq after redund:", H_eq_conventional.shape[0], H_eq_conventional.shape[1])
     print("Size of H_eq_custom_redund:", H_eq_custom_redund.shape[0], H_eq_custom_redund.shape[1])
-    input("waiting")
+    # input("waiting")
 
     if verbose:
         print('Removed %d rows from H' % (count_before_eq + count_before_ineq - count_after_eq - count_after_ineq))
+
+    H_eq = H_eq_custom_redund
+    H_ineq = H_ineq_custom_redund
+    # H_eq = H_eq_conventional
+    # H_ineq = H_ineq_conventional
 
     # Calculate the extreme rays of the cone C represented by inequalities H_total, resulting in
     # the elementary conversion modes of the input system.

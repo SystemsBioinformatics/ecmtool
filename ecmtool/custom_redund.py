@@ -1,19 +1,15 @@
-from time import time
-
-from mpi4py import MPI
 import numpy as np
-import os
 from scipy.linalg import LinAlgError
 from scipy.optimize import linprog
 
 from ecmtool.helpers import mp_print
+
 try:
     from ecmtool._bglu_dense import BGLU
 except (ImportError, EnvironmentError, OSError):
     from ecmtool.bglu_dense_uncompiled import BGLU
-from ecmtool.helpers import redund, get_metabolite_adjacency, to_fractions
-from ecmtool.intersect_directly_mpi import perturb_LP, normalize_columns, independent_rows, get_start_basis,\
-    add_first_ray
+from ecmtool.intersect_directly_mpi import perturb_LP, normalize_columns, independent_rows, get_start_basis, \
+    add_first_ray, get_more_basis_columns, setup_cycle_LP, cycle_check_with_output
 
 
 def kkt_check_redund(c, A, x, basis, i, tol=1e-8, threshold=1e-3, max_iter=100000, verbose=True):
@@ -112,32 +108,142 @@ def check_extreme(R, i, basis, tol=1e-10):
         return True
 
 
-def drop_redundant_rays(ray_matrix):
-    matrix_normalized = normalize_columns(ray_matrix)
+def get_remove_metabolite_redund(R, reaction, verbose=True):
+    column = R[:, reaction]
+    for i in range(len(column)):
+        if column[i] != 0:
+            return i
+    print("\tWarning: column with only zeros is part of cycle")
+    return 0
+
+
+def cancel_with_cycle_redund(R, met, cycle_ind, verbose=True, tol=1e-12):
+    cancelling_reaction = R[:, cycle_ind]
+    reactions_using_met = [i for i in range(R.shape[1]) if R[met, i] != 0 and i != cycle_ind]
+
+    next_R = np.copy(R)
+    to_be_dropped = [cycle_ind]
+
+    for reac_ind in reactions_using_met:
+        coeff_cycle = R[met, cycle_ind]
+        coeff_reac = R[met, reac_ind]
+        new_ray = R[:, reac_ind] - (coeff_reac / coeff_cycle) * R[:, cycle_ind]
+        if sum(abs(new_ray)) > tol:
+            next_R[:, reac_ind] = new_ray
+        else:
+            to_be_dropped.append(reac_ind)
+
+    # Delete cycle ray that is now the only one that produces met, so has to be zero + rays that are full of zeros now
+    next_R = np.delete(next_R, to_be_dropped, axis=1)
+
+    return next_R
+
+
+def remove_cycles_redund(R, tol=1e-12, verbose=True):
+    """Detect whether there are cycles, by doing an LP. If LP is unbounded find a minimal cycle. Cancel one metabolite
+    with the cycle."""
+    cycle_inds = []
+    A_ub, b_ub, A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))))
+
+    if verbose:
+        mp_print('Constructing basis for LP')
+    basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [])
+    b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, 1e-10)
+    if verbose:
+        mp_print('Starting linearity check using LP.')
+    cycle_present, status, cycle_indices = cycle_check_with_output(c, np.asarray(A_eq, dtype='float'), x0, basis)
+
+    if status != 0:
+        res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12},
+                      x0=x0)
+        if res.status == 4:
+            print("Numerical difficulties with revised simplex, trying interior point method instead")
+            res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
+
+        cycle_present = True if np.max(res.x) > 90 else False
+        if cycle_present:
+            cycle_indices = np.where(res.x > 90)[0]
+        if np.any(np.isnan(res.x)):
+            raise Exception('Remove cycles did not work, because LP-solver had issues. Try to solve this.')
+
+    # if the objective is unbounded, there is a cycle that sums to zero
+    while cycle_present:
+        # Find minimal cycle
+        met = -1
+        counter = 0
+        while met < 0:
+            cycle_ind = cycle_indices[counter]
+            met = get_remove_metabolite_redund(R, cycle_ind)
+            counter = counter + 1
+
+        R = cancel_with_cycle_redund(R, met, cycle_ind)
+        cycle_inds = np.append(cycle_inds, cycle_ind)
+
+        # Do new LP to check if there is still a cycle present.
+        A_ub, b_ub, A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))))
+
+        basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [])
+        b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, 1e-10)
+        if verbose:
+            mp_print('Starting linearity check in H_eq using LP.')
+        cycle_present, status, cycle_indices = cycle_check_with_output(c, np.asarray(A_eq, dtype='float'), x0, basis)
+
+        if status != 0:
+            res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12},
+                          x0=x0)
+            if res.status == 4:
+                print("Numerical difficulties with revised simplex, trying interior point method instead")
+                res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='interior-point', options={'tol': 1e-12})
+
+            cycle_present = True if np.max(res.x) > 90 else False
+            if cycle_present:
+                cycle_indices = np.where(res.x > 90)[0]
+            if np.any(np.isnan(res.x)):
+                raise Exception('Remove cycles did not work, because LP-solver had issues. Try to solve this.')
+
+    return R, np.array(cycle_inds, dtype=int)
+
+
+def drop_redundant_rays(ray_matrix, verbose=True):
+    # first find 'cycles': combinations of columns of matrix_indep_rows that add up to zero, and remove them
+    if verbose:
+        mp_print('Detecting linearities in H_ineq.')
+    ray_matrix_wo_linearities, cycle_inds = remove_cycles_redund(ray_matrix)
+
+    if verbose:
+        mp_print('Preparing redundancy test.')
+    matrix_normalized = normalize_columns(ray_matrix_wo_linearities)
     matrix_indep_rows = independent_rows(matrix_normalized)
+    cycle_rays = ray_matrix[:, cycle_inds]
 
-    comm = MPI.COMM_WORLD
-    mpi_size = comm.Get_size()
-    mpi_rank = comm.Get_rank()
-
-    # first find any column basis of R_indep
+    # then find any column basis of R_indep
     start_basis = get_start_basis(matrix_indep_rows)
     start_basis_inv = np.linalg.inv(matrix_indep_rows[:, start_basis])
 
     number_rays = matrix_indep_rows.shape[1]
+    init_number_rays = number_rays
     non_extreme_rays = []
     for i in range(number_rays):
-        if i % mpi_size == mpi_rank:
-            basis = add_first_ray(matrix_indep_rows, start_basis_inv, start_basis, i)
-            extreme = check_extreme(matrix_indep_rows, i, basis)
-            if not extreme:
-                non_extreme_rays.append(i)
+        if i % 10 == 0:
+            mp_print("Custom redund is on reduncancy test %d of %d (%f %%). Found %d redundant rays." %
+                     (i, init_number_rays, i / init_number_rays * 100, len(non_extreme_rays)), PRINT_IF_RANK_NONZERO=True)
 
-    # MPI communication step
-    non_extreme_sets = comm.allgather(non_extreme_rays)
-    for i in range(mpi_size):
-        if i != mpi_rank:
-            non_extreme_rays.extend(non_extreme_sets[i])
+        col_ind = i - len(non_extreme_rays)
+        basis = add_first_ray(matrix_indep_rows, start_basis_inv, start_basis, col_ind)
+        extreme = check_extreme(matrix_indep_rows, col_ind, basis)
+
+        if not extreme:
+            non_extreme_rays.append(i)
+            matrix_indep_rows = np.delete(matrix_indep_rows, col_ind, axis=1)
+            if col_ind in start_basis:
+                start_basis = get_start_basis(matrix_indep_rows)
+                start_basis_inv = np.linalg.inv(matrix_indep_rows[:, start_basis])
+            else:
+                start_basis[start_basis > col_ind] -= 1
+
+            number_rays = number_rays - 1
+
     non_extreme_rays.sort()
+    new_ray_matrix = np.delete(ray_matrix_wo_linearities, non_extreme_rays, axis=1)
 
-    return np.delete(ray_matrix, non_extreme_rays, axis=1)
+    return new_ray_matrix, cycle_rays
