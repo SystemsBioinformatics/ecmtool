@@ -272,8 +272,8 @@ def drop_redundant_rays(ray_matrix, verbose=True, use_pre_filter=False):
     for i in range(number_rays):
         if i % mpi_size == mpi_rank:
             if i % (10 * mpi_size) == mpi_rank:
-                mp_print("Process %d is on redundancy test %d of %d (%f %%)" %
-                         (mpi_rank, i, number_rays, i / number_rays * 100), PRINT_IF_RANK_NONZERO=True)
+                mp_print("Process %d is on redundancy test %d of %d (%f %%). Found %d redundant rays." %
+                         (mpi_rank, i, number_rays, i / number_rays * 100, len(non_extreme_rays)), PRINT_IF_RANK_NONZERO=True)
             basis = add_first_ray(matrix_indep_rows, start_basis_inv, start_basis, i)
             extreme = check_extreme(matrix_indep_rows, i, basis)
             if not extreme:

@@ -49,14 +49,14 @@ def print_ECMs(cone, debug_tags, network, orig_N, add_objective_metabolite, chec
         metabolite_ids = [met.id for met in
                           network.metabolites] if not network.compressed else network.uncompressed_metabolite_ids
 
-        print('\nECM #%d:' % (index + 1))
+        mp_print('\nECM #%d:' % (index + 1))
         for metabolite_index, stoichiometry_val in enumerate(ecm):
             if stoichiometry_val != 0.0:
-                print('%s\t\t->\t%.4f' % (metabolite_ids[metabolite_index], stoichiometry_val))
+                mp_print('%s\t\t->\t%.4f' % (metabolite_ids[metabolite_index], stoichiometry_val))
 
         if check_feasibility:
             satisfied = ecm_satisfies_stoichiometry(orig_N, cone[index, :])
-            print('ECM satisfies stoichiometry' if satisfied else 'ECM does not satisfy stoichiometry')
+            mp_print('ECM satisfies stoichiometry' if satisfied else 'ECM does not satisfy stoichiometry')
 
 
 def remove_close_vectors(matrix, threshold=10 ** -6, verbose=True):
