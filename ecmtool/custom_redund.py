@@ -236,7 +236,9 @@ def drop_redundant_rays(ray_matrix, verbose=True):
             non_extreme_rays.append(i)
             matrix_indep_rows = np.delete(matrix_indep_rows, col_ind, axis=1)
             if col_ind in start_basis:
-                start_basis = get_start_basis(matrix_indep_rows)
+                remaining_basis = np.delete(start_basis, np.where(start_basis == col_ind)[0])
+                remaining_basis[remaining_basis > col_ind] -= 1
+                start_basis = get_more_basis_columns(matrix_indep_rows, remaining_basis)
                 start_basis_inv = np.linalg.inv(matrix_indep_rows[:, start_basis])
             else:
                 start_basis[start_basis > col_ind] -= 1
