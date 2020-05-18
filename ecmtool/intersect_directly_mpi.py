@@ -553,7 +553,7 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
     return R, network, external_cycles
 
 
-def normalize_columns(R, verbose=True):
+def normalize_columns(R, verbose=False):
     result = np.zeros(R.shape)
     number_rays = R.shape[1]
     for i in range(result.shape[1]):

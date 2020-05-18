@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.linalg import LinAlgError
 from scipy.optimize import linprog
-
+from mpi4py import MPI
 from ecmtool.helpers import mp_print
 
 try:
@@ -10,6 +10,11 @@ except (ImportError, EnvironmentError, OSError):
     from ecmtool.bglu_dense_uncompiled import BGLU
 from ecmtool.intersect_directly_mpi import perturb_LP, normalize_columns, independent_rows, get_start_basis, \
     add_first_ray, get_more_basis_columns, setup_cycle_LP, cycle_check_with_output
+
+
+def unique(matrix):
+    unique_set = {tuple(row) for row in matrix if np.count_nonzero(row) > 0}
+    return np.vstack(unique_set) if len(unique_set) else to_fractions(np.ndarray(shape=(0, matrix.shape[1])))
 
 
 def kkt_check_redund(c, A, x, basis, i, tol=1e-8, threshold=1e-3, max_iter=100000, verbose=True):
@@ -233,6 +238,8 @@ def pre_redund(matrix_indep_rows):
 def drop_redundant_rays(ray_matrix, verbose=True, use_pre_filter=False):
     # Sometimes, use_pre_filter=True can speed up the calculations, but most of the times it doesn't
 
+    # First make sure that no duplicate rays are in the matrix
+    ray_matrix = np.transpose(unique(np.transpose(ray_matrix)))
     # first find 'cycles': combinations of columns of matrix_indep_rows that add up to zero, and remove them
     if verbose:
         mp_print('Detecting linearities in H_ineq.')
@@ -250,6 +257,10 @@ def drop_redundant_rays(ray_matrix, verbose=True, use_pre_filter=False):
     else:
         filtered_inds = np.arange(matrix_indep_rows.shape[1])
 
+    comm = MPI.COMM_WORLD
+    mpi_size = comm.Get_size()
+    mpi_rank = comm.Get_rank()
+
     matrix_indep_rows = matrix_indep_rows[:, filtered_inds]
 
     # then find any column basis of R_indep
@@ -257,30 +268,22 @@ def drop_redundant_rays(ray_matrix, verbose=True, use_pre_filter=False):
     start_basis_inv = np.linalg.inv(matrix_indep_rows[:, start_basis])
 
     number_rays = matrix_indep_rows.shape[1]
-    init_number_rays = number_rays
     non_extreme_rays = []
     for i in range(number_rays):
-        if i % 10 == 0:
-            mp_print("Custom redund is on reduncancy test %d of %d (%f %%). Found %d redundant rays." %
-                     (i, init_number_rays, i / init_number_rays * 100, len(non_extreme_rays)), PRINT_IF_RANK_NONZERO=True)
+        if i % mpi_size == mpi_rank:
+            if i % (10 * mpi_size) == mpi_rank:
+                mp_print("Process %d is on redundancy test %d of %d (%f %%)" %
+                         (mpi_rank, i, number_rays, i / number_rays * 100), PRINT_IF_RANK_NONZERO=True)
+            basis = add_first_ray(matrix_indep_rows, start_basis_inv, start_basis, i)
+            extreme = check_extreme(matrix_indep_rows, i, basis)
+            if not extreme:
+                non_extreme_rays.append(i)
 
-        col_ind = i - len(non_extreme_rays)
-        basis = add_first_ray(matrix_indep_rows, start_basis_inv, start_basis, col_ind)
-        extreme = check_extreme(matrix_indep_rows, col_ind, basis)
-
-        if not extreme:
-            non_extreme_rays.append(i)
-            matrix_indep_rows = np.delete(matrix_indep_rows, col_ind, axis=1)
-            if col_ind in start_basis:
-                remaining_basis = np.delete(start_basis, np.where(start_basis == col_ind)[0])
-                remaining_basis[remaining_basis > col_ind] -= 1
-                start_basis = get_more_basis_columns(matrix_indep_rows, remaining_basis)
-                start_basis_inv = np.linalg.inv(matrix_indep_rows[:, start_basis])
-            else:
-                start_basis[start_basis > col_ind] -= 1
-
-            number_rays = number_rays - 1
-
+    # MPI communication step
+    non_extreme_sets = comm.allgather(non_extreme_rays)
+    for i in range(mpi_size):
+        if i != mpi_rank:
+            non_extreme_rays.extend(non_extreme_sets[i])
     non_extreme_rays.sort()
     extreme_inds = np.delete(filtered_inds, non_extreme_rays)
     new_ray_matrix = ray_matrix_wo_linearities[:, extreme_inds]
