@@ -218,10 +218,11 @@ if __name__ == '__main__':
         # Iterative enumeration performs compression after the iteration steps.
         args.compress = False
 
-    if args.direct and sys.platform.startswith('win32'):
-        mp_print('\n!! Direct intersection is not yet supported on Windows, please use run_docker_windows.bat if '
-                 'you want to test direct intersection. This run will now use indirect intersection instead.\n')
-        args.direct = False
+    if sys.platform.startswith('win32'):
+        mp_print('!!\n'
+                 'Running ecmtool on Linux might be faster than on Windows, because of external dependencies.\n'
+                 'To reap the benefits of parallelization and the use of cython, please use a virtual Linux machine'
+                 'or a Linux computing cluster.\n')
 
     model_path = args.model_path
 
