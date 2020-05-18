@@ -204,17 +204,53 @@ def remove_cycles_redund(R, tol=1e-12, verbose=True):
     return R, np.array(cycle_inds, dtype=int)
 
 
-def drop_redundant_rays(ray_matrix, verbose=True):
+def pre_redund(matrix_indep_rows):
+    """In this function, we try to filter out many redundant rays, without claiming that all redundant rays are
+    filtered out. Running a redundancy-removal method is still needed after this."""
+    start_basis = get_start_basis(matrix_indep_rows)
+    start_basis_inv = np.linalg.inv(matrix_indep_rows[:, start_basis])
+
+    filtered_inds = start_basis
+    filtered_rays = matrix_indep_rows[:, start_basis]
+    n_rays = matrix_indep_rows.shape[1]
+    local_basis_inds = np.arange(len(start_basis))
+    for i in range(n_rays):
+        if i % 100 == 0:
+            mp_print("Passed %d of %d (%f %%) through redundancy filter. Found %d redundant rays." %
+                     (i, n_rays, i / n_rays * 100, i-len(np.where(filtered_inds<i)[0])))
+        if i not in filtered_inds:
+            new_ray = matrix_indep_rows[:, i][:, np.newaxis]
+            filtered_rays_new = np.append(filtered_rays, new_ray, axis=1)
+            basis = add_first_ray(filtered_rays_new, start_basis_inv, local_basis_inds, filtered_rays_new.shape[1] - 1)
+            extreme = check_extreme(filtered_rays_new, filtered_rays_new.shape[1] - 1, basis)
+            if extreme:
+                filtered_rays = filtered_rays_new
+                filtered_inds = np.append(filtered_inds, i)
+
+    return filtered_inds
+
+
+def drop_redundant_rays(ray_matrix, verbose=True, use_pre_filter=False):
+    # Sometimes, use_pre_filter=True can speed up the calculations, but most of the times it doesn't
+
     # first find 'cycles': combinations of columns of matrix_indep_rows that add up to zero, and remove them
     if verbose:
         mp_print('Detecting linearities in H_ineq.')
     ray_matrix_wo_linearities, cycle_inds = remove_cycles_redund(ray_matrix)
 
+    cycle_rays = ray_matrix[:, cycle_inds]
+
     if verbose:
         mp_print('Preparing redundancy test.')
     matrix_normalized = normalize_columns(ray_matrix_wo_linearities)
     matrix_indep_rows = independent_rows(matrix_normalized)
-    cycle_rays = ray_matrix[:, cycle_inds]
+
+    if use_pre_filter:
+        filtered_inds = pre_redund(matrix_indep_rows)
+    else:
+        filtered_inds = np.arange(matrix_indep_rows.shape[1])
+
+    matrix_indep_rows = matrix_indep_rows[:, filtered_inds]
 
     # then find any column basis of R_indep
     start_basis = get_start_basis(matrix_indep_rows)
@@ -246,6 +282,7 @@ def drop_redundant_rays(ray_matrix, verbose=True):
             number_rays = number_rays - 1
 
     non_extreme_rays.sort()
-    new_ray_matrix = np.delete(ray_matrix_wo_linearities, non_extreme_rays, axis=1)
+    extreme_inds = np.delete(filtered_inds, non_extreme_rays)
+    new_ray_matrix = ray_matrix_wo_linearities[:, extreme_inds]
 
     return new_ray_matrix, cycle_rays

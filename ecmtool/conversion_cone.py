@@ -195,7 +195,11 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     if verbose:
         print('Reducing rows in H with redund')
 
-    # testing
+    # Remove duplicates from H_ineq and H_eq
+    H_ineq = unique(H_ineq)
+    H_eq = unique(H_eq)
+
+    # Use redundancy-removal to make H_ineq and H_eq smaller
     print("Size of H_ineq before redund:", H_ineq.shape[0], H_ineq.shape[1])
     print("Size of H_eq before redund:", H_eq.shape[0], H_eq.shape[1])
     count_before_ineq = len(H_ineq)
