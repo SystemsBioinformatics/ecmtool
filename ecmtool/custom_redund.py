@@ -2,7 +2,7 @@ import numpy as np
 from scipy.linalg import LinAlgError
 from scipy.optimize import linprog
 from mpi4py import MPI
-from ecmtool.helpers import mp_print
+from ecmtool.helpers import mp_print, to_fractions
 
 try:
     from ecmtool._bglu_dense import BGLU
