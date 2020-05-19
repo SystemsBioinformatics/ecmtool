@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.linalg import LinAlgError
 from scipy.optimize import linprog
-from mpi4py import MPI
+from ecmtool import mpi_wrapper
 from ecmtool.helpers import mp_print, to_fractions
 
 try:
@@ -257,9 +257,8 @@ def drop_redundant_rays(ray_matrix, verbose=True, use_pre_filter=False):
     else:
         filtered_inds = np.arange(matrix_indep_rows.shape[1])
 
-    comm = MPI.COMM_WORLD
-    mpi_size = comm.Get_size()
-    mpi_rank = comm.Get_rank()
+    mpi_size = mpi_wrapper.get_process_size()
+    mpi_rank = mpi_wrapper.get_process_rank()
 
     matrix_indep_rows = matrix_indep_rows[:, filtered_inds]
 
@@ -280,7 +279,7 @@ def drop_redundant_rays(ray_matrix, verbose=True, use_pre_filter=False):
                 non_extreme_rays.append(i)
 
     # MPI communication step
-    non_extreme_sets = comm.allgather(non_extreme_rays)
+    non_extreme_sets = mpi_wrapper.world_allgather(non_extreme_rays)
     for i in range(mpi_size):
         if i != mpi_rank:
             non_extreme_rays.extend(non_extreme_sets[i])

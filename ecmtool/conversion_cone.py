@@ -5,6 +5,7 @@ from .network import Network, Reaction, Metabolite
 from .nullspace import iterative_nullspace
 from .custom_redund import drop_redundant_rays
 from .intersect_directly_mpi import independent_rows
+from ecmtool import mpi_wrapper
 
 
 def normalize_rows(M):
@@ -101,188 +102,194 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     :param verbose: print status messages during enumeration
     :return: matrix with conversion cone "c" as row vectors
     """
-    amount_metabolites, amount_reactions = N.shape[0], N.shape[1]
+    if mpi_wrapper.is_first_process():
+        amount_metabolites, amount_reactions = N.shape[0], N.shape[1]
 
-    # External metabolites that have no direction specified
-    in_out_metabolites = np.setdiff1d(external_metabolites, np.append(input_metabolites, output_metabolites, axis=0))
-    added_virtual_metabolites = np.asarray(np.add(range(len(in_out_metabolites)), amount_metabolites), dtype='int')
-    extended_external_metabolites = np.append(external_metabolites, added_virtual_metabolites, axis=0)
-    in_out_indices = [external_metabolites.index(index) for index in in_out_metabolites]
+        # External metabolites that have no direction specified
+        in_out_metabolites = np.setdiff1d(external_metabolites, np.append(input_metabolites, output_metabolites, axis=0))
+        added_virtual_metabolites = np.asarray(np.add(range(len(in_out_metabolites)), amount_metabolites), dtype='int')
+        extended_external_metabolites = np.append(external_metabolites, added_virtual_metabolites, axis=0)
+        in_out_indices = [external_metabolites.index(index) for index in in_out_metabolites]
 
-    if len(external_metabolites) == 0:
-        return to_fractions(np.ndarray(shape=(0, N.shape[0])))
+        if len(external_metabolites) == 0:
+            return to_fractions(np.ndarray(shape=(0, N.shape[0])))
 
-    # Compose G of the columns of N
-    G = np.transpose(N)
+        # Compose G of the columns of N
+        G = np.transpose(N)
 
-    # TODO: remove debug block
-    # G = np.asarray(G * 10**3, dtype=np.int64)
+        # TODO: remove debug block
+        # G = np.asarray(G * 10**3, dtype=np.int64)
 
-    G_exp = G[:, :]
-    G_rev = np.ndarray(shape=(0, G.shape[1]), dtype='object')
-    G_irrev = np.ndarray(shape=(0, G.shape[1]), dtype='object')
+        G_exp = G[:, :]
+        G_rev = np.ndarray(shape=(0, G.shape[1]), dtype='object')
+        G_irrev = np.ndarray(shape=(0, G.shape[1]), dtype='object')
 
-    # Add reversible reactions (columns) of N to G in the negative direction as well
-    for reaction_index in range(G.shape[0]):
-        if reaction_index in reversible_reactions:
-            G_exp = np.append(G_exp, [-G[reaction_index, :]], axis=0)
-            G_rev = np.append(G_rev, [-G[reaction_index, :]], axis=0)
-        else:
-            G_irrev = np.append(G_irrev, [G[reaction_index, :]], axis=0)
+        # Add reversible reactions (columns) of N to G in the negative direction as well
+        for reaction_index in range(G.shape[0]):
+            if reaction_index in reversible_reactions:
+                G_exp = np.append(G_exp, [-G[reaction_index, :]], axis=0)
+                G_rev = np.append(G_rev, [-G[reaction_index, :]], axis=0)
+            else:
+                G_irrev = np.append(G_irrev, [G[reaction_index, :]], axis=0)
 
 
-    # Calculate H as the union of our linearities and the extreme rays of matrix G (all as row vectors)
-    if verbose:
-         print('Calculating null space of inequalities system G')
-    linearities = np.transpose(iterative_nullspace(G, verbose=verbose))
+        # Calculate H as the union of our linearities and the extreme rays of matrix G (all as row vectors)
+        if verbose:
+             print('Calculating null space of inequalities system G')
+        linearities = np.transpose(iterative_nullspace(G, verbose=verbose))
 
-    if linearities.shape[0] == 0:
-        linearities = np.ndarray(shape=(0, G.shape[1]))
+        if linearities.shape[0] == 0:
+            linearities = np.ndarray(shape=(0, G.shape[1]))
 
-    linearities_deflated = deflate_matrix(linearities, external_metabolites)
+        linearities_deflated = deflate_matrix(linearities, external_metabolites)
 
-    # Calculate H as the union of our linearities and the extreme rays of matrix G (all as row vectors)
-    if verbose:
-         print('Calculating extreme rays H of inequalities system G')
+        # Calculate H as the union of our linearities and the extreme rays of matrix G (all as row vectors)
+        if verbose:
+             print('Calculating extreme rays H of inequalities system G')
 
-    # Calculate generating set of the dual of our initial conversion cone C0, C0*
-    rays = get_extreme_rays(np.append(linearities, G_rev, axis=0), G_irrev, verbose=verbose)
+        # Calculate generating set of the dual of our initial conversion cone C0, C0*
+        rays = get_extreme_rays(np.append(linearities, G_rev, axis=0), G_irrev, verbose=verbose)
 
-    if rays.shape[0] == 0:
-        print('Warning: given system has no nonzero inequalities H. Returning empty conversion cone.')
-        return to_fractions(np.ndarray(shape=(0, G.shape[1])))
+        if rays.shape[0] == 0:
+            print('Warning: given system has no nonzero inequalities H. Returning empty conversion cone.')
+            return to_fractions(np.ndarray(shape=(0, G.shape[1])))
 
-    if verbose:
-        print('Deflating H')
-    rays_deflated = deflate_matrix(rays, external_metabolites)
+        if verbose:
+            print('Deflating H')
+        rays_deflated = deflate_matrix(rays, external_metabolites)
 
-    if verbose:
-        print('Expanding H with metabolite direction constraints')
-    # Add bidirectional (in- and output) metabolites in reverse direction
-    rays_split = split_columns(rays_deflated, in_out_indices) if not only_rays else rays_deflated
-    linearities_split = split_columns(linearities_deflated, in_out_indices) if not only_rays else linearities_deflated
+        if verbose:
+            print('Expanding H with metabolite direction constraints')
+        # Add bidirectional (in- and output) metabolites in reverse direction
+        rays_split = split_columns(rays_deflated, in_out_indices) if not only_rays else rays_deflated
+        linearities_split = split_columns(linearities_deflated, in_out_indices) if not only_rays else linearities_deflated
 
-    H_ineq = rays_split
-    H_eq = linearities_split
+        H_ineq = rays_split
+        H_eq = linearities_split
 
-    # Add input/output constraints to H_ineq
-    if not H_ineq.shape[0]:
-        H_ineq = np.zeros(shape=(1, H_ineq.shape[1]))
+        # Add input/output constraints to H_ineq
+        if not H_ineq.shape[0]:
+            H_ineq = np.zeros(shape=(1, H_ineq.shape[1]))
 
-    identity = to_fractions(np.identity(H_ineq.shape[1]))
+        identity = to_fractions(np.identity(H_ineq.shape[1]))
 
-    # Bidirectional (in- and output) metabolites.
-    # When enumerating only extreme rays, no splitting is done, and
-    # thus no other dimensions need to have directionality specified.
-    if not only_rays:
-        for list_index, inout_metabolite_index in enumerate(in_out_indices):
-            index = inout_metabolite_index
+        # Bidirectional (in- and output) metabolites.
+        # When enumerating only extreme rays, no splitting is done, and
+        # thus no other dimensions need to have directionality specified.
+        if not only_rays:
+            for list_index, inout_metabolite_index in enumerate(in_out_indices):
+                index = inout_metabolite_index
+                H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
+
+                index = len(external_metabolites) + list_index
+                H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
+
+        # Inputs
+        for input_metabolite in input_metabolites:
+            index = external_metabolites.index(input_metabolite)
+            H_ineq = np.append(H_ineq, [-identity[index, :]], axis=0)
+
+        # Outputs
+        for output_metabolite in output_metabolites:
+            index = external_metabolites.index(output_metabolite)
             H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
 
-            index = len(external_metabolites) + list_index
-            H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
+        if verbose:
+            print('Reducing rows in H with redund')
 
-    # Inputs
-    for input_metabolite in input_metabolites:
-        index = external_metabolites.index(input_metabolite)
-        H_ineq = np.append(H_ineq, [-identity[index, :]], axis=0)
+        # Remove duplicates from H_ineq and H_eq
+        H_ineq = unique(H_ineq)
+        H_eq = unique(H_eq)
 
-    # Outputs
-    for output_metabolite in output_metabolites:
-        index = external_metabolites.index(output_metabolite)
-        H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
+        # Use redundancy-removal to make H_ineq and H_eq smaller
+        print("Size of H_ineq before redund:", H_ineq.shape[0], H_ineq.shape[1])
+        print("Size of H_eq before redund:", H_eq.shape[0], H_eq.shape[1])
+        count_before_ineq = len(H_ineq)
+        count_before_eq = len(H_eq)
 
-    if verbose:
-        print('Reducing rows in H with redund')
-
-    # Remove duplicates from H_ineq and H_eq
-    H_ineq = unique(H_ineq)
-    H_eq = unique(H_eq)
-
-    # Use redundancy-removal to make H_ineq and H_eq smaller
-    print("Size of H_ineq before redund:", H_ineq.shape[0], H_ineq.shape[1])
-    print("Size of H_eq before redund:", H_eq.shape[0], H_eq.shape[1])
-    count_before_ineq = len(H_ineq)
-    count_before_eq = len(H_eq)
+    H_ineq = mpi_wrapper.world_allgather(H_ineq)
+    H_eq = mpi_wrapper.world_allgather(H_eq)
 
     use_custom_redund = True  # Set to false if you want to use lrslib redund
     if use_custom_redund:
-        print('Using custom redundancy removal')
+        mp_print('Using custom redundancy removal')
         t1 = time()
         H_ineq_transpose, cycle_rays = drop_redundant_rays(np.transpose(H_ineq))
         H_ineq = np.transpose(H_ineq_transpose)
 
         H_eq = np.concatenate((H_eq, np.transpose(cycle_rays)), axis=0) # Add found linearities from H_ineq to H_eq
-        print("Custom redund took %f sec" % (time()-t1))
+        mp_print("Custom redund took %f sec" % (time()-t1))
 
         t1 = time()
         H_eq = independent_rows(H_eq)
-        print("Removing dependent rows in H_eq took %f sec" % (time() - t1))
+        mp_print("Removing dependent rows in H_eq took %f sec" % (time() - t1))
     else:
-        print('Using classical redundancy removal')
+        mp_print('Using classical redundancy removal')
         t2 = time()
         H_ineq = redund(H_ineq)
-        print("Redund took %f sec" % (time() - t2))
+        mp_print("Redund took %f sec" % (time() - t2))
         t2 = time()
         H_eq = redund(H_eq)
-        print("Redund took %f sec" % (time() - t2))
+        mp_print("Redund took %f sec" % (time() - t2))
 
-    print("Size of H_ineq after redund:", H_ineq.shape[0], H_ineq.shape[1])
-    print("Size of H_eq after redund:", H_eq.shape[0], H_eq.shape[1])
-    count_after_ineq = len(H_ineq)
-    count_after_eq = len(H_eq)
+    if mpi_wrapper.is_first_process():
+        print("Size of H_ineq after redund:", H_ineq.shape[0], H_ineq.shape[1])
+        print("Size of H_eq after redund:", H_eq.shape[0], H_eq.shape[1])
+        count_after_ineq = len(H_ineq)
+        count_after_eq = len(H_eq)
 
-    if verbose:
-        print('Removed %d rows from H in total' % (count_before_eq + count_before_ineq - count_after_eq - count_after_ineq))
+        if verbose:
+            print('Removed %d rows from H in total' % (count_before_eq + count_before_ineq - count_after_eq - count_after_ineq))
 
-    # Calculate the extreme rays of the cone C represented by inequalities H_total, resulting in
-    # the elementary conversion modes of the input system.
-    if verbose:
-        print('Calculating extreme rays C of inequalities system H_eq, H_ineq')
+        # Calculate the extreme rays of the cone C represented by inequalities H_total, resulting in
+        # the elementary conversion modes of the input system.
+        if verbose:
+            print('Calculating extreme rays C of inequalities system H_eq, H_ineq')
 
-    linearity_rays = np.ndarray(shape=(0, H_eq.shape[1]))
-    if only_rays and len(in_out_metabolites) > 0:
-        linearities = np.transpose(iterative_nullspace(np.append(H_eq, H_ineq, axis=0), verbose=verbose))
-        if linearities.shape[0] > 0:
-            if verbose:
-                print('Appending linearities')
-            linearity_rays = np.append(linearity_rays, linearities, axis=0)
-            linearity_rays = np.append(linearity_rays, -linearities, axis=0)
+        linearity_rays = np.ndarray(shape=(0, H_eq.shape[1]))
+        if only_rays and len(in_out_metabolites) > 0:
+            linearities = np.transpose(iterative_nullspace(np.append(H_eq, H_ineq, axis=0), verbose=verbose))
+            if linearities.shape[0] > 0:
+                if verbose:
+                    print('Appending linearities')
+                linearity_rays = np.append(linearity_rays, linearities, axis=0)
+                linearity_rays = np.append(linearity_rays, -linearities, axis=0)
 
-            H_eq = np.append(H_eq, linearities, axis=0)
+                H_eq = np.append(H_eq, linearities, axis=0)
 
-    rays = get_extreme_rays(H_eq if len(H_eq) else None, H_ineq, verbose=verbose)
+        rays = get_extreme_rays(H_eq if len(H_eq) else None, H_ineq, verbose=verbose)
 
-    # When calculating only extreme rays, we need to add linealities in both directions
-    if only_rays and len(in_out_metabolites) > 0:
-        rays = np.append(rays, linearity_rays, axis=0)
+        # When calculating only extreme rays, we need to add linealities in both directions
+        if only_rays and len(in_out_metabolites) > 0:
+            rays = np.append(rays, linearity_rays, axis=0)
 
-    if rays.shape[0] == 0:
-        print('Warning: no feasible Elementary Conversion Modes found')
-        return rays
+        if rays.shape[0] == 0:
+            print('Warning: no feasible Elementary Conversion Modes found')
+            return rays
 
-    if verbose:
-        print('Inflating rays')
+        if verbose:
+            print('Inflating rays')
 
-    if only_rays:
-        rays_inflated = inflate_matrix(rays, external_metabolites, amount_metabolites)
-    else:
-        rays_inflated = inflate_matrix(rays, extended_external_metabolites, amount_metabolites + len(in_out_metabolites))
+        if only_rays:
+            rays_inflated = inflate_matrix(rays, external_metabolites, amount_metabolites)
+        else:
+            rays_inflated = inflate_matrix(rays, extended_external_metabolites, amount_metabolites + len(in_out_metabolites))
 
-    if verbose:
-        print('Removing non-unique rays')
+        if verbose:
+            print('Removing non-unique rays')
 
 
-    # Merge bidirectional metabolites again, and drop duplicate rows
-    if not only_rays:
-        rays_inflated[:, in_out_metabolites] = np.subtract(rays_inflated[:, in_out_metabolites], rays_inflated[:, G.shape[1]:])
-    rays_merged = np.asarray(rays_inflated[:, :G.shape[1]], dtype='object')
-    rays_unique = unique(rays_merged)
-    # rays_unique = redund(rays_merged)
+        # Merge bidirectional metabolites again, and drop duplicate rows
+        if not only_rays:
+            rays_inflated[:, in_out_metabolites] = np.subtract(rays_inflated[:, in_out_metabolites], rays_inflated[:, G.shape[1]:])
+        rays_merged = np.asarray(rays_inflated[:, :G.shape[1]], dtype='object')
+        rays_unique = unique(rays_merged)
+        # rays_unique = redund(rays_merged)
 
-    if verbose:
-        print('Enumerated %d rays' % len(rays_unique))
+        if verbose:
+            print('Enumerated %d rays' % len(rays_unique))
 
+    rays_unique = mpi_wrapper.world_allgather(rays_unique)
     return rays_unique
 
 
