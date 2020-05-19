@@ -639,22 +639,28 @@ def setup_cycle_detection_LP(R_indep, cycle_ind):
     return A_ub, b_ub, A_eq2, b_eq2, c
 
 
-def setup_cycle_LP(R_indep):
+def setup_cycle_LP(R_indep, only_eq=False):
     number_rays = R_indep.shape[1]
 
-    A_ub = -np.identity(number_rays)
-    b_ub = np.zeros(number_rays)
+    if not only_eq:
+        A_ub = -np.identity(number_rays)
+        b_ub = np.zeros(number_rays)
+
     A_eq = R_indep
     b_eq = np.zeros(A_eq.shape[0])
     c = -np.ones(number_rays)
 
-    # Add upper bound of 100
-    A_ub2 = np.concatenate((A_ub, np.identity(number_rays)))
-    b_ub2 = np.concatenate((b_ub, [100] * number_rays))
+    if not only_eq:
+        # Add upper bound of 100
+        A_ub2 = np.concatenate((A_ub, np.identity(number_rays)))
+        b_ub2 = np.concatenate((b_ub, [100] * number_rays))
 
     x0 = np.zeros(number_rays)
 
-    return A_ub2, b_ub2, A_eq, b_eq, c, x0
+    if not only_eq:
+        return A_ub2, b_ub2, A_eq, b_eq, c, x0
+    else:
+        return A_eq, b_eq, c, x0
 
 
 def setup_LP(R_indep, i, j):
