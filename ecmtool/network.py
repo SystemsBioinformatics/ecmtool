@@ -1,4 +1,4 @@
-from cdd import Fraction
+from fractions import Fraction
 import libsbml as sbml
 import cbmpy
 

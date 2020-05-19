@@ -186,7 +186,7 @@ def remove_cycles_redund(R, tol=1e-12, verbose=True):
         cycle_inds = np.append(cycle_inds, cycle_ind)
 
         # Do new LP to check if there is still a cycle present.
-        A_ub, b_ub, A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))))
+        A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))), only_eq=True)
 
         basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [])
         b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, 1e-10)
@@ -195,6 +195,8 @@ def remove_cycles_redund(R, tol=1e-12, verbose=True):
         cycle_present, status, cycle_indices = cycle_check_with_output(c, np.asarray(A_eq, dtype='float'), x0, basis)
 
         if status != 0:
+            A_ub, b_ub, A_eq, b_eq, c, x0 = setup_cycle_LP(
+                independent_rows(normalize_columns(np.array(R, dtype='float'))))
             res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12},
                           x0=x0)
             if res.status == 4:

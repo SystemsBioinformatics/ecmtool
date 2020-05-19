@@ -6,7 +6,6 @@ from fractions import Fraction, gcd
 from subprocess import check_call, STDOUT, PIPE
 from os import remove, devnull as os_devnull, system
 
-import cdd
 import numpy as np
 from random import randint
 
@@ -276,12 +275,12 @@ def get_efms(N, reversibility, verbose=True):
 #     return efms[:, :n_reactions]
 
 
-def get_extreme_rays_cdd(inequality_matrix):
-    mat = cdd.Matrix(np.append(np.zeros(shape=(inequality_matrix.shape[0], 1)), inequality_matrix, axis=1), number_type='fraction')
-    mat.rep_type = cdd.RepType.INEQUALITY
-    poly = cdd.Polyhedron(mat)
-    gen = poly.get_generators()
-    return np.asarray(gen)[:, 1:]
+# def get_extreme_rays_cdd(inequality_matrix):
+#     mat = cdd.Matrix(np.append(np.zeros(shape=(inequality_matrix.shape[0], 1)), inequality_matrix, axis=1), number_type='fraction')
+#     mat.rep_type = cdd.RepType.INEQUALITY
+#     poly = cdd.Polyhedron(mat)
+#     gen = poly.get_generators()
+#     return np.asarray(gen)[:, 1:]
 
 
 def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True, verbose=False):

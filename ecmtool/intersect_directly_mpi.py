@@ -439,13 +439,14 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
     removable_metabolites = []
     removable_reactions = []
     count_since_last_redund = 0
-    A_ub, b_ub, A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(R)))
+    A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(R)), only_eq=True)
 
     basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [])
     b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, 1e-10)
     cycle_present, status, cycle_indices = cycle_check_with_output(c, np.asarray(A_eq, dtype='float'), x0, basis)
 
     if status != 0:
+        A_ub, b_ub, A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(R)))
         res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12},
                       x0=x0)
         if res.status == 4:
@@ -505,7 +506,7 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
 
             R = np.transpose(R)
 
-        A_ub, b_ub, A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(R)))
+        A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(R)), only_eq=True)
 
         # Do new LP to check if there is still a cycle present.
         basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [])
@@ -513,6 +514,7 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
         cycle_present, status, cycle_indices = cycle_check_with_output(c, np.asarray(A_eq, dtype='float'), x0, basis)
 
         if status != 0:
+            A_ub, b_ub, A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(R)))
             res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12},
                           x0=x0)
             if res.status == 4:
