@@ -210,8 +210,15 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
         H_ineq = []
         H_eq = []
 
-    H_ineq = mpi_wrapper.bcast(H_ineq, 0)
-    H_eq = mpi_wrapper.bcast(H_eq, 0)
+    # need to know shape before Bcast is possible
+    H_ineq_shape = mpi_wrapper.bcast(H_ineq.shape, root=0)
+    H_eq_shape = mpi_wrapper.bcast(H_eq.shape, root=0)
+    if not mpi_wrapper.is_first_process:
+        H_ineq = np.zeros(H_ineq_shape, dtype=Fraction)
+        H_eq = np.zeros(H_eq_shape, dtype=Fraction)
+    H_ineq = mpi_wrapper.Bcast(H_ineq, root=0)
+    H_eq = mpi_wrapper.Bcast(H_eq, root=0)
+    print("broadcast successful")
 
     use_custom_redund = True  # Set to false if you want to use lrslib redund
     if use_custom_redund:
@@ -292,7 +299,7 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
         if verbose:
             print('Enumerated %d rays' % len(rays_unique))
 
-    rays_unique = mpi_wrapper.world_allgather(rays_unique)
+    rays_unique = mpi_wrapper.broadcast(rays_unique)
     return rays_unique
 
 
