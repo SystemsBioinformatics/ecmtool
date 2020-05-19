@@ -206,9 +206,14 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
         print("Size of H_eq before redund:", H_eq.shape[0], H_eq.shape[1])
         count_before_ineq = len(H_ineq)
         count_before_eq = len(H_eq)
+    else:
+        H_ineq = []
+        H_eq = []
 
     H_ineq = mpi_wrapper.world_allgather(H_ineq)
+    H_ineq = H_ineq[0]
     H_eq = mpi_wrapper.world_allgather(H_eq)
+    H_eq = H_eq[0]
 
     use_custom_redund = True  # Set to false if you want to use lrslib redund
     if use_custom_redund:
@@ -288,8 +293,11 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
 
         if verbose:
             print('Enumerated %d rays' % len(rays_unique))
+    else:
+        rays_unique = []
 
     rays_unique = mpi_wrapper.world_allgather(rays_unique)
+    rays_unique = rays_unique[0]
     return rays_unique
 
 
