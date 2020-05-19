@@ -85,7 +85,7 @@ def split_columns(matrix, columns):
 
 
 def unique(matrix):
-    unique_set = {tuple(row) for row in matrix if np.count_nonzero(row) > 0}
+    unique_set = list({tuple(row) for row in matrix if np.count_nonzero(row) > 0})
     return np.vstack(unique_set) if len(unique_set) else to_fractions(np.ndarray(shape=(0, matrix.shape[1])))
 
 
@@ -206,9 +206,12 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
         print("Size of H_eq before redund:", H_eq.shape[0], H_eq.shape[1])
         count_before_ineq = len(H_ineq)
         count_before_eq = len(H_eq)
+    else:
+        H_ineq = []
+        H_eq = []
 
-    H_ineq = mpi_wrapper.world_allgather(H_ineq)
-    H_eq = mpi_wrapper.world_allgather(H_eq)
+    H_ineq = mpi_wrapper.bcast(H_ineq, 0)
+    H_eq = mpi_wrapper.bcast(H_eq, 0)
 
     use_custom_redund = True  # Set to false if you want to use lrslib redund
     if use_custom_redund:
