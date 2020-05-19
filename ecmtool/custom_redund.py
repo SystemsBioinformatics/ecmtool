@@ -14,7 +14,7 @@ from ecmtool.intersect_directly_mpi import perturb_LP, normalize_columns, indepe
 
 def unique(matrix):
     unique_set = {tuple(row) for row in matrix if np.count_nonzero(row) > 0}
-    return np.vstack(unique_set) if len(unique_set) else to_fractions(np.ndarray(shape=(0, matrix.shape[1])))
+    return np.vstack(list(unique_set)) if len(unique_set) else to_fractions(np.ndarray(shape=(0, matrix.shape[1])))
 
 
 def kkt_check_redund(c, A, x, basis, i, tol=1e-8, threshold=1e-3, max_iter=100000, verbose=True):
