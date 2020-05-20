@@ -164,6 +164,7 @@ def remove_cycles_redund(R, tol=1e-12, verbose=True):
     cycle_present, status, cycle_indices = cycle_check_with_output(c, np.asarray(A_eq, dtype='float'), x0, basis)
 
     if status != 0:
+        print("Cycle check failed, trying normal LP")
         A_ub, b_ub, A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))))
         res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12},
                       x0=x0)
@@ -200,6 +201,7 @@ def remove_cycles_redund(R, tol=1e-12, verbose=True):
         cycle_present, status, cycle_indices = cycle_check_with_output(c, np.asarray(A_eq, dtype='float'), x0, basis)
 
         if status != 0:
+            print("Cycle check failed, trying normal LP")
             A_ub, b_ub, A_eq, b_eq, c, x0 = setup_cycle_LP(
                 independent_rows(normalize_columns(np.array(R, dtype='float'))))
             res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12},
@@ -256,8 +258,10 @@ def drop_redundant_rays(ray_matrix, verbose=True, use_pre_filter=False):
     cycle_rays = ray_matrix[:, cycle_inds]
 
     if verbose:
-        mp_print('Preparing redundancy test.')
+        mp_print('Normalizing columns.')
     matrix_normalized = normalize_columns(ray_matrix_wo_linearities)
+    if verbose:
+        mp_print('Selecting independent rows.')
     matrix_indep_rows = independent_rows(matrix_normalized)
 
     if use_pre_filter:
