@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.linalg import LinAlgError
 from scipy.optimize import linprog
+
 from ecmtool import mpi_wrapper
 from ecmtool.helpers import mp_print, to_fractions
 
@@ -126,27 +127,28 @@ def cancel_with_cycle_redund(R, met, cycle_ind, verbose=True, tol=1e-12):
     cancelling_reaction = R[:, cycle_ind]
     reactions_using_met = [i for i in range(R.shape[1]) if R[met, i] != 0 and i != cycle_ind]
 
-    next_R = np.copy(R)
+    cycle_ray = R[:, cycle_ind]
+    # next_R = np.copy(R)
     to_be_dropped = [cycle_ind]
 
+    n_reacs = len(reactions_using_met)
     for reac_ind in reactions_using_met:
         if verbose:
-            n_reacs = len(reactions_using_met)
             if reac_ind % 10000 == 0:
                 mp_print("Removed cycle metab from %d of %d reactions (%f %%)" %
                          (reac_ind, n_reacs, reac_ind / n_reacs * 100))
-        coeff_cycle = R[met, cycle_ind]
+        coeff_cycle = cycle_ray[met]
         coeff_reac = R[met, reac_ind]
-        new_ray = R[:, reac_ind] - (coeff_reac / coeff_cycle) * R[:, cycle_ind]
+        new_ray = R[:, reac_ind] - (coeff_reac / coeff_cycle) * cycle_ray
         if sum(abs(new_ray)) > tol:
-            next_R[:, reac_ind] = new_ray
+            R[:, reac_ind] = new_ray
         else:
             to_be_dropped.append(reac_ind)
 
     # Delete cycle ray that is now the only one that produces met, so has to be zero + rays that are full of zeros now
-    next_R = np.delete(next_R, to_be_dropped, axis=1)
+    R = np.delete(R, to_be_dropped, axis=1)
 
-    return next_R
+    return R
 
 
 def remove_cycles_redund(R, tol=1e-12, verbose=True):
