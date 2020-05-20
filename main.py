@@ -185,7 +185,7 @@ if __name__ == '__main__':
     parser.add_argument('--tag', type=str, default='',
                         help='Comma-separated list of reaction indices, as given by --print_reactions true (before compression), that will be tagged with new virtual metabolites, such that the reaction flux appears in ECMs.')
     parser.add_argument('--hide_all_in_or_outputs', type=str, default='',
-                        help='Option is only available if --direct is chosen. String that is either empty, input, or output. If it is inputs or outputs, after splitting metabolites, all inputs or outputs are hidden (objective is always excluded)')
+                        help='Option will possibly slow down indirect intersection. String that is either empty, input, or output. If it is inputs or outputs, after splitting metabolites, all inputs or outputs are hidden (objective is always excluded)')
     parser.add_argument('--iterative', type=str2bool, default=False,
                         help='Enable iterative conversion mode enumeration (helps on large, dense networks) (default: false)')
     parser.add_argument('--only_rays', type=str2bool, default=False,
@@ -273,6 +273,15 @@ if __name__ == '__main__':
 
         # Split metabolites in input and output
         network.split_in_out(args.only_rays)
+
+    if args.hide_all_in_or_outputs:
+        if not args.direct:
+            network.split_in_out(args.only_rays)
+
+        hide_indices = [ind for ind, metab in enumerate(network.metabolites) if
+                        (metab.is_external) & (metab.direction == args.hide_all_in_or_outputs) & (
+                            not metab.id == 'objective_out')]
+        network.hide(hide_indices)
 
     if args.compress:
         network.compress(verbose=args.verbose, SCEI=args.scei)

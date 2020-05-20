@@ -195,10 +195,10 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
             H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
 
         if verbose:
-            print('Reducing rows in H with redund')
+            print('Reducing rows in H by removing redundant rows')
 
         # Remove duplicates from H_ineq and H_eq
-        H_ineq = unique(H_ineq)
+        # H_ineq = unique(H_ineq)   # Removing duplicates is done too in drop_redundant_rays, so this is superfluous
         H_eq = unique(H_eq)
 
         # Use redundancy-removal to make H_ineq and H_eq smaller
@@ -214,6 +214,7 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     H_ineq = H_ineq[0]
     H_eq = mpi_wrapper.world_allgather(H_eq)
     H_eq = H_eq[0]
+    print("Size of H_eq after communication step:", H_eq.shape[0], H_eq.shape[1])
 
     use_custom_redund = True  # Set to false if you want to use lrslib redund
     if use_custom_redund:

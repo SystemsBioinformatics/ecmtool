@@ -157,7 +157,7 @@ def kkt_check(c, A, x, basis, p, m, tol=1e-8, threshold=1e-3, max_iter=100000, v
     return True, 1
 
 
-def cycle_check_with_output(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=100000, verbose=True):
+def cycle_check_with_output(c, A, x, basis, tol=1e-8, threshold=10, max_iter=100000, verbose=True):
     """
     Determine whether KKT conditions hold for x0.
     Take size 0 steps if available.
@@ -206,9 +206,9 @@ def cycle_check_with_output(c, A, x, basis, tol=1e-8, threshold=1e-3, max_iter=1
         basis = B.b
 
         if np.dot(c, x) < -threshold:  # found a better solution, so not adjacent
-            # if verbose:
-            #     mp_print("Did %d steps in kkt_check, found False - c*x %.8f" % (iteration - 1, np.dot(c, x)))
-            return True, 0, [np.argmax(x)]
+            if verbose:
+                mp_print("Cycle check has invalid exit status. Numerical issue likely occurred.")
+            return True, 1, [np.argmax(x)]
 
     mp_print("Cycling?")
     return False, 1, [-1]

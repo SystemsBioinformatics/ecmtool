@@ -199,7 +199,7 @@ def remove_cycles_redund(R, tol=1e-12, verbose=True):
         basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [])
         b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, 1e-10)
         if verbose:
-            mp_print('Starting linearity check in H_eq using LP.')
+            mp_print('Starting linearity check in H_ineq using LP.')
         cycle_present, status, cycle_indices = cycle_check_with_output(c, np.asarray(A_eq, dtype='float'), x0, basis)
 
         if status != 0:
