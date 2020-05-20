@@ -222,11 +222,11 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
         H_ineq_transpose, cycle_rays = drop_redundant_rays(np.transpose(H_ineq))
         H_ineq = np.transpose(H_ineq_transpose)
 
-        H_eq = np.concatenate((H_eq, np.transpose(cycle_rays)), axis=0) # Add found linearities from H_ineq to H_eq
+        H_eq = np.concatenate((H_eq, np.transpose(cycle_rays)), axis=0)  # Add found linearities from H_ineq to H_eq
         mp_print("Custom redund took %f sec" % (time()-t1))
 
         t1 = time()
-        H_eq = independent_rows(H_eq)
+        # H_eq = independent_rows(H_eq)
         mp_print("Removing dependent rows in H_eq took %f sec" % (time() - t1))
     else:
         mp_print('Using classical redundancy removal')
