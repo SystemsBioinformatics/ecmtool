@@ -61,7 +61,7 @@ def kkt_check_redund(c, A, x, basis, i, tol=1e-8, threshold=1e-3, max_iter=10000
         i = u > tol  # if none of the u are positive, unbounded
         if not np.any(i):
             mp_print("Warning: unbounded problem in KKT_check")
-            return True, 1
+            return True, 0
 
         th = xb[i] / u[i]
         l = np.argmin(th)  # implicitly selects smallest subscript
@@ -88,6 +88,11 @@ def kkt_check_redund(c, A, x, basis, i, tol=1e-8, threshold=1e-3, max_iter=10000
         iteration += 1
         if iteration % 10000 == 0:
             print("Warning: reached %d iterations" % iteration)
+        if iteration % max_iter == 0:
+            mp_print("Cycling? Starting again with new perturbation.")
+            return True, 2
+
+    return True, 1
 
 
 def setup_LP_redund(R_indep, i):
@@ -106,6 +111,18 @@ def check_extreme(R, i, basis, tol=1e-10):
     b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, tol)
     KKT, status = kkt_check_redund(c, A_eq, x0, basis, i)
 
+    counter_seeds = 1
+    while status == 2:
+        b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, tol, seed=42 + counter_seeds)
+        KKT, status = kkt_check_redund(c, A_eq, x0, basis, i)
+        counter_seeds = counter_seeds + 1
+        if counter_seeds % 100 == 0:
+            mp_print(
+                'Warning: Adjacency check keeps cycling, even with different perturbations. Reporting rays as adjacent.',
+                PRINT_IF_RANK_NONZERO=True)
+            status = 0
+            KKT = True
+
     if status == 0:
         return KKT
     else:
@@ -116,11 +133,13 @@ def check_extreme(R, i, basis, tol=1e-10):
 
 def get_remove_metabolite_redund(R, reaction, verbose=True):
     column = R[:, reaction]
-    for i in range(len(column)):
-        if column[i] != 0:
-            return i
-    print("\tWarning: column with only zeros is part of cycle")
-    return 0
+    metab_occupancy = [(ind, np.count_nonzero(R[ind, :])) for ind in range(len(column)) if column[ind] != 0]
+    if not len(metab_occupancy):
+        print("\tWarning: column with only zeros is part of cycle")
+        return 0
+
+    # Choose minimally involved metabolite
+    return min(metab_occupancy, key=lambda x: x[1])[0]
 
 
 def cancel_with_cycle_redund(R, met, cycle_ind, verbose=True, tol=1e-12):
@@ -154,7 +173,7 @@ def cancel_with_cycle_redund(R, met, cycle_ind, verbose=True, tol=1e-12):
 def remove_cycles_redund(R, tol=1e-12, verbose=True):
     """Detect whether there are cycles, by doing an LP. If LP is unbounded find a minimal cycle. Cancel one metabolite
     with the cycle."""
-    cycle_inds = []
+    cycle_rays = np.zeros((R.shape[0], 0))
     A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))), only_eq=True)
 
     if verbose:
@@ -190,8 +209,8 @@ def remove_cycles_redund(R, tol=1e-12, verbose=True):
             met = get_remove_metabolite_redund(R, cycle_ind)
             counter = counter + 1
 
+        cycle_rays = np.append(cycle_rays, R[:, cycle_ind][:, np.newaxis], axis=1)
         R = cancel_with_cycle_redund(R, met, cycle_ind)
-        cycle_inds = np.append(cycle_inds, cycle_ind)
 
         # Do new LP to check if there is still a cycle present.
         A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))), only_eq=True)
@@ -218,7 +237,7 @@ def remove_cycles_redund(R, tol=1e-12, verbose=True):
             if np.any(np.isnan(res.x)):
                 raise Exception('Remove cycles did not work, because LP-solver had issues. Try to solve this.')
 
-    return R, np.array(cycle_inds, dtype=int)
+    return R, cycle_rays
 
 
 def pre_redund(matrix_indep_rows):
@@ -255,9 +274,7 @@ def drop_redundant_rays(ray_matrix, verbose=True, use_pre_filter=False):
     # first find 'cycles': combinations of columns of matrix_indep_rows that add up to zero, and remove them
     if verbose:
         mp_print('Detecting linearities in H_ineq.')
-    ray_matrix_wo_linearities, cycle_inds = remove_cycles_redund(ray_matrix)
-
-    cycle_rays = ray_matrix[:, cycle_inds]
+    ray_matrix_wo_linearities, cycle_rays = remove_cycles_redund(ray_matrix)
 
     if verbose:
         mp_print('Normalizing columns.')
