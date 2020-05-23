@@ -1,16 +1,17 @@
-import os, sys
+import os
+import sys
+from argparse import ArgumentParser, ArgumentTypeError
+from time import time
 
 import numpy as np
-from time import time
 from scipy.optimize import linprog
-from argparse import ArgumentParser, ArgumentTypeError
 
 from ecmtool import mpi_wrapper
-
+from ecmtool.conversion_cone import get_conversion_cone, iterative_conversion_cone
 from ecmtool.helpers import get_metabolite_adjacency, redund, to_fractions
 from ecmtool.helpers import mp_print, unsplit_metabolites, print_ecms_direct, normalize_columns
 from ecmtool.network import extract_sbml_stoichiometry, add_reaction_tags
-from ecmtool.conversion_cone import get_conversion_cone, iterative_conversion_cone, unique
+
 
 class HiddenPrints:
     def __enter__(self):
@@ -188,14 +189,17 @@ if __name__ == '__main__':
                         help='Enable to only return extreme rays, and not elementary modes. This describes the full conversion space, but not all biologically relevant minimal conversions. See (Urbanczik, 2005) (default: false)')
     parser.add_argument('--verbose', type=str2bool, default=True,
                         help='Enable to show detailed console output (default: true)')
-    parser.add_argument('--splitting_before_polco', type=str2bool, default=True, help='Enables splitting external metabolites by making virtual input and output metabolites before starting the computation. Setting to false would do the splitting after first computation step. Setting it to true makes for faster computation, usually. (default: true)')
+    parser.add_argument('--splitting_before_polco', type=str2bool, default=True,
+                        help='Enables splitting external metabolites by making virtual input and output metabolites before starting the computation. Setting to false would do the splitting after first computation step. Which method is faster is complicated and model-dependent. (default: true)')
+    parser.add_argument('--redund_after_polco', type=str2bool, default=True,
+                        help='(Indirect intersection only) Enables redundant row removal from inequality description of dual cone. Works well with models with relatively many internal metabolites, and when running parrallelized computation using MPI (default: true)')
     parser.add_argument('--scei', type=str2bool, default=True, help='Enable to use SCEI compression (default: true)')
     parser.add_argument('--sort_order', type=str, default='min_adj',
                         help='Order in which internal metabolites should be set to zero. Default is to minimize the added adjacencies, other options are: min_lp, max_lp_per_adj, min_connections')
     parser.add_argument('--intermediate_cone_path', type=str, default='',
                         help='Filename where intermediate cone result can be found. If an empty string is given (default), then no intermediate result is picked up and the calculation is done in full')
     parser.add_argument('--manual_override', type=str, default='',
-                       help='Index indicating which metabolite should be intersected in first step. Advanced option, can be used in combination with --intermediate_cone_path, to pick a specific intersection at a specific time.')
+                        help='Index indicating which metabolite should be intersected in first step. Advanced option, can be used in combination with --intermediate_cone_path, to pick a specific intersection at a specific time.')
 
     args = parser.parse_args()
 
@@ -336,10 +340,11 @@ if __name__ == '__main__':
         else:
             # Indirect enumeration
             cone = get_conversion_cone(network.N, network.external_metabolite_indices(),
-                                                      network.reversible_reaction_indices(),
-                                                      input_metabolites=network.input_metabolite_indices(),
-                                                      output_metabolites=network.output_metabolite_indices(),
-                                                      verbose=args.verbose, only_rays=args.only_rays)
+                                       network.reversible_reaction_indices(),
+                                       input_metabolites=network.input_metabolite_indices(),
+                                       output_metabolites=network.output_metabolite_indices(),
+                                       verbose=args.verbose, only_rays=args.only_rays,
+                                       redund_after_polco=args.redund_after_polco)
 
         cone_transpose, ids = unsplit_metabolites(np.transpose(cone), network)
         cone = np.transpose(cone_transpose)

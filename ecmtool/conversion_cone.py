@@ -90,7 +90,7 @@ def unique(matrix):
 
 
 def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], input_metabolites=[], output_metabolites=[],
-                        only_rays=False, verbose=False):
+                        only_rays=False, verbose=False, redund_after_polco=True):
     """
     Calculates the conversion cone as described in (Urbanczik, 2005).
     :param N: stoichiometry matrix
@@ -216,27 +216,28 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     H_eq = H_eq[0]
     print("Size of H_eq after communication step:", H_eq.shape[0], H_eq.shape[1])
 
-    use_custom_redund = True  # Set to false if you want to use lrslib redund
-    if use_custom_redund:
-        mp_print('Using custom redundancy removal')
-        t1 = time()
-        H_ineq_transpose, cycle_rays = drop_redundant_rays(np.transpose(H_ineq))
-        H_ineq = np.transpose(H_ineq_transpose)
+    if redund_after_polco:
+        use_custom_redund = True  # Set to false if you want to use lrslib redund
+        if use_custom_redund:
+            mp_print('Using custom redundancy removal')
+            t1 = time()
+            H_ineq_transpose, cycle_rays = drop_redundant_rays(np.transpose(H_ineq))
+            H_ineq = np.transpose(H_ineq_transpose)
 
-        H_eq = np.concatenate((H_eq, np.transpose(cycle_rays)), axis=0)  # Add found linearities from H_ineq to H_eq
-        mp_print("Custom redund took %f sec" % (time()-t1))
+            H_eq = np.concatenate((H_eq, np.transpose(cycle_rays)), axis=0)  # Add found linearities from H_ineq to H_eq
+            mp_print("Custom redund took %f sec" % (time()-t1))
 
-        t1 = time()
-        # H_eq = independent_rows(H_eq)
-        mp_print("Removing dependent rows in H_eq took %f sec" % (time() - t1))
-    else:
-        mp_print('Using classical redundancy removal')
-        t2 = time()
-        H_ineq = redund(H_ineq)
-        mp_print("Redund took %f sec" % (time() - t2))
-        t2 = time()
-        H_eq = redund(H_eq)
-        mp_print("Redund took %f sec" % (time() - t2))
+            t1 = time()
+            # H_eq = independent_rows(H_eq)
+            mp_print("Removing dependent rows in H_eq took %f sec" % (time() - t1))
+        else:
+            mp_print('Using classical redundancy removal')
+            t2 = time()
+            H_ineq = redund(H_ineq)
+            mp_print("Redund took %f sec" % (time() - t2))
+            t2 = time()
+            H_eq = redund(H_eq)
+            mp_print("Redund took %f sec" % (time() - t2))
 
     if mpi_wrapper.is_first_process():
         print("Size of H_ineq after redund:", H_ineq.shape[0], H_ineq.shape[1])
