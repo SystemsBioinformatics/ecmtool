@@ -1,9 +1,11 @@
 from time import time
+
 import numpy as np
 from scipy.linalg import LinAlgError
 from scipy.optimize import linprog
 
 from ecmtool.helpers import mp_print
+
 try:
     from ecmtool._bglu_dense import BGLU
 except (ImportError, EnvironmentError, OSError):
@@ -153,7 +155,9 @@ def kkt_check(c, A, x, basis, p, m, tol=1e-8, threshold=1e-3, max_iter=100000, v
         iteration += 1
         if iteration % 10000 == 0:
             print("Warning: reached %d iterations" % iteration)
-    mp_print("Cycling?")
+        if iteration % max_iter == 0:
+            mp_print("Cycling? Starting again with new perturbation.")
+            return True, 2
     return True, 1
 
 
@@ -682,8 +686,8 @@ def setup_LP(R_indep, i, j):
     return R_indep, b_eq, c, x0
 
 
-def perturb_LP(b_eq, x0, A_eq, basis, epsilon):
-    np.random.seed(42)
+def perturb_LP(b_eq, x0, A_eq, basis, epsilon, seed=42):
+    np.random.seed(seed)
     eps = np.random.uniform(epsilon / 2, epsilon, len(basis))
     b_eq = b_eq + np.dot(A_eq[:, basis], eps)
     x0[basis] += eps
@@ -696,6 +700,18 @@ def determine_adjacency(R, i, j, basis, tol=1e-10):
     A_eq, b_eq, c, x0 = setup_LP(R, i, j)
     b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, 1e-10)
     KKT, status = kkt_check(c, A_eq, x0, basis, i, j)
+
+    counter_seeds = 1
+    while status == 2:
+        b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, 1e-10, seed=42 + counter_seeds)
+        KKT, status = kkt_check(c, A_eq, x0, basis, i, j)
+        counter_seeds = counter_seeds + 1
+        if counter_seeds % 100 == 0:
+            mp_print(
+                'Warning: Adjacency check keeps cycling, even with different perturbations. Reporting rays as adjacent.',
+                PRINT_IF_RANK_NONZERO=True)
+            status = 0
+            KKT = True
 
     if status == 0:
         return 1 if KKT else 0
@@ -897,7 +913,7 @@ def reduce_column_norms(matrix):
 
 
 def unsplit_metabolites(R, network):
-    metabolite_ids = [network.metabolites[i].id for i in network.external_metabolite_indices()]
+    metabolite_ids = [metab.id for metab in network.metabolites]
     res = []
     ids = []
 
