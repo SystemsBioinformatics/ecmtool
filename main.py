@@ -11,6 +11,7 @@ from ecmtool.helpers import get_efms, get_metabolite_adjacency, redund, to_fract
 from ecmtool.helpers import mp_print
 from ecmtool.network import extract_sbml_stoichiometry, add_reaction_tags
 from ecmtool.conversion_cone import get_conversion_cone, iterative_conversion_cone, unique
+from ecmtool.intersect_directly_mpi import unsplit_metabolites, print_ecms_direct
 
 class HiddenPrints:
     def __enter__(self):
@@ -192,9 +193,8 @@ if __name__ == '__main__':
                         help='Enable to only return extreme rays, and not elementary modes. This describes the full conversion space, but not all biologically relevant minimal conversions. See (Urbanczik, 2005) (default: false)')
     parser.add_argument('--verbose', type=str2bool, default=True,
                         help='Enable to show detailed console output (default: true)')
+    parser.add_argument('--splitting_before_polco', type=str2bool, default=True, help='Enables splitting external metabolites by making virtual input and output metabolites before starting the computation. Setting to false would do the splitting after first computation step. Setting it to true makes for faster computation, usually. (default: true)')
     parser.add_argument('--scei', type=str2bool, default=True, help='Enable to use SCEI compression (default: true)')
-    parser.add_argument('--compare', type=str2bool, default=False,
-                        help='Enable to compare output of direct vs indirect')
     parser.add_argument('--job_size', type=int, default=1, help='Number of LPs per multiprocessing job')
     parser.add_argument('--sort_order', type=str, default='min_adj',
                         help='Order in which internal metabolites should be set to zero. Default is to minimize the added adjacencies, other options are: min_lp, max_lp_per_adj, min_connections')
@@ -271,11 +271,12 @@ if __name__ == '__main__':
         if args.intermediate_cone_path:
             check_if_intermediate_cone_exists(args.intermediate_cone_path)
 
+    if args.direct or args.splitting_before_polco:
         # Split metabolites in input and output
         network.split_in_out(args.only_rays)
 
     if args.hide_all_in_or_outputs:
-        if not args.direct:
+        if not args.direct and not args.splitting_before_polco:
             network.split_in_out(args.only_rays)
 
         hide_indices = [ind for ind, metab in enumerate(network.metabolites) if
@@ -341,13 +342,14 @@ if __name__ == '__main__':
                 iterative_conversion_cone(network, only_rays=args.only_rays, verbose=args.verbose))
         else:
             # Indirect enumeration
-            cone = network.uncompress(get_conversion_cone(network.N, network.external_metabolite_indices(),
+            cone = get_conversion_cone(network.N, network.external_metabolite_indices(),
                                                       network.reversible_reaction_indices(),
                                                       input_metabolites=network.input_metabolite_indices(),
                                                       output_metabolites=network.output_metabolite_indices(),
-                                                      verbose=args.verbose, only_rays=args.only_rays))
+                                                      verbose=args.verbose, only_rays=args.only_rays)
 
-        ids = [id for id in network.uncompressed_metabolite_ids]
+        cone_transpose, ids = unsplit_metabolites(np.transpose(cone), network)
+        cone = np.transpose(cone_transpose)
 
     if mpi_wrapper.is_first_process():
         try:
@@ -357,10 +359,7 @@ if __name__ == '__main__':
             np.savetxt(args.out_path, normalised, delimiter=',', header=','.join(ids), comments='')
 
     if args.print_conversions:
-        if args.direct:
-            print_ecms_direct(T_intersected, ids)
-        else:
-            print_ECMs(cone, tagged_reaction_indices, network, orig_N, args.add_objective_metabolite, args.check_feasibility)
+        print_ecms_direct(np.transpose(cone), ids)
 
     end = time()
     mp_print('Ran in %f seconds' % (end - start))
