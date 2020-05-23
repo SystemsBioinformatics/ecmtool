@@ -151,17 +151,13 @@ if __name__ == '__main__':
         description='Calculate Elementary Conversion Modes from an SBML model. For medium-to large networks, be sure to define --inputs and --outputs. This reduces the enumeration problem complexity considerably.')
     parser.add_argument('--model_path', type=str, default='models/active_subnetwork_KO_5.xml',
                         help='Relative or absolute path to an SBML model .xml file')
-    parser.add_argument('--direct', type=str2bool, default=True, help='Enable to intersect with equalities directly')
+    parser.add_argument('--direct', type=str2bool, default=False, help='Enable to intersect with equalities directly. Direct intersection works better than indirect when many metabolites are hidden, and on large networks (default: False)')
     parser.add_argument('--compress', type=str2bool, default=True,
                         help='Perform compression to which the conversions are invariant, and reduce the network size considerably (default: True)')
     parser.add_argument('--out_path', default='conversion_cone.csv',
                         help='Relative or absolute path to the .csv file you want to save the calculated conversions to (default: conversion_cone.csv)')
     parser.add_argument('--add_objective_metabolite', type=str2bool, default=True,
                         help='Add a virtual metabolite containing the stoichiometry of the objective function of the model (default: true)')
-    parser.add_argument('--check_feasibility', type=str2bool, default=False,
-                        help='For each found ECM, verify that a feasible flux exists that produces it (default: false)')
-    parser.add_argument('--check_bijection', type=str2bool, default=False,
-                        help='Verify completeness of found ECMs by calculating ECMs from EFMs and proving bijection (don\'t use on large networks) (default: false)')
     parser.add_argument('--print_metabolites', type=str2bool, default=True,
                         help='Print the names and IDs of metabolites in the (compressed) metabolic network (default: true)')
     parser.add_argument('--print_reactions', type=str2bool, default=False,
@@ -181,12 +177,12 @@ if __name__ == '__main__':
     parser.add_argument('--hide', type=str, default='',
                         help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that are transformed into internal metabolites by adding bidirectional exchange reactions')
     parser.add_argument('--prohibit', type=str, default='',
-                        help='EXPERIMENTAL. Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that are transformed into internal metabolites without adding bidirectional exchange reactions.'
+                        help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that are transformed into internal metabolites without adding bidirectional exchange reactions.'
                              'This metabolite can therefore not be used as input nor output.')
     parser.add_argument('--tag', type=str, default='',
                         help='Comma-separated list of reaction indices, as given by --print_reactions true (before compression), that will be tagged with new virtual metabolites, such that the reaction flux appears in ECMs.')
     parser.add_argument('--hide_all_in_or_outputs', type=str, default='',
-                        help='Option will possibly slow down indirect intersection. String that is either empty, input, or output. If it is inputs or outputs, after splitting metabolites, all inputs or outputs are hidden (objective is always excluded)')
+                        help='String that is either empty, input, or output. If it is inputs or outputs, after splitting metabolites, all inputs or outputs are hidden (objective is always excluded)')
     parser.add_argument('--iterative', type=str2bool, default=False,
                         help='Enable iterative conversion mode enumeration (helps on large, dense networks) (default: false)')
     parser.add_argument('--only_rays', type=str2bool, default=False,
@@ -195,7 +191,6 @@ if __name__ == '__main__':
                         help='Enable to show detailed console output (default: true)')
     parser.add_argument('--splitting_before_polco', type=str2bool, default=True, help='Enables splitting external metabolites by making virtual input and output metabolites before starting the computation. Setting to false would do the splitting after first computation step. Setting it to true makes for faster computation, usually. (default: true)')
     parser.add_argument('--scei', type=str2bool, default=True, help='Enable to use SCEI compression (default: true)')
-    parser.add_argument('--job_size', type=int, default=1, help='Number of LPs per multiprocessing job')
     parser.add_argument('--sort_order', type=str, default='min_adj',
                         help='Order in which internal metabolites should be set to zero. Default is to minimize the added adjacencies, other options are: min_lp, max_lp_per_adj, min_connections')
     parser.add_argument('--intermediate_cone_path', type=str, default='',
@@ -322,7 +317,6 @@ if __name__ == '__main__':
         external = np.asarray(network.external_metabolite_indices())
         internal = np.setdiff1d(range(R.shape[0]), external)
         T_intersected, ids = intersect_directly(R, internal, network, verbose=args.verbose,
-                                                lps_per_job=args.job_size,
                                                 sort_order=args.sort_order, manual_override=args.manual_override,
                                                 intermediate_cone_path=args.intermediate_cone_path)
         if len(external_cycles):
