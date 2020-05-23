@@ -3,13 +3,13 @@ from scipy.linalg import LinAlgError
 from scipy.optimize import linprog
 
 from ecmtool import mpi_wrapper
-from ecmtool.helpers import mp_print, to_fractions
+from ecmtool.helpers import mp_print, to_fractions, normalize_columns
 
 try:
     from ecmtool._bglu_dense import BGLU
 except (ImportError, EnvironmentError, OSError):
     from ecmtool.bglu_dense_uncompiled import BGLU
-from ecmtool.intersect_directly_mpi import perturb_LP, normalize_columns, independent_rows, get_start_basis, \
+from ecmtool.intersect_directly_mpi import perturb_LP, independent_rows, get_start_basis, \
     add_first_ray, get_more_basis_columns, setup_cycle_LP, cycle_check_with_output
 
 

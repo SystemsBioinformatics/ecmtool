@@ -4,7 +4,7 @@ import numpy as np
 from scipy.linalg import LinAlgError
 from scipy.optimize import linprog
 
-from ecmtool.helpers import mp_print
+from ecmtool.helpers import mp_print, unsplit_metabolites, normalize_columns
 
 try:
     from ecmtool._bglu_dense import BGLU
@@ -19,31 +19,6 @@ def check_if_intermediate_cone_exists(intermediate_cone_path):
         mp_print('Will try to pick up intermediate cone, file found.')
     else:
         mp_print('Tried to pick up intermediate cone, but file not found.')
-
-
-def print_ecms_direct(R, metabolite_ids):
-    obj_id = -1
-    if "objective" in metabolite_ids:
-        obj_id = metabolite_ids.index("objective")
-    elif "objective_out" in metabolite_ids:
-        obj_id = metabolite_ids.index("objective_out")
-
-    mp_print("\n--%d ECMs found by intersecting directly--\n" % R.shape[1])
-    for i in range(R.shape[1]):
-        mp_print("ECM #%d:" % (i+1))
-        if np.max(R[:,
-                  i]) > 1e100:  # If numbers become too large, they can't be printed, therefore we make them smaller first
-            ecm = np.array(R[:, i] / np.max(R[:, i]), dtype='float')
-        else:
-            ecm = np.array(R[:, i], dtype='float')
-
-        div = 1
-        if obj_id != -1 and R[obj_id][i] != 0:
-            div = ecm[obj_id]
-        for j in range(R.shape[0]):
-            if ecm[j] != 0:
-                mp_print("%s\t\t->\t%.4f" % (metabolite_ids[j].replace("_in", "").replace("_out", ""), ecm[j] / div))
-        mp_print("")
 
 
 def get_more_basis_columns(A, basis):
@@ -556,24 +531,6 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
     return R, network, external_cycles
 
 
-def normalize_columns(R, verbose=False):
-    result = np.zeros(R.shape)
-    number_rays = R.shape[1]
-    for i in range(result.shape[1]):
-        if verbose:
-            if i % 10000 == 0:
-                mp_print("Normalize columns is on ray %d of %d (%f %%)" %
-                         (i, number_rays, i / number_rays * 100), PRINT_IF_RANK_NONZERO=True)
-        if np.max(R[:,
-                  i]) > 1e100:  # If numbers are very large, converting to float might give issues, therefore we first divide by another int
-            part_normalized_column = np.array(R[:, i] / np.max(R[:, i]), dtype='float')
-            result[:, i] = part_normalized_column / np.linalg.norm(part_normalized_column)
-        else:
-            norm_column = np.linalg.norm(np.array(R[:, i], dtype='float'))
-            result[:, i] = np.array(R[:, i], dtype='float') / norm_column
-    return result
-
-
 def smallest_positive(arr):
     a = np.where(np.isfinite(arr), arr, -1)
     return min(np.where(a < 0, max(a) * 2, a)), np.argmin(np.where(a < 0, max(a) * 2, a))
@@ -908,29 +865,6 @@ def reduce_column_norms(matrix):
         if norm > 2:
             matrix[:, i] /= int(np.floor(norm))
     return matrix
-
-
-def unsplit_metabolites(R, network):
-    metabolite_ids = [metab.id for metab in network.metabolites]
-    res = []
-    ids = []
-
-    processed = {}
-    for i in range(R.shape[0]):
-        metabolite = metabolite_ids[i].replace("_in", "").replace("_out", "")
-        if metabolite in processed:
-            row = processed[metabolite]
-            res[row] += R[i, :]
-        else:
-            res.append(R[i, :].tolist())
-            processed[metabolite] = len(res) - 1
-            ids.append(metabolite)
-
-    # remove all-zero rays
-    res = np.asarray(res)
-    res = res[:, [sum(abs(res)) != 0][0]]
-
-    return res, ids
 
 
 def in_cone(R, tar):

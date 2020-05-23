@@ -7,11 +7,10 @@ from argparse import ArgumentParser, ArgumentTypeError
 
 from ecmtool import mpi_wrapper
 
-from ecmtool.helpers import get_efms, get_metabolite_adjacency, redund, to_fractions
-from ecmtool.helpers import mp_print
+from ecmtool.helpers import get_metabolite_adjacency, redund, to_fractions
+from ecmtool.helpers import mp_print, unsplit_metabolites, print_ecms_direct, normalize_columns
 from ecmtool.network import extract_sbml_stoichiometry, add_reaction_tags
 from ecmtool.conversion_cone import get_conversion_cone, iterative_conversion_cone, unique
-from ecmtool.intersect_directly_mpi import unsplit_metabolites, print_ecms_direct
 
 class HiddenPrints:
     def __enter__(self):
@@ -259,8 +258,8 @@ if __name__ == '__main__':
     orig_N = network.N
 
     if args.direct:
-        from ecmtool.intersect_directly_mpi import intersect_directly, print_ecms_direct, remove_cycles, \
-            compress_after_cycle_removing, normalize_columns, check_if_intermediate_cone_exists
+        from ecmtool.intersect_directly_mpi import intersect_directly, remove_cycles, \
+            compress_after_cycle_removing, check_if_intermediate_cone_exists
 
         # Check if intermediate cone exists at the given location
         if args.intermediate_cone_path:

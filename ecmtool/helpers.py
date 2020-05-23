@@ -485,3 +485,69 @@ def mp_print(*args, **kwargs):
         print(*args)
     elif 'PRINT_IF_RANK_NONZERO' in kwargs and kwargs['PRINT_IF_RANK_NONZERO']:
         print(*args)
+
+
+def unsplit_metabolites(R, network):
+    metabolite_ids = [metab.id for metab in network.metabolites]
+    res = []
+    ids = []
+
+    processed = {}
+    for i in range(R.shape[0]):
+        metabolite = metabolite_ids[i].replace("_in", "").replace("_out", "")
+        if metabolite in processed:
+            row = processed[metabolite]
+            res[row] += R[i, :]
+        else:
+            res.append(R[i, :].tolist())
+            processed[metabolite] = len(res) - 1
+            ids.append(metabolite)
+
+    # remove all-zero rays
+    res = np.asarray(res)
+    res = res[:, [sum(abs(res)) != 0][0]]
+
+    return res, ids
+
+
+def print_ecms_direct(R, metabolite_ids):
+    obj_id = -1
+    if "objective" in metabolite_ids:
+        obj_id = metabolite_ids.index("objective")
+    elif "objective_out" in metabolite_ids:
+        obj_id = metabolite_ids.index("objective_out")
+
+    mp_print("\n--%d ECMs found by intersecting directly--\n" % R.shape[1])
+    for i in range(R.shape[1]):
+        mp_print("ECM #%d:" % (i+1))
+        if np.max(R[:,
+                  i]) > 1e100:  # If numbers become too large, they can't be printed, therefore we make them smaller first
+            ecm = np.array(R[:, i] / np.max(R[:, i]), dtype='float')
+        else:
+            ecm = np.array(R[:, i], dtype='float')
+
+        div = 1
+        if obj_id != -1 and R[obj_id][i] != 0:
+            div = ecm[obj_id]
+        for j in range(R.shape[0]):
+            if ecm[j] != 0:
+                mp_print("%s\t\t->\t%.4f" % (metabolite_ids[j].replace("_in", "").replace("_out", ""), ecm[j] / div))
+        mp_print("")
+
+
+def normalize_columns(R, verbose=False):
+    result = np.zeros(R.shape)
+    number_rays = R.shape[1]
+    for i in range(result.shape[1]):
+        if verbose:
+            if i % 10000 == 0:
+                mp_print("Normalize columns is on ray %d of %d (%f %%)" %
+                         (i, number_rays, i / number_rays * 100), PRINT_IF_RANK_NONZERO=True)
+        if np.max(R[:,
+                  i]) > 1e100:  # If numbers are very large, converting to float might give issues, therefore we first divide by another int
+            part_normalized_column = np.array(R[:, i] / np.max(R[:, i]), dtype='float')
+            result[:, i] = part_normalized_column / np.linalg.norm(part_normalized_column)
+        else:
+            norm_column = np.linalg.norm(np.array(R[:, i], dtype='float'))
+            result[:, i] = np.array(R[:, i], dtype='float') / norm_column
+    return result
