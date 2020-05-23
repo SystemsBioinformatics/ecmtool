@@ -329,8 +329,7 @@ def iteration_without_lps(R, met, network):
     return next_matrix
 
 
-def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, verbose=True,
-                         lps_per_job=1):
+def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, verbose=True):
     # determine +/0/-
     plus = []
     zero = []
@@ -359,7 +358,7 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, v
     nr_adjacent = 0
     if calculate_adjacency:
         adj = geometric_ray_adjacency(R, plus=plus, minus=minus, verbose=verbose,
-                                      remove_cycles=True, lps_per_job=lps_per_job)
+                                      remove_cycles=True)
         # combine + and - if adjacent
         for (p, m) in adj:
             nr_adjacent += 1
@@ -829,8 +828,7 @@ def get_bases(A, plus, minus):
     return bases
 
 
-def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose=True, remove_cycles=True,
-                            lps_per_job=1):
+def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose=True, remove_cycles=True):
     """
     Returns r by r adjacency matrix of rays, given
     ray matrix R. Diagonal is 0, not 1.
@@ -971,7 +969,7 @@ def pick_up_intermediate_cone(internal_metabolites, network, intermediate_cone_p
     return R, internal_metabolites, network
 
 
-def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12, lps_per_job=1, sort_order='min_adj',
+def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12, sort_order='min_adj',
                        intermediate_cone_path='', manual_override = ''):
     """
 
@@ -980,7 +978,6 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12
     :param network:
     :param verbose:
     :param tol:
-    :param lps_per_job:
     :param sort_order: Different options for determining metabolite intersection order. As a default we will intersect
     the metabolite that adds the minimal number of adjacencies in the model. Other options are 'min_lp',
     'max_lp_per_adj', and 'min_connections'.
@@ -1080,7 +1077,7 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12
         if np.sum(R[i - len(deleted[deleted < i]), :] > 0) * np.sum(R[i - len(deleted[deleted < i]), :] < 0) == 0:
             R = iteration_without_lps(R, to_remove, network)
         else:
-            R, removed = eliminate_metabolite(R, to_remove, network, calculate_adjacency=True, lps_per_job=lps_per_job)
+            R, removed = eliminate_metabolite(R, to_remove, network, calculate_adjacency=True)
             rows_removed_redund += removed
         deleted = np.append(deleted, i)
         internal.remove(i)
