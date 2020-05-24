@@ -3,7 +3,7 @@ from scipy.linalg import LinAlgError
 from scipy.optimize import linprog
 
 from ecmtool import mpi_wrapper
-from ecmtool.helpers import mp_print, to_fractions, normalize_columns
+from ecmtool.helpers import mp_print, to_fractions, normalize_columns, normalize_columns_fraction
 
 try:
     from ecmtool._bglu_dense import BGLU
@@ -270,7 +270,7 @@ def drop_redundant_rays(ray_matrix, verbose=True, use_pre_filter=False):
     # Sometimes, use_pre_filter=True can speed up the calculations, but most of the times it doesn't
 
     # First make sure that no duplicate rays are in the matrix
-    ray_matrix = np.transpose(unique(np.transpose(ray_matrix)))
+    ray_matrix = np.transpose(unique(np.transpose(normalize_columns_fraction(ray_matrix))))
     # first find 'cycles': combinations of columns of matrix_indep_rows that add up to zero, and remove them
     if verbose:
         mp_print('Detecting linearities in H_ineq.')

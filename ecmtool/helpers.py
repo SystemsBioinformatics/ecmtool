@@ -551,3 +551,16 @@ def normalize_columns(R, verbose=False):
             norm_column = np.linalg.norm(np.array(R[:, i], dtype='float'))
             result[:, i] = np.array(R[:, i], dtype='float') / norm_column
     return result
+
+
+def normalize_columns_fraction(R, verbose=True):
+    result = to_fractions(np.zeros(R.shape))
+    number_rays = R.shape[1]
+    for i in range(result.shape[1]):
+        if verbose:
+            if i % 10000 == 0:
+                mp_print("Normalize columns is on ray %d of %d (%f %%)" %
+                         (i, number_rays, i / number_rays * 100), PRINT_IF_RANK_NONZERO=True)
+        norm_column = np.sum(np.abs(np.array(R[:, i])))
+        result[:, i] = np.array(R[:, i]) / norm_column
+    return result
