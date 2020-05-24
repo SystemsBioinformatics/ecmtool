@@ -266,12 +266,20 @@ def pre_redund(matrix_indep_rows):
     return filtered_inds
 
 
-def drop_redundant_rays(ray_matrix, verbose=True, use_pre_filter=False):
-    # Sometimes, use_pre_filter=True can speed up the calculations, but most of the times it doesn't
+def drop_redundant_rays(ray_matrix, verbose=True, use_pre_filter=False, unique=True):
+    """
 
-    # First make sure that no duplicate rays are in the matrix
-    ray_matrix = np.transpose(unique(np.transpose(normalize_columns_fraction(ray_matrix))))
-    # first find 'cycles': combinations of columns of matrix_indep_rows that add up to zero, and remove them
+    :param ray_matrix:
+    :param verbose:
+    :param use_pre_filter: Sometimes, use_pre_filter=True can speed up the calculations, but mostly it doesn't
+    :param unique: Boolean that states whether rays given as input are already unique
+    :return:
+    """
+    if not unique:
+        # First make sure that no duplicate rays are in the matrix
+        ray_matrix = np.transpose(unique(np.transpose(normalize_columns_fraction(ray_matrix))))
+
+    # Find 'cycles': combinations of columns of matrix_indep_rows that add up to zero, and remove them
     if verbose:
         mp_print('Detecting linearities in H_ineq.')
     ray_matrix_wo_linearities, cycle_rays = remove_cycles_redund(ray_matrix)

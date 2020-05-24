@@ -198,8 +198,8 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
             print('Reducing rows in H by removing redundant rows')
 
         # Remove duplicates from H_ineq and H_eq
-        # H_ineq = unique(H_ineq)   # Removing duplicates is done too in drop_redundant_rays, so this is superfluous
-        H_eq = unique(H_eq)
+        H_ineq = unique(np.transpose(normalize_columns_fraction(np.transpose(H_ineq))))
+        H_eq = unique(np.transpose(normalize_columns_fraction(np.transpose(H_eq))))
 
         # Use redundancy-removal to make H_ineq and H_eq smaller
         print("Size of H_ineq before redund:", H_ineq.shape[0], H_ineq.shape[1])
@@ -221,7 +221,7 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
         if use_custom_redund:
             mp_print('Using custom redundancy removal')
             t1 = time()
-            H_ineq_transpose, cycle_rays = drop_redundant_rays(np.transpose(H_ineq))
+            H_ineq_transpose, cycle_rays = drop_redundant_rays(np.transpose(H_ineq), unique=True)
             H_ineq = np.transpose(H_ineq_transpose)
 
             H_eq = np.concatenate((H_eq, np.transpose(cycle_rays)), axis=0)  # Add found linearities from H_ineq to H_eq
