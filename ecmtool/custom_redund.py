@@ -287,7 +287,7 @@ def drop_redundant_rays(ray_matrix, verbose=True, use_pre_filter=False, unique_b
             mp_print('Detecting linearities in H_ineq.')
         ray_matrix, cycle_rays = remove_cycles_redund(ray_matrix)
     else:
-        cycle_rays = []
+        cycle_rays = np.zeros((ray_matrix.shape[0], 0))
 
     if not normalised:
         if verbose:

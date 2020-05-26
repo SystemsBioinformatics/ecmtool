@@ -228,7 +228,7 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
         if use_custom_redund:
             mp_print('Using custom redundancy removal')
             t1 = time()
-            H_ineq_transpose = drop_redundant_rays(np.transpose(H_ineq), unique_bool=True, linearities=False, normalised=True)
+            H_ineq_transpose, cycle_rays = drop_redundant_rays(np.transpose(H_ineq), unique_bool=True, linearities=False, normalised=True)
             H_ineq = np.transpose(H_ineq_transpose)
             mp_print("Custom redund took %f sec" % (time()-t1))
 
