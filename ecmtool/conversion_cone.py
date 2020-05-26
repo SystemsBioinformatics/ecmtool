@@ -3,7 +3,7 @@ from time import time
 from .helpers import *
 from .network import Network, Reaction, Metabolite
 from .nullspace import iterative_nullspace
-from .custom_redund import drop_redundant_rays
+from .custom_redund import drop_redundant_rays, remove_cycles_redund
 from .intersect_directly_mpi import independent_rows
 from ecmtool import mpi_wrapper
 
@@ -197,15 +197,22 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
         if verbose:
             print('Reducing rows in H by removing redundant rows')
 
-        # Remove duplicates from H_ineq and H_eq
-        H_ineq = unique(np.transpose(normalize_columns_fraction(np.transpose(H_ineq))))
-        H_eq = unique(np.transpose(normalize_columns_fraction(np.transpose(H_eq))))
-
         # Use redundancy-removal to make H_ineq and H_eq smaller
         print("Size of H_ineq before redund:", H_ineq.shape[0], H_ineq.shape[1])
         print("Size of H_eq before redund:", H_eq.shape[0], H_eq.shape[1])
         count_before_ineq = len(H_ineq)
         count_before_eq = len(H_eq)
+
+        if verbose:
+            mp_print('Detecting linearities in H_ineq.')
+        H_ineq_transpose, cycle_rays = remove_cycles_redund(np.transpose(H_ineq))
+        H_ineq = np.transpose(H_ineq_transpose)
+
+        H_eq = np.concatenate((H_eq, np.transpose(cycle_rays)), axis=0)  # Add found linearities from H_ineq to H_eq
+
+        # Remove duplicates from H_ineq and H_eq
+        H_ineq = unique(np.transpose(normalize_columns_fraction(np.transpose(H_ineq))))
+        H_eq = unique(np.transpose(normalize_columns_fraction(np.transpose(H_eq))))
     else:
         H_ineq = []
         H_eq = []
@@ -216,15 +223,13 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     H_eq = H_eq[0]
     print("Size of H_eq after communication step:", H_eq.shape[0], H_eq.shape[1])
 
+    use_custom_redund = True  # If set to false, redundancy removal with redund from lrslib is used
     if redund_after_polco:
-        use_custom_redund = True  # Set to false if you want to use lrslib redund
         if use_custom_redund:
             mp_print('Using custom redundancy removal')
             t1 = time()
-            H_ineq_transpose, cycle_rays = drop_redundant_rays(np.transpose(H_ineq), unique=True)
+            H_ineq_transpose = drop_redundant_rays(np.transpose(H_ineq), unique_bool=True, linearities=False, normalised=True)
             H_ineq = np.transpose(H_ineq_transpose)
-
-            H_eq = np.concatenate((H_eq, np.transpose(cycle_rays)), axis=0)  # Add found linearities from H_ineq to H_eq
             mp_print("Custom redund took %f sec" % (time()-t1))
 
             t1 = time()

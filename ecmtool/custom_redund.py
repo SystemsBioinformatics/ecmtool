@@ -266,27 +266,36 @@ def pre_redund(matrix_indep_rows):
     return filtered_inds
 
 
-def drop_redundant_rays(ray_matrix, verbose=True, use_pre_filter=False, unique=True):
+def drop_redundant_rays(ray_matrix, verbose=True, use_pre_filter=False, unique_bool=True, linearities=False, normalised=True):
     """
 
     :param ray_matrix:
     :param verbose:
     :param use_pre_filter: Sometimes, use_pre_filter=True can speed up the calculations, but mostly it doesn't
     :param unique: Boolean that states whether rays given as input are already unique
+    :param linearities: Boolean indicating if linearities are still present
+    :param normalised: Boolean indicating if ray_matrix columns are already normalised
     :return:
     """
-    if not unique:
+    if not unique_bool:
         # First make sure that no duplicate rays are in the matrix
         ray_matrix = np.transpose(unique(np.transpose(normalize_columns_fraction(ray_matrix))))
 
     # Find 'cycles': combinations of columns of matrix_indep_rows that add up to zero, and remove them
-    if verbose:
-        mp_print('Detecting linearities in H_ineq.')
-    ray_matrix_wo_linearities, cycle_rays = remove_cycles_redund(ray_matrix)
+    if linearities:
+        if verbose:
+            mp_print('Detecting linearities in H_ineq.')
+        ray_matrix, cycle_rays = remove_cycles_redund(ray_matrix)
+    else:
+        cycle_rays = []
 
-    if verbose:
-        mp_print('Normalizing columns.')
-    matrix_normalized = normalize_columns(ray_matrix_wo_linearities)
+    if not normalised:
+        if verbose:
+            mp_print('Normalizing columns.')
+        matrix_normalized = normalize_columns(ray_matrix)
+    else:
+        matrix_normalized = np.array(ray_matrix, dtype='float')
+
     if verbose:
         mp_print('Selecting independent rows.')
     matrix_indep_rows = independent_rows(matrix_normalized)
@@ -324,6 +333,6 @@ def drop_redundant_rays(ray_matrix, verbose=True, use_pre_filter=False, unique=T
             non_extreme_rays.extend(non_extreme_sets[i])
     non_extreme_rays.sort()
     extreme_inds = np.delete(filtered_inds, non_extreme_rays)
-    new_ray_matrix = ray_matrix_wo_linearities[:, extreme_inds]
+    new_ray_matrix = ray_matrix[:, extreme_inds]
 
     return new_ray_matrix, cycle_rays
