@@ -553,13 +553,16 @@ def normalize_columns(R, verbose=False):
     return result
 
 
-def normalize_columns_fraction(R, verbose=True):
-    number_rays = R.shape[1]
-    for i in range(number_rays):
-        if verbose:
-            if i % 10000 == 0:
-                mp_print("Normalize columns is on ray %d of %d (%f %%)" %
-                         (i, number_rays, i / number_rays * 100), PRINT_IF_RANK_NONZERO=True)
-        norm_column = np.sum(np.abs(np.array(R[:, i])))
-        R[:, i] = np.array(R[:, i]) / norm_column
+def normalize_columns_fraction(R, vectorized=False, verbose=True):
+    if not vectorized:
+        number_rays = R.shape[1]
+        for i in range(number_rays):
+            if verbose:
+                if i % 10000 == 0:
+                    mp_print("Normalize columns is on ray %d of %d (%f %%)" %
+                             (i, number_rays, i / number_rays * 100), PRINT_IF_RANK_NONZERO=True)
+            norm_column = np.sum(np.abs(np.array(R[:, i])))
+            R[:, i] = np.array(R[:, i]) / norm_column
+    else:
+        R = R / np.sum(np.abs(R), axis=0)
     return R
