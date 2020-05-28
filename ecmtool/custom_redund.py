@@ -113,10 +113,11 @@ def check_extreme(R, i, basis, tol=1e-10):
 
     counter_seeds = 1
     while status == 2:
+        tol = tol + 1e-10
         b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, tol, seed=42 + counter_seeds)
         KKT, status = kkt_check_redund(c, A_eq, x0, basis, i)
         counter_seeds = counter_seeds + 1
-        if counter_seeds % 100 == 0:
+        if counter_seeds % 20 == 0:
             mp_print(
                 'Warning: Adjacency check keeps cycling, even with different perturbations. Reporting rays as adjacent.',
                 PRINT_IF_RANK_NONZERO=True)
