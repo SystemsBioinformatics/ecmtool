@@ -206,8 +206,9 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
         H_eq = np.concatenate((H_eq, np.transpose(cycle_rays)), axis=0)  # Add found linearities from H_ineq to H_eq
 
         # Remove duplicates from H_ineq and H_eq
-        H_ineq = unique(np.transpose(normalize_columns_fraction(np.transpose(H_ineq))))
-        H_eq = unique(np.transpose(normalize_columns_fraction(np.transpose(H_eq))))
+        if redund_after_polco:
+            H_ineq = unique(np.transpose(normalize_columns_fraction(np.transpose(H_ineq))))
+            H_eq = unique(np.transpose(normalize_columns_fraction(np.transpose(H_eq))))
     else:
         H_ineq = []
         H_eq = []
