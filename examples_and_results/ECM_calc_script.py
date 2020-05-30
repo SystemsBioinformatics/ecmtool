@@ -4,15 +4,16 @@ from examples_and_results.helpers_ECM_calc import *
 
 """CONSTANTS"""
 model_name = "bacteroid"
+input_file_name = "bacteroid_ECMinputSmaller.csv"
+# For a bigger computation, try:
+# input_file_name = "bacteroid_ECMinputAll.csv"
 
 # Define directories for finding models
 model_dir = os.path.join(os.getcwd(), "models")
 
 model_path = os.path.join(model_dir, model_name + ".xml")
 mod = cbm.readSBML3FBC(model_path)
-input_file_path = os.path.join(os.getcwd(), "input_files", "bacteroid_ECMinputSmaller.csv")
-# For a bigger computation, try:
-# input_file_path = os.path.join(os.getcwd(), "input_files", "bacteroid_ECMinputAll.csv")
+input_file_path = os.path.join(os.getcwd(), "input_files", input_file_name)
 
 ecms_matrix, metab_ids, full_network = calc_ECMs(model_path, print_results=True, input_file_path=input_file_path)
 

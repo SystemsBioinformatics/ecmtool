@@ -11,6 +11,7 @@ from examples_and_results.helpers_ECM_calc import get_efms
 This script calculates the EFMs and ECMs for a number of models (created by taking subnetworks of e_coli_core).
 Note that this script only works if EFMtool and Matlab is installed and working on your machine.
 """
+EFMTOOL_PATH = 'C:\\Users\\Daan\\surfdrive\\PhD\\Software\\efmtool'
 
 models = ['active_subnetwork_KO_' + str(i) for i in range(9)]
 models = models + ['active_subnetwork', 'active_subnetwork_FVA', 'e_coli_core']
@@ -45,7 +46,7 @@ for model_str in models:
             n_exchanges += 1
 
     efms = get_efms(ex_N, reversibilities, verbose=True,
-                    efmtool_path='C:\\Users\\Daan\\surfdrive\\PhD\\Software\\efmtool')
+                    efmtool_path=EFMTOOL_PATH)
 
     network.compress(verbose=True)
 
