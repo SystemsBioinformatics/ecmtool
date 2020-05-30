@@ -15,6 +15,11 @@ from sympy import Matrix
 from ecmtool.mpi_wrapper import get_process_rank
 
 
+def unique(matrix):
+    unique_set = list({tuple(row) for row in matrix if np.count_nonzero(row) > 0})
+    return np.vstack(unique_set) if len(unique_set) else to_fractions(np.ndarray(shape=(0, matrix.shape[1])))
+
+
 def relative_path(file_path):
     return os.path.join(os.path.dirname(__file__), file_path)
 
@@ -32,7 +37,7 @@ def get_total_memory_gb():
     Returns total system memory in GiB (gibibytes)
     :return:
     """
-    return psutil.virtual_memory().total / 1024**3
+    return psutil.virtual_memory().total / 1024 ** 3
 
 
 def get_min_max_java_memory():
@@ -167,7 +172,6 @@ def nullspace_matlab(N):
 
 
 def nullspace_polco(A, verbose=False):
-
     B_neg = np.append(-np.identity(A.shape[1]), np.ones(shape=(A.shape[1], 1)), axis=1)
     B_pos = np.append(np.identity(A.shape[1]), np.ones(shape=(A.shape[1], 1)), axis=1)
     B = np.append(B_neg, B_pos, axis=0)
@@ -247,18 +251,19 @@ def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
 #     return x
 
 def get_efms(N, reversibility, verbose=True):
-   import matlab.engine
-   engine = matlab.engine.start_matlab()
-   engine.cd(relative_path('efmtool'))
-   result = engine.CalculateFluxModes(matlab.double([list(row) for row in N]), matlab.logical(reversibility))
-   if verbose:
-       print('Fetching calculated EFMs')
-   size = result['efms'].size
-   shape = size[1], size[0] # _data is in transposed form w.r.t. the result matrix
-   efms = np.reshape(np.array(result['efms']._data), shape)
-   if verbose:
-       print('Finishing fetching calculated EFMs')
-   return efms
+    import matlab.engine
+    engine = matlab.engine.start_matlab()
+    engine.cd(relative_path('efmtool'))
+    result = engine.CalculateFluxModes(matlab.double([list(row) for row in N]), matlab.logical(reversibility))
+    if verbose:
+        print('Fetching calculated EFMs')
+    size = result['efms'].size
+    shape = size[1], size[0]  # _data is in transposed form w.r.t. the result matrix
+    efms = np.reshape(np.array(result['efms']._data), shape)
+    if verbose:
+        print('Finishing fetching calculated EFMs')
+    return efms
+
 
 # def get_efms(N, reversibility, verbose=True):
 #     N_ex = N
@@ -339,7 +344,7 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True
                     ('' if equality_matrix is None else '-eq %s ' % equality_path) +
                     ('' if inequality_matrix is None else '-iq %s ' % inequality_path) +
                     '-out text %s' % generators_path).split(' '),
-            stdout=(devnull if not verbose else None), stderr=(devnull if not verbose else None))
+                   stdout=(devnull if not verbose else None), stderr=(devnull if not verbose else None))
 
     # Read resulting extreme rays
     if verbose:
@@ -351,7 +356,8 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True
         if len(lines) > 0:
             number_lines = len(lines)
             number_entries = len(lines[0].replace('\n', '').split('\t'))
-            rays = np.repeat(np.repeat(to_fractions(np.zeros(shape=(1,1))), number_entries, axis=1), number_lines, axis=0)
+            rays = np.repeat(np.repeat(to_fractions(np.zeros(shape=(1, 1))), number_entries, axis=1), number_lines,
+                             axis=0)
 
             for row, line in enumerate(lines):
                 # print('line %d/%d' % (row+1, number_lines))
@@ -382,7 +388,8 @@ def binary_exists(binary_file):
 def get_redund_binary():
     if sys.platform.startswith('linux'):
         if not binary_exists('redund'):
-            raise EnvironmentError('Executable "redund" was not found in your path. Please install package lrslib (e.g. apt install lrslib)')
+            raise EnvironmentError(
+                'Executable "redund" was not found in your path. Please install package lrslib (e.g. apt install lrslib)')
         return 'redund'
     elif sys.platform.startswith('win32'):
         return relative_path('redund\\redund_win.exe')
@@ -519,7 +526,7 @@ def print_ecms_direct(R, metabolite_ids):
 
     mp_print("\n--%d ECMs found by intersecting directly--\n" % R.shape[1])
     for i in range(R.shape[1]):
-        mp_print("ECM #%d:" % (i+1))
+        mp_print("ECM #%d:" % (i + 1))
         if np.max(R[:,
                   i]) > 1e100:  # If numbers become too large, they can't be printed, therefore we make them smaller first
             ecm = np.array(R[:, i] / np.max(R[:, i]), dtype='float')

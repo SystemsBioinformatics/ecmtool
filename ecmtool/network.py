@@ -680,10 +680,6 @@ class Network:
         :param metabolite_indices: list of metabolite indices
         :return:
         """
-        # This 'get_or_create hide_metabolites' can be used to keep track of metabolites that are hidden, but makes
-        # the code a bit slower. Therefore, it is outcommented.
-        # source, sink = self.get_or_create_hide_metabolites()
-
         for index in metabolite_indices:
             self.metabolites[index].is_external = False
 

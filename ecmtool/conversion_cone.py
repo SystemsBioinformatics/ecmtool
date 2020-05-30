@@ -84,11 +84,6 @@ def split_columns(matrix, columns):
     return matrix
 
 
-def unique(matrix):
-    unique_set = list({tuple(row) for row in matrix if np.count_nonzero(row) > 0})
-    return np.vstack(unique_set) if len(unique_set) else to_fractions(np.ndarray(shape=(0, matrix.shape[1])))
-
-
 def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], input_metabolites=[], output_metabolites=[],
                         only_rays=False, verbose=False, redund_after_polco=True):
     """
