@@ -213,6 +213,7 @@ def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
             with shape (k, n), where n is the estimated dimension of the
             nullspace of `A`.  The columns of `ns` are a basis for the
             nullspace; each element in numpy.dot(A, ns) will be approximately
+            nullspace; each element in numpy.dot(A, ns) will be approximately
             zero.
     """
     if not symbolic:
@@ -236,20 +237,6 @@ def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
             else np.ndarray(shape=(N.shape[0], 0))
 
 
-# def get_extreme_rays_efmtool(inequality_matrix, matlab_root='/Applications/MATLAB_R2018b.app/'):
-#     H = inequality_matrix
-#     r, m = H.shape
-#     N = np.append(-np.identity(r), H, axis=1)
-#
-#     engine = matlab.engine.start_matlab()
-#     engine.cd('efmtool')
-#     engine.workspace['N'] = matlab.double([list(row) for row in N])
-#     engine.workspace['rev'] = ([False] * r) + ([True] * m)
-#     result = engine.CalculateFluxModes(matlab.double([list(row) for row in N]), matlab.logical(([False] * r) + ([True] * m)))
-#     v = result['efms']
-#     x = np.transpose(np.asarray(v)[r:, :])
-#     return x
-
 def get_efms(N, reversibility, verbose=True):
     import matlab.engine
     engine = matlab.engine.start_matlab()
@@ -263,29 +250,6 @@ def get_efms(N, reversibility, verbose=True):
     if verbose:
         print('Finishing fetching calculated EFMs')
     return efms
-
-
-# def get_efms(N, reversibility, verbose=True):
-#     N_ex = N
-#     n_reactions = N.shape[1]
-#     for index,rev in enumerate(reversibility):
-#         N_ex = np.append(N_ex, np.transpose([-N[:,index]]), axis=1)
-#     efms_redund = nullspace(N_ex, symbolic=True)
-#     efms = efms_redund
-#     i = 0
-#     for index,rev in enumerate(reversibility):
-#         if rev:
-#             efms[:, index] -= efms[:, n_reactions+i]
-#             i += 1
-#     return efms[:, :n_reactions]
-
-
-# def get_extreme_rays_cdd(inequality_matrix):
-#     mat = cdd.Matrix(np.append(np.zeros(shape=(inequality_matrix.shape[0], 1)), inequality_matrix, axis=1), number_type='fraction')
-#     mat.rep_type = cdd.RepType.INEQUALITY
-#     poly = cdd.Polyhedron(mat)
-#     gen = poly.get_generators()
-#     return np.asarray(gen)[:, 1:]
 
 
 def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True, verbose=False):
