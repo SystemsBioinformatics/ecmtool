@@ -19,8 +19,28 @@ path should be replaced with the path ecmtool was downloaded to).
 Ecmtool can be ran by executing `python main.py –model_path <path/to/model.xml> [arguments]` from the command line, after navigating to the ecmtool directory as described above. The possible arguments and their default values are printed when you run `python main.py --help`.
 After execution is done, the found conversions have been written to file (default: _conversions.csv_). The first row of this CSV file contain the metabolite IDs as read from the SBML model.
 
+### Example
+
+```bash
+python3 main.py --model_path models/e_coli_core.xml --auto_direction true --out_path core_conversions.csv
+```
+
 ## Mode 2: Python library
 ecmtool can also be used as a separate programming interface from within your own Python code. To do so, install ecmtool using _pip_ (e.g. `pip install ecmtool`). The most crucial method is ecmtool.conversion_cone:get_conversion_cone(), which returns the ECMs of a given stoichiometric matrix. For information on how to use advanced features like SBML parsing, network compression, and metabolite direction estimation, please see ecmtool/main.py.
+
+
+### Example
+```python
+from ecmtool.network import extract_sbml_stoichiometry
+from ecmtool.conversion_cone import get_conversion_cone
+
+network = extract_sbml_stoichiometry('models/sxp_toy.xml', add_objective=True)
+stoichiometry = network.N
+
+ecms = get_conversion_cone(stoichiometry, network.external_metabolite_indices(),
+ network.reversible_reaction_indices(), network.input_metabolite_indices(), 
+ network.output_metabolite_indices())
+```
 
 ## Advanced usage
 After testing how the tool works, most users will want to run their workloads on computing clusters instead of on single machines. This section describes some of the steps that are useful for running on clusers
