@@ -348,6 +348,15 @@ if __name__ == '__main__':
 
         cone_transpose, ids = unsplit_metabolites(np.transpose(cone), network)
         cone = np.transpose(cone_transpose)
+        # Keep only information about external metabolites (internals are zero)
+        internal_ids = []
+        for ind_metab, id_metab in enumerate(ids):
+            external_bool = [metab.is_external for metab in network.metabolites if metab.id == id_metab][0]
+            if not external_bool:
+                internal_ids.append(ind_metab)
+
+        ids = list(np.delete(ids, internal_ids))
+        cone = np.delete(cone, internal_ids, axis=1)
 
     if mpi_wrapper.is_first_process():
         try:
