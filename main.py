@@ -350,10 +350,11 @@ if __name__ == '__main__':
         cone = np.transpose(cone_transpose)
         # Keep only information about external metabolites (internals are zero)
         internal_ids = []
-        for ind_metab, id_metab in enumerate(ids):
-            external_bool = [metab.is_external for metab in network.metabolites if metab.id == id_metab][0]
-            if not external_bool:
-                internal_ids.append(ind_metab)
+        for metab in network.metabolites:
+            if not metab.is_external:
+                id_ind = [ind for ind, id in enumerate(ids) if id == metab.id]
+                if len(id_ind):
+                    internal_ids.append(id_ind[0])
 
         ids = list(np.delete(ids, internal_ids))
         cone = np.delete(cone, internal_ids, axis=1)
