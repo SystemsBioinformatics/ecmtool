@@ -244,9 +244,10 @@ if __name__ == '__main__':
         prohibit_indices = [int(index) for index in args.prohibit.split(',') if len(index)]
         network.prohibit(prohibit_indices)
 
+    tag_ids = []
     if args.tag:
         tagged_reaction_indices = [int(index) for index in args.tag.split(',') if len(index)]
-        add_reaction_tags(network, tagged_reaction_indices)
+        tag_ids = add_reaction_tags(network, tagged_reaction_indices)
 
     if args.print_reactions:
         mp_print('Reactions%s:' % (' before compression' if args.compress else ''))
@@ -279,7 +280,8 @@ if __name__ == '__main__':
 
         hide_indices = [ind for ind, metab in enumerate(network.metabolites) if
                         (metab.is_external) & (metab.direction == args.hide_all_in_or_outputs) & (
-                            not metab.id == 'objective_out')]
+                            not metab.id == 'objective_out') & (
+                                    metab.id.replace("_in", "").replace("_out", "") not in tag_ids)]
         network.hide(hide_indices)
 
     if args.compress:

@@ -215,12 +215,16 @@ def add_reaction_tags(network, reactions=[]):
     if len(reactions) == 0:
         reactions = range(len(network.reactions))
 
+    tag_ids = []
     for reaction in reactions:
+        tag_ids.append('virtual_tag_%s' % network.reactions[reaction].id)
         network.metabolites.append(Metabolite('virtual_tag_%s' % network.reactions[reaction].id,
                                               'Virtual tag for %s' % network.reactions[reaction].id,
                                               compartment='e', is_external=True,
                                               direction='both' if network.reactions[reaction].reversible else 'output'))
     network.N = np.append(network.N, to_fractions(np.identity(len(network.reactions)))[reactions, :], axis=0)
+
+    return tag_ids
 
 
 class Reaction:
