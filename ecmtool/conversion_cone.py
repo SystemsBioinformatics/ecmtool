@@ -95,6 +95,7 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     :param output_metabolites: list of row numbers (0-based) of metabolites that are tagged as outputs
     :param only_rays: return only the extreme rays of the conversion cone, and not the elementary vectors (ECMs instead of ECVs)
     :param verbose: print status messages during enumeration
+    :param redund_after_polco: Optionally remove redundant rays from H_eq and H_ineq before final extreme ray enumeration by Polco
     :return: matrix with conversion cone "c" as row vectors
     """
     if mpi_wrapper.is_first_process():
@@ -224,7 +225,7 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
         if use_custom_redund:
             mp_print('Using custom redundancy removal')
             t1 = time()
-            H_ineq_transpose, cycle_rays = drop_redundant_rays(np.transpose(H_ineq), unique_bool=True, linearities=False, normalised=True)
+            H_ineq_transpose, cycle_rays = drop_redundant_rays(np.transpose(H_ineq), rays_are_unique=True, linearities=False, normalised=True)
             H_ineq = np.transpose(H_ineq_transpose)
             mp_print("Custom redund took %f sec" % (time()-t1))
 
@@ -454,78 +455,6 @@ def iterative_conversion_cone(network, max_metabolites=30, only_rays=False, verb
                                           verbose=verbose, only_rays=only_rays)
     return network.uncompress(conversion_cone)
 
-
-def get_clementine_conversion_cone(N, external_metabolites=[], reversible_reactions=[], input_metabolites=[], output_metabolites=[],
-                                   verbose=True):
-    """
-    Calculates the conversion cone using Superior Clementine Equality Intersection (all rights reserved).
-    Follows the general Double Description method by Motzkin, using G as initial basis and intersecting
-    hyperplanes of internal metabolites = 0.
-    :param N:
-    :param external_metabolites:
-    :param reversible_reactions:
-    :param input_metabolites:
-    :param output_metabolites:
-    :return:
-    """
-    amount_metabolites, amount_reactions = N.shape[0], N.shape[1]
-    internal_metabolites = np.setdiff1d(range(amount_metabolites), external_metabolites)
-
-    identity = np.identity(amount_metabolites)
-    equalities = [identity[:, index] for index in internal_metabolites]
-
-    # Compose G of the columns of N
-    G = np.transpose(N)
-
-    # Add reversible reactions (columns) of N to G in the negative direction as well
-    for reaction_index in range(G.shape[0]):
-        if reaction_index in reversible_reactions:
-            G = np.append(G, [-G[reaction_index, :]], axis=0)
-
-    # For each internal metabolite, intersect the intermediary cone with an equality to 0 for that metabolite
-    for index, internal_metabolite in enumerate(internal_metabolites):
-        if verbose:
-            print('Iteration %d/%d' % (index, len(internal_metabolites)))
-
-        # Find conversions that use this metabolite
-        active_conversions = np.asarray([conversion_index for conversion_index in range(G.shape[0])
-                              if G[conversion_index, internal_metabolite] != 0])
-
-        # Skip internal metabolites that aren't used anywhere
-        if len(active_conversions) == 0:
-            if verbose:
-                print('Skipping internal metabolite #%d, since it is not used by any reaction\n' % internal_metabolite)
-            continue
-
-        # Project conversions that use this metabolite onto the hyperplane internal_metabolite = 0
-        projections = np.dot(G[active_conversions, :], equalities[index])
-        positive = active_conversions[np.argwhere(projections > 0)[:, 0]]
-        negative = active_conversions[np.argwhere(projections < 0)[:, 0]]
-        candidates = np.ndarray(shape=(0, amount_metabolites))
-
-        if verbose:
-            print('Adding %d candidates' % (len(positive) * len(negative)))
-
-        # Make convex combinations of all pairs (positive, negative) such that their internal_metabolite = 0
-        for pos in positive:
-            for neg in negative:
-                candidate = np.add(G[pos, :], G[neg, :] * (G[pos, internal_metabolite] / -G[neg, internal_metabolite]))
-                candidates = np.append(candidates, [candidate], axis=0)
-
-        # Keep only rays that satisfy internal_metabolite = 0
-        keep = np.setdiff1d(range(G.shape[0]), np.append(positive, negative, axis=0))
-        if verbose:
-            print('Removing %d rays\n' % (G.shape[0] - len(keep)))
-        G = G[keep, :]
-        G = np.append(G, candidates, axis=0)
-        # G = drop_nonextreme(G, get_zero_set(G, equalities), verbose=verbose)
-        input("now at redund 486")
-        G = redund(G, verbose=verbose)
-
-
-    return G
-
-
 def get_pseudo_external_direction(network, metabolite_index):
     number_pos = 0
     number_neg = 0
@@ -657,6 +586,7 @@ def iterative_biomass_conversions(network, verbose=False):
     Has to be called directly after network.restore_objective_reaction().
 
     :param network:
+    :param verbose:
     :return:
     """
     substrate_indices, product_indices = network.get_objective_reagents()

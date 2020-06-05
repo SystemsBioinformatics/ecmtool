@@ -21,6 +21,7 @@ def clementine_equality_compression(N, external_metabolites=[], reversible_react
     :param reversible_reactions:
     :param input_metabolites:
     :param output_metabolites:
+    :param verbose:
     :return:
     """
     number_metabolites, amount_reactions = N.shape[0], N.shape[1]
@@ -105,7 +106,7 @@ def clementine_equality_compression(N, external_metabolites=[], reversible_react
 def get_sbml_model(path):
     doc = sbml.readSBMLFromFile(path)
     model = doc.getModel()
-    model.__keep_doc_alive__ = doc
+    model.__keep_doc_alive__ = doc  # Needed to prevent garbage collection from thrashing model
     return model
 
 
@@ -118,6 +119,8 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     :param path: string absolute or relative path to the .sbml file
     :param add_objective: Look for SBML v3 FBC objective definition
     :param skip_external_reactions: Ignore external reactions, as identified by '_EX_' in their ID
+    :param determine_inputs_outputs: Automatically determine input and output metabolites from analysing the network.
+    :param external_compartment: The compartment name for the external environment in the SBML model. Usually 'e'.
     :return: Network
     """
     cbmpy_model = cbmpy.readSBML3FBC(path)

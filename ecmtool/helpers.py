@@ -53,149 +53,6 @@ def get_min_max_java_memory():
     return min, max
 
 
-def nullspace_rank_internal(src, dst, verbose=False):
-    """
-    Translated directly from Polco's NullspaceRank:nullspaceRankInternal().
-    :param src: ndarray of Fraction() objects
-    :param dst:
-    :return:
-    """
-    rows, cols = src.shape
-    row_mapping = [row for row in range(rows)]
-
-    if verbose:
-        print('Starting rank calculation')
-
-    for col in range(cols):
-        if verbose:
-            print('Processing columns (rank) - %.2f%%' % (col / float(cols) * 100))
-
-        row_pivot = col
-        if row_pivot >= rows:
-            return rows, dst
-
-        pivot_dividend = src[row_pivot, col].numerator
-        pivot_divisor = None
-
-        # If pivotDividend == 0, try to find another non-dependent row
-        for row in range(row_pivot + 1, rows):
-            if pivot_dividend != 0:
-                break
-
-            pivot_dividend = src[row, col].numerator
-            if pivot_dividend != 0:
-                # Swap rows
-                src[[row_pivot, row]] = src[[row, row_pivot]]
-                dst[[row_pivot, row]] = dst[[row, row_pivot]]
-
-                tmp = row_mapping[row_pivot]
-                row_mapping[row_pivot] = row_mapping[row]
-                row_mapping[row] = tmp
-
-        if pivot_dividend == 0:
-            # Done, col is rank
-            # TODO: this is likely wrong. When a column is filled with only zeroes,
-            # we need to move on to the next column.
-            return col, dst
-
-        pivot_divisor = src[row_pivot, col].denominator
-
-        # Make pivot a 1
-        src[row_pivot, :] *= Fraction(pivot_dividend, pivot_divisor)
-        dst[row_pivot, :] *= Fraction(pivot_dividend, pivot_divisor)
-
-        for other_row in range(rows):
-            if other_row != col:
-                # Make it a 0
-                other_row_pivot_dividend = src[other_row, col].numerator
-                if other_row_pivot_dividend != 0:
-                    other_row_pivot_divisor = src[other_row, col].denominator
-                    src[other_row, :] -= src[row_pivot, :] * Fraction(other_row_pivot_dividend, other_row_pivot_divisor)
-                    dst[other_row, :] -= dst[row_pivot, :] * Fraction(other_row_pivot_dividend, other_row_pivot_divisor)
-
-    return cols, dst
-
-
-def nullspace_terzer(src, verbose=False):
-    src_T = np.transpose(src[:, :])
-    dst = to_fractions(np.identity(src_T.shape[0]))
-    rank, dst = nullspace_rank_internal(src_T, dst, verbose=verbose)
-    len = src_T.shape[0]
-
-    nullspace = to_fractions(np.zeros(shape=(len - rank, dst.shape[1])))
-
-    if verbose:
-        print('Starting nullspace calculation')
-
-    for row in range(rank, len):
-        if verbose:
-            print('Processing rows (rank) - %.2f%%' % ((row - rank) / float(len - rank) * 100))
-
-        sign = 0  # Originally "sgn" in Polco
-        scp = 1
-
-        # Find one common multiplicand that makes all cells' fractions integer
-        for col in range(len):
-            dividend = dst[row, col].numerator
-            if dividend != 0:
-                divisor = dst[row, col].denominator
-                scp /= gcd(scp, divisor)
-                scp *= divisor
-                sign += np.sign(dividend)
-
-        # We want as many cells in this row to be positive as possible
-        if np.sign(scp) != np.sign(sign):
-            scp *= -1
-
-        # Scale all cells to integer values
-        for col in range(len):
-            dividend = dst[row, col].numerator
-            value = None
-
-            if dividend == 0:
-                value = Fraction(0, 1)
-            else:
-                divisor = dst[row, col].denominator
-                value = dividend * Fraction(scp, divisor)
-
-            nullspace[row - rank, col] = value
-
-    return np.transpose(nullspace)
-
-
-def nullspace_matlab(N):
-    import matlab.engine
-    engine = matlab.engine.start_matlab()
-    result = engine.null(matlab.double([list(row) for row in N]), 'r')
-    x = to_fractions(np.asarray(result))
-    return x
-
-
-def nullspace_polco(A, verbose=False):
-    B_neg = np.append(-np.identity(A.shape[1]), np.ones(shape=(A.shape[1], 1)), axis=1)
-    B_pos = np.append(np.identity(A.shape[1]), np.ones(shape=(A.shape[1], 1)), axis=1)
-    B = np.append(B_neg, B_pos, axis=0)
-    A = np.append(A, np.zeros(shape=(A.shape[0], 1)), axis=1)
-
-    result = get_extreme_rays(A, B, verbose=verbose)
-
-    for row in range(result.shape[0]):
-        result[row, :] /= 1 if result[row, -1] == 0 else result[row, -1]
-
-    null_vectors = result[:, :-1]
-    deduped_vectors = []
-
-    # for row in range(null_vectors.shape[0]):
-    #     if not np.any([np.sum(null_vectors[row, :] - entry) == 0 for entry in deduped_vectors]):
-    #         deduped_vectors.append(null_vectors[row, :])
-    #     else:
-    #         print('x')
-    #         pass
-    #
-    # return np.transpose(redund(np.asarray(deduped_vectors, dtype='object')))
-    return np.transpose(redund(np.asarray(null_vectors, dtype='object')))
-
-
 def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
     """
     Calculates the null space of given matrix N.
@@ -203,6 +60,7 @@ def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
     :param N: ndarray
             A should be at most 2-D.  A 1-D array with length k will be treated
             as a 2-D with shape (1, k)
+    :param symbolic: set to False to compute nullspace numerically instead of symbolically
     :param atol: float
             The absolute tolerance for a zero singular value.  Singular values
             smaller than `atol` are considered to be zero.
@@ -235,21 +93,6 @@ def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
         return to_fractions(
             np.transpose(np.asarray(nullspace_matrix.rref()[0], dtype='object'))) if nullspace_matrix \
             else np.ndarray(shape=(N.shape[0], 0))
-
-
-def get_efms(N, reversibility, verbose=True):
-    import matlab.engine
-    engine = matlab.engine.start_matlab()
-    engine.cd(relative_path('efmtool'))
-    result = engine.CalculateFluxModes(matlab.double([list(row) for row in N]), matlab.logical(reversibility))
-    if verbose:
-        print('Fetching calculated EFMs')
-    size = result['efms'].size
-    shape = size[1], size[0]  # _data is in transposed form w.r.t. the result matrix
-    efms = np.reshape(np.array(result['efms']._data), shape)
-    if verbose:
-        print('Finishing fetching calculated EFMs')
-    return efms
 
 
 def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True, verbose=False):
@@ -449,7 +292,6 @@ def mp_print(*args, **kwargs):
     Multiprocessing wrapper for print().
     Prints the given arguments, but only on process 0 unless
     named argument PRINT_IF_RANK_NONZERO is set to true.
-    :param s: string to print
     :return:
     """
     if get_process_rank() == 0:

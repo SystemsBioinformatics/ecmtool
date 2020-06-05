@@ -30,6 +30,7 @@ def iterative_nullspace(A, rows_per_iteration = 10, nullspace_method=nullspace_s
     :param A:
     :param rows_per_iteration:
     :param nullspace_method:
+    :param verbose:
     :return:
     """
     number_partitions = int(np.ceil(A.shape[0] / float(rows_per_iteration)))

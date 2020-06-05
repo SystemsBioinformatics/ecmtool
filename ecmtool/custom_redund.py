@@ -267,18 +267,18 @@ def pre_redund(matrix_indep_rows):
     return filtered_inds
 
 
-def drop_redundant_rays(ray_matrix, verbose=True, use_pre_filter=False, unique_bool=True, linearities=False, normalised=True):
+def drop_redundant_rays(ray_matrix, verbose=True, use_pre_filter=False, rays_are_unique=True, linearities=False, normalised=True):
     """
 
     :param ray_matrix:
     :param verbose:
     :param use_pre_filter: Sometimes, use_pre_filter=True can speed up the calculations, but mostly it doesn't
-    :param unique: Boolean that states whether rays given as input are already unique
+    :param rays_are_unique: Boolean that states whether rays given as input are already unique
     :param linearities: Boolean indicating if linearities are still present
     :param normalised: Boolean indicating if ray_matrix columns are already normalised
     :return:
     """
-    if not unique_bool:
+    if not rays_are_unique:
         # First make sure that no duplicate rays are in the matrix
         ray_matrix = np.transpose(unique(np.transpose(normalize_columns_fraction(ray_matrix))))
 

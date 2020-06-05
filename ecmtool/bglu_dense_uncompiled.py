@@ -285,7 +285,8 @@ class BGLU(LU):
 
         return v
 
-    def perform_perm(self, p):
+    @staticmethod
+    def perform_perm(p):
         """
         Perform individual row swaps defined in p returned by factor_lu to
         generate final permutation indices pi
