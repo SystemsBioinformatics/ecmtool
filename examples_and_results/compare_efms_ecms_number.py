@@ -57,8 +57,6 @@ for model_str in models:
                             verbose=True))
 
     cone = cone.transpose()
-    ids = network.uncompressed_metabolite_ids
-    np.savetxt('conversion_cone.csv', np.transpose(cone), delimiter=',', header=','.join(ids), comments='')
 
     n_efms = efms.shape[0]
     n_ecms = cone.shape[1]
