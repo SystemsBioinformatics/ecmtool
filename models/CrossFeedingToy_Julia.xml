@@ -1,0 +1,463 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SBML created with CBMPy (0.7.21.660) on Thu, 17 Jan 2019 13:02:18 -->
+<sbml xmlns="http://www.sbml.org/sbml/level3/version1/core" xmlns:fbc="http://www.sbml.org/sbml/level3/version1/fbc/version1" xmlns:html="http://www.w3.org/1999/xhtml" level="3" version="1" fbc:required="false">
+  <model metaid="meta_core_model_1" id="core_model_1" substanceUnits="mmol_per_gdw" timeUnits="hour" extentUnits="mmol_per_gdw">
+    <notes>
+      <html:p>
+        <html:br/>
+        <html:span size="small">Model &quot;<html:strong>core_model_1</html:strong>&quot; (cbmpy_fbc_model) generated with <html:a href="http://cbmpy.sourceforge.net">CBMPy</html:a> (0.7.21.660) on Thu, 17 Jan 2019 13:02:18.</html:span>
+      </html:p>
+    </notes>
+    <listOfUnitDefinitions>
+      <unitDefinition id="mmol_per_hour" name="mmol_per_hour">
+        <listOfUnits>
+          <unit kind="mole" exponent="1" scale="-3" multiplier="1"/>
+          <unit kind="second" exponent="-1" scale="0" multiplier="3600"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="per_hour" name="per_hour">
+        <listOfUnits>
+          <unit kind="second" exponent="-1" scale="0" multiplier="3600"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="mmol_per_gdw" name="mmol_per_gdw">
+        <listOfUnits>
+          <unit kind="mole" exponent="1" scale="-3" multiplier="1"/>
+          <unit kind="gram" exponent="-1" scale="0" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="hour" name="hour">
+        <listOfUnits>
+          <unit kind="second" exponent="1" scale="0" multiplier="3600"/>
+        </listOfUnits>
+      </unitDefinition>
+    </listOfUnitDefinitions>
+    <listOfCompartments>
+      <compartment metaid="meta_Cell" id="Cell" name="Cell" spatialDimensions="3" size="1" units="dimensionless" constant="true">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="CBMPy_info" value="created by SBML writer"/>
+          </listOfKeyValueData>
+        </annotation>
+      </compartment>
+    </listOfCompartments>
+    <listOfSpecies>
+      <species metaid="meta_AS" id="AS" name="AS" compartment="Cell" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="SUBSYSTEM"/>
+          </listOfKeyValueData>
+        </annotation>
+      </species>
+      <species metaid="meta_AllEnzSpecies" id="AllEnzSpecies" name="All Enzymes combined" compartment="Cell" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_Arg" id="Arg" name="Arg" compartment="Cell" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="SUBSYSTEM"/>
+          </listOfKeyValueData>
+        </annotation>
+      </species>
+      <species metaid="meta_BM" id="BM" name="BM" compartment="Cell" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="SUBSYSTEM"/>
+          </listOfKeyValueData>
+        </annotation>
+      </species>
+      <species metaid="meta_BM_ex" id="BM_ex" name="BM_ex" compartment="Cell" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="true" constant="false">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="SUBSYSTEM"/>
+          </listOfKeyValueData>
+        </annotation>
+      </species>
+      <species metaid="meta_C" id="C" name="C" compartment="Cell" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="SUBSYSTEM"/>
+          </listOfKeyValueData>
+        </annotation>
+      </species>
+      <species metaid="meta_Enzyme_v_AS" id="Enzyme_v_AS" name="Enzyme for v_AS" compartment="Cell" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_Enzyme_v_Arg" id="Enzyme_v_Arg" name="Enzyme for v_Arg" compartment="Cell" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_Enzyme_v_Argout" id="Enzyme_v_Argout" name="Enzyme for v_Argout" compartment="Cell" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_Enzyme_v_Argup" id="Enzyme_v_Argup" name="Enzyme for v_Argup" compartment="Cell" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_Enzyme_v_Cup" id="Enzyme_v_Cup" name="Enzyme for v_Cup" compartment="Cell" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_Enzyme_v_His" id="Enzyme_v_His" name="Enzyme for v_His" compartment="Cell" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_Enzyme_v_Hisout" id="Enzyme_v_Hisout" name="Enzyme for v_Hisout" compartment="Cell" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_Enzyme_v_Hisup" id="Enzyme_v_Hisup" name="Enzyme for v_Hisup" compartment="Cell" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_Enzyme_v_Prot" id="Enzyme_v_Prot" name="Enzyme for v_Prot" compartment="Cell" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_His" id="His" name="His" compartment="Cell" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="SUBSYSTEM"/>
+          </listOfKeyValueData>
+        </annotation>
+      </species>
+      <species metaid="meta_Prot" id="Prot" name="Prot" compartment="Cell" initialAmount="0" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="SUBSYSTEM"/>
+          </listOfKeyValueData>
+        </annotation>
+      </species>
+    </listOfSpecies>
+    <listOfReactions>
+      <reaction metaid="meta_V_Enzyme_v_Prot" id="V_Enzyme_v_Prot" name="Reaction producing Enzyme for v_Prot" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="Prot" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="Enzyme_v_Prot" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_v_His" id="v_His" name="v_His" reversible="false" fast="false">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="SUBSYSTEM"/>
+          </listOfKeyValueData>
+        </annotation>
+        <listOfReactants>
+          <speciesReference species="C" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="His" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_V_Enzyme_v_Hisout" id="V_Enzyme_v_Hisout" name="Reaction producing Enzyme for v_Hisout" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="Prot" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="Enzyme_v_Hisout" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_v_Cup" id="v_Cup" name="v_Cup" reversible="false" fast="false">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="SUBSYSTEM"/>
+          </listOfKeyValueData>
+        </annotation>
+        <listOfProducts>
+          <speciesReference species="C" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_V_Enzyme_v_His" id="V_Enzyme_v_His" name="Reaction producing Enzyme for v_His" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="Prot" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="Enzyme_v_His" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_V_Enzyme_to_BM_v_Hisout" id="V_Enzyme_to_BM_v_Hisout" name="Enzyme v_Hisout into BM" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="Enzyme_v_Hisout" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="AllEnzSpecies" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_V_Enzyme_v_Argout" id="V_Enzyme_v_Argout" name="Reaction producing Enzyme for v_Argout" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="Prot" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="Enzyme_v_Argout" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_v_BM" id="v_BM" name="v_BM" reversible="false" fast="false">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="SUBSYSTEM"/>
+          </listOfKeyValueData>
+        </annotation>
+        <listOfReactants>
+          <speciesReference species="AS" stoichiometry="1" constant="true"/>
+          <speciesReference species="Arg" stoichiometry="1" constant="true"/>
+          <speciesReference species="His" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="BM" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_V_Enzyme_v_Hisup" id="V_Enzyme_v_Hisup" name="Reaction producing Enzyme for v_Hisup" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="Prot" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="Enzyme_v_Hisup" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_V_Enzyme_to_BM_v_Arg" id="V_Enzyme_to_BM_v_Arg" name="Enzyme v_Arg into BM" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="Enzyme_v_Arg" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="AllEnzSpecies" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_v_Prot" id="v_Prot" name="v_Prot" reversible="false" fast="false">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="SUBSYSTEM"/>
+          </listOfKeyValueData>
+        </annotation>
+        <listOfReactants>
+          <speciesReference species="AS" stoichiometry="1" constant="true"/>
+          <speciesReference species="Arg" stoichiometry="1" constant="true"/>
+          <speciesReference species="His" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="Prot" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_v_Argout" id="v_Argout" name="v_Argout" reversible="false" fast="false">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="SUBSYSTEM"/>
+          </listOfKeyValueData>
+        </annotation>
+        <listOfReactants>
+          <speciesReference species="Arg" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+      </reaction>
+      <reaction metaid="meta_v_BM_ex" id="v_BM_ex" name="v_BM_ex" reversible="false" fast="false">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="SUBSYSTEM"/>
+          </listOfKeyValueData>
+        </annotation>
+        <listOfReactants>
+          <speciesReference species="BM" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="BM_ex" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_V_Enzyme_v_Argup" id="V_Enzyme_v_Argup" name="Reaction producing Enzyme for v_Argup" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="Prot" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="Enzyme_v_Argup" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_v_Hisout" id="v_Hisout" name="v_Hisout" reversible="false" fast="false">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="SUBSYSTEM"/>
+          </listOfKeyValueData>
+        </annotation>
+        <listOfReactants>
+          <speciesReference species="His" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+      </reaction>
+      <reaction metaid="meta_V_Enzyme_to_BM_v_Hisup" id="V_Enzyme_to_BM_v_Hisup" name="Enzyme v_Hisup into BM" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="Enzyme_v_Hisup" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="AllEnzSpecies" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_v_Argup" id="v_Argup" name="v_Argup" reversible="false" fast="false">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="SUBSYSTEM"/>
+          </listOfKeyValueData>
+        </annotation>
+        <listOfProducts>
+          <speciesReference species="Arg" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_V_Enzyme_v_Arg" id="V_Enzyme_v_Arg" name="Reaction producing Enzyme for v_Arg" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="Prot" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="Enzyme_v_Arg" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_V_Enzyme_to_BM_v_Prot" id="V_Enzyme_to_BM_v_Prot" name="Enzyme v_Prot into BM" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="Enzyme_v_Prot" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="AllEnzSpecies" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_V_Enzyme_v_AS" id="V_Enzyme_v_AS" name="Reaction producing Enzyme for v_AS" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="Prot" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="Enzyme_v_AS" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_v_Arg" id="v_Arg" name="v_Arg" reversible="false" fast="false">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="SUBSYSTEM"/>
+          </listOfKeyValueData>
+        </annotation>
+        <listOfReactants>
+          <speciesReference species="C" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="Arg" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_V_Enzyme_to_BM_v_Argup" id="V_Enzyme_to_BM_v_Argup" name="Enzyme v_Argup into BM" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="Enzyme_v_Argup" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="AllEnzSpecies" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_v_Hisup" id="v_Hisup" name="v_Hisup" reversible="false" fast="false">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="SUBSYSTEM"/>
+          </listOfKeyValueData>
+        </annotation>
+        <listOfProducts>
+          <speciesReference species="His" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_V_Enzyme_to_BM_v_His" id="V_Enzyme_to_BM_v_His" name="Enzyme v_His into BM" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="Enzyme_v_His" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="AllEnzSpecies" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_V_Enzyme_v_Cup" id="V_Enzyme_v_Cup" name="Reaction producing Enzyme for v_Cup" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="Prot" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="Enzyme_v_Cup" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_V_Enzyme_to_BM_v_Cup" id="V_Enzyme_to_BM_v_Cup" name="Enzyme v_Cup into BM" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="Enzyme_v_Cup" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="AllEnzSpecies" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_V_Enzyme_to_BM_v_Argout" id="V_Enzyme_to_BM_v_Argout" name="Enzyme v_Argout into BM" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="Enzyme_v_Argout" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="AllEnzSpecies" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_v_Prot_sink" id="v_Prot_sink" name="v_Prot_sink" reversible="false" fast="false">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="SUBSYSTEM"/>
+          </listOfKeyValueData>
+        </annotation>
+        <listOfReactants>
+          <speciesReference species="AllEnzSpecies" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+      </reaction>
+      <reaction metaid="meta_V_Enzyme_to_BM_v_AS" id="V_Enzyme_to_BM_v_AS" name="Enzyme v_AS into BM" reversible="false" fast="false">
+        <listOfReactants>
+          <speciesReference species="Enzyme_v_AS" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="AllEnzSpecies" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction metaid="meta_v_AS" id="v_AS" name="v_AS" reversible="false" fast="false">
+        <annotation>
+          <listOfKeyValueData xmlns="http://pysces.sourceforge.net/KeyValueData">
+            <data id="SUBSYSTEM"/>
+          </listOfKeyValueData>
+        </annotation>
+        <listOfReactants>
+          <speciesReference species="C" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="AS" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+    </listOfReactions>
+    <fbc:listOfFluxBounds>
+      <fbc:fluxBound fbc:id="v_Hisout_lb" fbc:reaction="v_Hisout" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="v_Hisout_ub" fbc:reaction="v_Hisout" fbc:operation="lessEqual" fbc:value="1000"/>
+      <fbc:fluxBound fbc:id="v_Argup_lb" fbc:reaction="v_Argup" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="v_Argup_ub" fbc:reaction="v_Argup" fbc:operation="lessEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="v_His_lb" fbc:reaction="v_His" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="v_His_ub" fbc:reaction="v_His" fbc:operation="lessEqual" fbc:value="1000"/>
+      <fbc:fluxBound fbc:id="v_Cup_lb" fbc:reaction="v_Cup" fbc:operation="greaterEqual" fbc:value="3"/>
+      <fbc:fluxBound fbc:id="v_Cup_ub" fbc:reaction="v_Cup" fbc:operation="lessEqual" fbc:value="1000"/>
+      <fbc:fluxBound fbc:id="v_Arg_lb" fbc:reaction="v_Arg" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="v_Arg_ub" fbc:reaction="v_Arg" fbc:operation="lessEqual" fbc:value="1000"/>
+      <fbc:fluxBound fbc:id="v_AS_lb" fbc:reaction="v_AS" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="v_AS_ub" fbc:reaction="v_AS" fbc:operation="lessEqual" fbc:value="1000"/>
+      <fbc:fluxBound fbc:id="v_BM_lb" fbc:reaction="v_BM" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="v_BM_ub" fbc:reaction="v_BM" fbc:operation="lessEqual" fbc:value="1000"/>
+      <fbc:fluxBound fbc:id="v_BM_ex_lb" fbc:reaction="v_BM_ex" fbc:operation="greaterEqual" fbc:value="1"/>
+      <fbc:fluxBound fbc:id="v_BM_ex_ub" fbc:reaction="v_BM_ex" fbc:operation="lessEqual" fbc:value="1"/>
+      <fbc:fluxBound fbc:id="v_Hisup_lb" fbc:reaction="v_Hisup" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="v_Hisup_ub" fbc:reaction="v_Hisup" fbc:operation="lessEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="v_Prot_lb" fbc:reaction="v_Prot" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="v_Prot_ub" fbc:reaction="v_Prot" fbc:operation="lessEqual" fbc:value="1000"/>
+      <fbc:fluxBound fbc:id="v_Argout_lb" fbc:reaction="v_Argout" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="v_Argout_ub" fbc:reaction="v_Argout" fbc:operation="lessEqual" fbc:value="1000"/>
+      <fbc:fluxBound fbc:id="v_Prot_sink_lb" fbc:reaction="v_Prot_sink" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="v_Prot_sink_ub" fbc:reaction="v_Prot_sink" fbc:operation="lessEqual" fbc:value="1000"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_v_Hisout_upper_bnd" fbc:reaction="V_Enzyme_v_Hisout" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_v_Hisout_lower_bnd" fbc:reaction="V_Enzyme_v_Hisout" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_to_BM_v_Hisout_upper_bnd" fbc:reaction="V_Enzyme_to_BM_v_Hisout" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_to_BM_v_Hisout_lower_bnd" fbc:reaction="V_Enzyme_to_BM_v_Hisout" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_v_Argup_upper_bnd" fbc:reaction="V_Enzyme_v_Argup" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_v_Argup_lower_bnd" fbc:reaction="V_Enzyme_v_Argup" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_to_BM_v_Argup_upper_bnd" fbc:reaction="V_Enzyme_to_BM_v_Argup" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_to_BM_v_Argup_lower_bnd" fbc:reaction="V_Enzyme_to_BM_v_Argup" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_v_His_upper_bnd" fbc:reaction="V_Enzyme_v_His" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_v_His_lower_bnd" fbc:reaction="V_Enzyme_v_His" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_to_BM_v_His_upper_bnd" fbc:reaction="V_Enzyme_to_BM_v_His" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_to_BM_v_His_lower_bnd" fbc:reaction="V_Enzyme_to_BM_v_His" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_v_Cup_upper_bnd" fbc:reaction="V_Enzyme_v_Cup" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_v_Cup_lower_bnd" fbc:reaction="V_Enzyme_v_Cup" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_to_BM_v_Cup_upper_bnd" fbc:reaction="V_Enzyme_to_BM_v_Cup" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_to_BM_v_Cup_lower_bnd" fbc:reaction="V_Enzyme_to_BM_v_Cup" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_v_Arg_upper_bnd" fbc:reaction="V_Enzyme_v_Arg" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_v_Arg_lower_bnd" fbc:reaction="V_Enzyme_v_Arg" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_to_BM_v_Arg_upper_bnd" fbc:reaction="V_Enzyme_to_BM_v_Arg" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_to_BM_v_Arg_lower_bnd" fbc:reaction="V_Enzyme_to_BM_v_Arg" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_v_AS_upper_bnd" fbc:reaction="V_Enzyme_v_AS" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_v_AS_lower_bnd" fbc:reaction="V_Enzyme_v_AS" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_to_BM_v_AS_upper_bnd" fbc:reaction="V_Enzyme_to_BM_v_AS" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_to_BM_v_AS_lower_bnd" fbc:reaction="V_Enzyme_to_BM_v_AS" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_v_Prot_upper_bnd" fbc:reaction="V_Enzyme_v_Prot" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_v_Prot_lower_bnd" fbc:reaction="V_Enzyme_v_Prot" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_to_BM_v_Prot_upper_bnd" fbc:reaction="V_Enzyme_to_BM_v_Prot" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_to_BM_v_Prot_lower_bnd" fbc:reaction="V_Enzyme_to_BM_v_Prot" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_v_Argout_upper_bnd" fbc:reaction="V_Enzyme_v_Argout" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_v_Argout_lower_bnd" fbc:reaction="V_Enzyme_v_Argout" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_to_BM_v_Argout_upper_bnd" fbc:reaction="V_Enzyme_to_BM_v_Argout" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_to_BM_v_Argout_lower_bnd" fbc:reaction="V_Enzyme_to_BM_v_Argout" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_v_Hisup_upper_bnd" fbc:reaction="V_Enzyme_v_Hisup" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_v_Hisup_lower_bnd" fbc:reaction="V_Enzyme_v_Hisup" fbc:operation="greaterEqual" fbc:value="0"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_to_BM_v_Hisup_upper_bnd" fbc:reaction="V_Enzyme_to_BM_v_Hisup" fbc:operation="lessEqual" fbc:value="INF"/>
+      <fbc:fluxBound fbc:id="V_Enzyme_to_BM_v_Hisup_lower_bnd" fbc:reaction="V_Enzyme_to_BM_v_Hisup" fbc:operation="greaterEqual" fbc:value="0"/>
+    </fbc:listOfFluxBounds>
+    <fbc:listOfObjectives fbc:activeObjective="objMaxJ25">
+      <fbc:objective fbc:id="objMaxJ25" fbc:type="minimize">
+        <fbc:listOfFluxObjectives>
+          <fbc:fluxObjective fbc:reaction="v_Cup" fbc:coefficient="1"/>
+        </fbc:listOfFluxObjectives>
+      </fbc:objective>
+    </fbc:listOfObjectives>
+  </model>
+</sbml>

@@ -6,14 +6,18 @@ from fractions import Fraction, gcd
 from subprocess import check_call, STDOUT, PIPE
 from os import remove, devnull as os_devnull, system
 
-import cdd
 import numpy as np
 from random import randint
 
 from numpy.linalg import svd
 from sympy import Matrix
 
-from mpi4py import MPI
+from ecmtool.mpi_wrapper import get_process_rank
+
+
+def unique(matrix):
+    unique_set = list({tuple(row) for row in matrix if np.count_nonzero(row) > 0})
+    return np.vstack(unique_set) if len(unique_set) else to_fractions(np.ndarray(shape=(0, matrix.shape[1])))
 
 
 def relative_path(file_path):
@@ -33,7 +37,7 @@ def get_total_memory_gb():
     Returns total system memory in GiB (gibibytes)
     :return:
     """
-    return psutil.virtual_memory().total / 1024**3
+    return psutil.virtual_memory().total / 1024 ** 3
 
 
 def get_min_max_java_memory():
@@ -49,150 +53,6 @@ def get_min_max_java_memory():
     return min, max
 
 
-def nullspace_rank_internal(src, dst, verbose=False):
-    """
-    Translated directly from Polco's NullspaceRank:nullspaceRankInternal().
-    :param src: ndarray of Fraction() objects
-    :param dst:
-    :return:
-    """
-    rows, cols = src.shape
-    row_mapping = [row for row in range(rows)]
-
-    if verbose:
-        print('Starting rank calculation')
-
-    for col in range(cols):
-        if verbose:
-            print('Processing columns (rank) - %.2f%%' % (col / float(cols) * 100))
-
-        row_pivot = col
-        if row_pivot >= rows:
-            return rows, dst
-
-        pivot_dividend = src[row_pivot, col].numerator
-        pivot_divisor = None
-
-        # If pivotDividend == 0, try to find another non-dependent row
-        for row in range(row_pivot + 1, rows):
-            if pivot_dividend != 0:
-                break
-
-            pivot_dividend = src[row, col].numerator
-            if pivot_dividend != 0:
-                # Swap rows
-                src[[row_pivot, row]] = src[[row, row_pivot]]
-                dst[[row_pivot, row]] = dst[[row, row_pivot]]
-
-                tmp = row_mapping[row_pivot]
-                row_mapping[row_pivot] = row_mapping[row]
-                row_mapping[row] = tmp
-
-        if pivot_dividend == 0:
-            # Done, col is rank
-            # TODO: this is likely wrong. When a column is filled with only zeroes,
-            # we need to move on to the next column.
-            return col, dst
-
-        pivot_divisor = src[row_pivot, col].denominator
-
-        # Make pivot a 1
-        src[row_pivot, :] *= Fraction(pivot_dividend, pivot_divisor)
-        dst[row_pivot, :] *= Fraction(pivot_dividend, pivot_divisor)
-
-        for other_row in range(rows):
-            if other_row != col:
-                # Make it a 0
-                other_row_pivot_dividend = src[other_row, col].numerator
-                if other_row_pivot_dividend != 0:
-                    other_row_pivot_divisor = src[other_row, col].denominator
-                    src[other_row, :] -= src[row_pivot, :] * Fraction(other_row_pivot_dividend, other_row_pivot_divisor)
-                    dst[other_row, :] -= dst[row_pivot, :] * Fraction(other_row_pivot_dividend, other_row_pivot_divisor)
-
-    return cols, dst
-
-
-def nullspace_terzer(src, verbose=False):
-    src_T = np.transpose(src[:, :])
-    dst = to_fractions(np.identity(src_T.shape[0]))
-    rank, dst = nullspace_rank_internal(src_T, dst, verbose=verbose)
-    len = src_T.shape[0]
-
-    nullspace = to_fractions(np.zeros(shape=(len - rank, dst.shape[1])))
-
-    if verbose:
-        print('Starting nullspace calculation')
-
-    for row in range(rank, len):
-        if verbose:
-            print('Processing rows (rank) - %.2f%%' % ((row - rank) / float(len - rank) * 100))
-
-        sign = 0  # Originally "sgn" in Polco
-        scp = 1
-
-        # Find one common multiplicand that makes all cells' fractions integer
-        for col in range(len):
-            dividend = dst[row, col].numerator
-            if dividend != 0:
-                divisor = dst[row, col].denominator
-                scp /= gcd(scp, divisor)
-                scp *= divisor
-                sign += np.sign(dividend)
-
-        # We want as many cells in this row to be positive as possible
-        if np.sign(scp) != np.sign(sign):
-            scp *= -1
-
-        # Scale all cells to integer values
-        for col in range(len):
-            dividend = dst[row, col].numerator
-            value = None
-
-            if dividend == 0:
-                value = Fraction(0, 1)
-            else:
-                divisor = dst[row, col].denominator
-                value = dividend * Fraction(scp, divisor)
-
-            nullspace[row - rank, col] = value
-
-    return np.transpose(nullspace)
-
-
-def nullspace_matlab(N):
-    import matlab.engine
-    engine = matlab.engine.start_matlab()
-    result = engine.null(matlab.double([list(row) for row in N]), 'r')
-    x = to_fractions(np.asarray(result))
-    return x
-
-
-def nullspace_polco(A, verbose=False):
-
-    B_neg = np.append(-np.identity(A.shape[1]), np.ones(shape=(A.shape[1], 1)), axis=1)
-    B_pos = np.append(np.identity(A.shape[1]), np.ones(shape=(A.shape[1], 1)), axis=1)
-    B = np.append(B_neg, B_pos, axis=0)
-    A = np.append(A, np.zeros(shape=(A.shape[0], 1)), axis=1)
-
-    result = get_extreme_rays(A, B, verbose=verbose)
-
-    for row in range(result.shape[0]):
-        result[row, :] /= 1 if result[row, -1] == 0 else result[row, -1]
-
-    null_vectors = result[:, :-1]
-    deduped_vectors = []
-
-    # for row in range(null_vectors.shape[0]):
-    #     if not np.any([np.sum(null_vectors[row, :] - entry) == 0 for entry in deduped_vectors]):
-    #         deduped_vectors.append(null_vectors[row, :])
-    #     else:
-    #         print('x')
-    #         pass
-    #
-    # return np.transpose(redund(np.asarray(deduped_vectors, dtype='object')))
-    return np.transpose(redund(np.asarray(null_vectors, dtype='object')))
-
-
 def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
     """
     Calculates the null space of given matrix N.
@@ -200,6 +60,7 @@ def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
     :param N: ndarray
             A should be at most 2-D.  A 1-D array with length k will be treated
             as a 2-D with shape (1, k)
+    :param symbolic: set to False to compute nullspace numerically instead of symbolically
     :param atol: float
             The absolute tolerance for a zero singular value.  Singular values
             smaller than `atol` are considered to be zero.
@@ -209,6 +70,7 @@ def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
     :return: If `A` is an array with shape (m, k), then `ns` will be an array
             with shape (k, n), where n is the estimated dimension of the
             nullspace of `A`.  The columns of `ns` are a basis for the
+            nullspace; each element in numpy.dot(A, ns) will be approximately
             nullspace; each element in numpy.dot(A, ns) will be approximately
             zero.
     """
@@ -231,57 +93,6 @@ def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
         return to_fractions(
             np.transpose(np.asarray(nullspace_matrix.rref()[0], dtype='object'))) if nullspace_matrix \
             else np.ndarray(shape=(N.shape[0], 0))
-
-
-# def get_extreme_rays_efmtool(inequality_matrix, matlab_root='/Applications/MATLAB_R2018b.app/'):
-#     H = inequality_matrix
-#     r, m = H.shape
-#     N = np.append(-np.identity(r), H, axis=1)
-#
-#     engine = matlab.engine.start_matlab()
-#     engine.cd('efmtool')
-#     engine.workspace['N'] = matlab.double([list(row) for row in N])
-#     engine.workspace['rev'] = ([False] * r) + ([True] * m)
-#     result = engine.CalculateFluxModes(matlab.double([list(row) for row in N]), matlab.logical(([False] * r) + ([True] * m)))
-#     v = result['efms']
-#     x = np.transpose(np.asarray(v)[r:, :])
-#     return x
-
-def get_efms(N, reversibility, verbose=True):
-    import matlab.engine
-    engine = matlab.engine.start_matlab()
-    engine.cd(relative_path('efmtool'))
-    result = engine.CalculateFluxModes(matlab.double([list(row) for row in N]), matlab.logical(reversibility))
-    if verbose:
-        print('Fetching calculated EFMs')
-    size = result['efms'].size
-    shape = size[1], size[0] # _data is in transposed form w.r.t. the result matrix
-    efms = np.reshape(np.array(result['efms']._data), shape)
-    if verbose:
-        print('Finishing fetching calculated EFMs')
-    return efms
-
-# def get_efms(N, reversibility, verbose=True):
-#     N_ex = N
-#     n_reactions = N.shape[1]
-#     for index,rev in enumerate(reversibility):
-#         N_ex = np.append(N_ex, np.transpose([-N[:,index]]), axis=1)
-#     efms_redund = nullspace(N_ex, symbolic=True)
-#     efms = efms_redund
-#     i = 0
-#     for index,rev in enumerate(reversibility):
-#         if rev:
-#             efms[:, index] -= efms[:, n_reactions+i]
-#             i += 1
-#     return efms[:, :n_reactions]
-
-
-def get_extreme_rays_cdd(inequality_matrix):
-    mat = cdd.Matrix(np.append(np.zeros(shape=(inequality_matrix.shape[0], 1)), inequality_matrix, axis=1), number_type='fraction')
-    mat.rep_type = cdd.RepType.INEQUALITY
-    poly = cdd.Polyhedron(mat)
-    gen = poly.get_generators()
-    return np.asarray(gen)[:, 1:]
 
 
 def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True, verbose=False):
@@ -314,14 +125,14 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True
     if equality_matrix is not None:
         with open_relative('tmp' + os.sep + 'eq_%d.txt' % rand, 'w') as file:
             for row in range(equality_matrix.shape[0]):
-                file.write(' '.join([str(val) for val in equality_matrix[row, :]]) + '\r\n')
+                file.write(' '.join([str(val) for val in equality_matrix[row, :]]) + '\n')
 
     # Write inequalities system to disk as space separated file
     if verbose:
         print('Writing inequalities to file')
     with open_relative('tmp' + os.sep + 'iq_%d.txt' % rand, 'w') as file:
         for row in range(inequality_matrix.shape[0]):
-            file.write(' '.join([str(val) for val in inequality_matrix[row, :]]) + '\r\n')
+            file.write(' '.join([str(val) for val in inequality_matrix[row, :]]) + '\n')
 
     # Run external extreme ray enumeration tool
     min_mem, max_mem = get_min_max_java_memory()
@@ -340,7 +151,7 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True
                     ('' if equality_matrix is None else '-eq %s ' % equality_path) +
                     ('' if inequality_matrix is None else '-iq %s ' % inequality_path) +
                     '-out text %s' % generators_path).split(' '),
-            stdout=(devnull if not verbose else None), stderr=(devnull if not verbose else None))
+                   stdout=(devnull if not verbose else None), stderr=(devnull if not verbose else None))
 
     # Read resulting extreme rays
     if verbose:
@@ -352,7 +163,8 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True
         if len(lines) > 0:
             number_lines = len(lines)
             number_entries = len(lines[0].replace('\n', '').split('\t'))
-            rays = np.repeat(np.repeat(to_fractions(np.zeros(shape=(1,1))), number_entries, axis=1), number_lines, axis=0)
+            rays = np.repeat(np.repeat(to_fractions(np.zeros(shape=(1, 1))), number_entries, axis=1), number_lines,
+                             axis=0)
 
             for row, line in enumerate(lines):
                 # print('line %d/%d' % (row+1, number_lines))
@@ -383,7 +195,8 @@ def binary_exists(binary_file):
 def get_redund_binary():
     if sys.platform.startswith('linux'):
         if not binary_exists('redund'):
-            raise EnvironmentError('Executable "redund" was not found in your path. Please install package lrslib (e.g. apt install lrslib)')
+            raise EnvironmentError(
+                'Executable "redund" was not found in your path. Please install package lrslib (e.g. apt install lrslib)')
         return 'redund'
     elif sys.platform.startswith('win32'):
         return relative_path('redund\\redund_win.exe')
@@ -394,7 +207,7 @@ def get_redund_binary():
 
 
 def redund(matrix, verbose=False):
-    rank = str(MPI.COMM_WORLD.Get_rank())
+    rank = str(get_process_rank())
     matrix = to_fractions(matrix)
     binary = get_redund_binary()
     matrix_path = relative_path('tmp' + os.sep + 'matrix' + rank + '.ine')
@@ -472,3 +285,97 @@ def get_metabolite_adjacency(N):
                 adjacency[adjacent, metabolite_index] = 1
 
     return adjacency
+
+
+def mp_print(*args, **kwargs):
+    """
+    Multiprocessing wrapper for print().
+    Prints the given arguments, but only on process 0 unless
+    named argument PRINT_IF_RANK_NONZERO is set to true.
+    :return:
+    """
+    if get_process_rank() == 0:
+        print(*args)
+    elif 'PRINT_IF_RANK_NONZERO' in kwargs and kwargs['PRINT_IF_RANK_NONZERO']:
+        print(*args)
+
+
+def unsplit_metabolites(R, network):
+    metabolite_ids = [metab.id for metab in network.metabolites]
+    res = []
+    ids = []
+
+    processed = {}
+    for i in range(R.shape[0]):
+        metabolite = metabolite_ids[i].replace("_in", "").replace("_out", "")
+        if metabolite in processed:
+            row = processed[metabolite]
+            res[row] += R[i, :]
+        else:
+            res.append(R[i, :].tolist())
+            processed[metabolite] = len(res) - 1
+            ids.append(metabolite)
+
+    # remove all-zero rays
+    res = np.asarray(res)
+    res = res[:, [sum(abs(res)) != 0][0]]
+
+    return res, ids
+
+
+def print_ecms_direct(R, metabolite_ids):
+    obj_id = -1
+    if "objective" in metabolite_ids:
+        obj_id = metabolite_ids.index("objective")
+    elif "objective_out" in metabolite_ids:
+        obj_id = metabolite_ids.index("objective_out")
+
+    mp_print("\n--%d ECMs found by intersecting directly--\n" % R.shape[1])
+    for i in range(R.shape[1]):
+        mp_print("ECM #%d:" % (i + 1))
+        if np.max(R[:,
+                  i]) > 1e100:  # If numbers become too large, they can't be printed, therefore we make them smaller first
+            ecm = np.array(R[:, i] / np.max(R[:, i]), dtype='float')
+        else:
+            ecm = np.array(R[:, i], dtype='float')
+
+        div = 1
+        if obj_id != -1 and R[obj_id][i] != 0:
+            div = ecm[obj_id]
+        for j in range(R.shape[0]):
+            if ecm[j] != 0:
+                mp_print("%s\t\t->\t%.4f" % (metabolite_ids[j].replace("_in", "").replace("_out", ""), ecm[j] / div))
+        mp_print("")
+
+
+def normalize_columns(R, verbose=False):
+    result = np.zeros(R.shape)
+    number_rays = R.shape[1]
+    for i in range(result.shape[1]):
+        if verbose:
+            if i % 10000 == 0:
+                mp_print("Normalize columns is on ray %d of %d (%f %%)" %
+                         (i, number_rays, i / number_rays * 100), PRINT_IF_RANK_NONZERO=True)
+        if np.max(R[:,
+                  i]) > 1e100:  # If numbers are very large, converting to float might give issues, therefore we first divide by another int
+            part_normalized_column = np.array(R[:, i] / np.max(R[:, i]), dtype='float')
+            result[:, i] = part_normalized_column / np.linalg.norm(part_normalized_column)
+        else:
+            norm_column = np.linalg.norm(np.array(R[:, i], dtype='float'))
+            result[:, i] = np.array(R[:, i], dtype='float') / norm_column
+    return result
+
+
+def normalize_columns_fraction(R, vectorized=False, verbose=True):
+    if not vectorized:
+        number_rays = R.shape[1]
+        for i in range(number_rays):
+            if verbose:
+                if i % 10000 == 0:
+                    mp_print("Normalize columns is on ray %d of %d (%f %%)" %
+                             (i, number_rays, i / number_rays * 100), PRINT_IF_RANK_NONZERO=True)
+            norm_column = np.sum(np.abs(np.array(R[:, i])))
+            R[:, i] = np.array(R[:, i]) / norm_column
+    else:
+        R = R / np.sum(np.abs(R), axis=0)
+    return R
