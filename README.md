@@ -49,7 +49,7 @@ After testing how the tool works, most users will want to run their workloads on
 The direct enumeration method can be sped up by compiling our LU decomposition code with Cython. The following describes the steps needed on Linux, but the same concept also applies to Mac OS and Windows. First make sure all dependencies are satisfied. Then execute:
 
 ```
-python3 setup.py build_ext --inplace
+python3 cython_setup.py build_ext --inplace
 
 mv _bglu* ecmtool/
 ```
