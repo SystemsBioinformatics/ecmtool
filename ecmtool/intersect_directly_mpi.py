@@ -806,9 +806,8 @@ def pick_up_intermediate_cone(internal_metabolites, network, intermediate_cone_p
 
 
 def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12, sort_order='min_adj',
-                       intermediate_cone_path='', manual_override = ''):
+                       intermediate_cone_path='', manual_override=''):
     """
-
     :param R:
     :param internal_metabolites:
     :param network:
@@ -817,6 +816,8 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12
     :param sort_order: Different options for determining metabolite intersection order. As a default we will intersect
     the metabolite that adds the minimal number of adjacencies in the model. Other options are 'min_lp',
     'max_lp_per_adj', and 'min_connections'.
+    :param intermediate_cone_path: Path to previously saved intermediate cone
+    :param manual_override: If provided, eliminate this internal metabolite first
     :return:
     """
     if intermediate_cone_path:
@@ -833,7 +834,7 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12
     while len(internal) > 0:
         sorting = sort_order
 
-        # For each internal metabolite, calculate the number of producing reactions times the number of consuming
+        # For each internal metabolite, calculate the number of producing reactions times the number of consuming.
         # R[j-len(deleted[deleted<j]) is the current row for the metabolite that was once at the j-th place
         n_lps = [np.sum(R[j - len(deleted[deleted < j]), :] > 0) * np.sum(R[j - len(deleted[deleted < j]), :] < 0) for j
                  in internal]
@@ -885,7 +886,7 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12
                      for j in internal]) / (np.array(adj_added) - np.min(adj_added) + 1)
                 i = internal[np.argmax(lp_per_adj)]
 
-        # i - len(deleted[deleted<i] is the current row for the metabolite that was once at the ith place
+        # i - len(deleted[deleted<i] is the current row for the metabolite that was once at the i-th place
         to_remove = i - len(deleted[deleted < i])
         if verbose:
             mp_print("\n\nIteration %d (internal metabolite = %d: %s) of %d" % (
@@ -902,14 +903,12 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12
                     np.round(np.array(lp_per_adj), 2).astype(str)))
                 mp_print("Rescaled maximal LPs per added adjacency option chosen.\n")
             elif sorting == 'min_connections':
-                mp_print("Possible connectedness of metabolites for this sstep:\n" + ", ".join(
+                mp_print("Possible connectedness of metabolites for this step:\n" + ", ".join(
                     np.array(connections).astype(str)))
                 mp_print("Minimally connected option chosen.\n")
             elif sorting == 'min_lp':
                 mp_print("Minimal LPs chosen.\n")
-            it += 1
 
-        # input("waiting")
         if np.sum(R[i - len(deleted[deleted < i]), :] > 0) * np.sum(R[i - len(deleted[deleted < i]), :] < 0) == 0:
             R = iteration_without_lps(R, to_remove, network)
         else:
@@ -918,6 +917,7 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12
         deleted = np.append(deleted, i)
         internal.remove(i)
 
+        # Save intermediate result to file, if possible
         if get_process_rank() == 0:
             try:
                 metab_ids = [metab.id for metab in network.metabolites]
@@ -926,13 +926,12 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12
             except OverflowError:
                 mp_print('Intermediate result cannot be stored due to too large numbers.')
 
+        it += 1
+
     # remove artificial rays introduced by splitting metabolites
     R, ids = unsplit_metabolites(R, network)
 
     if verbose:
         mp_print("\n\tRows removed by redund overall: %d\n" % rows_removed_redund)
-        if rows_removed_redund != 0:
-            pass
-            # input("Waiting...")
 
     return R, ids
