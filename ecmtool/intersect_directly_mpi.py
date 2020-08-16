@@ -91,8 +91,6 @@ def kkt_check(c, A, x, basis, p, m, tol=1e-8, threshold=1e-3, max_iter=100000, v
         sn = sn[~bl]
 
         if np.all(sn >= -tol):  # in this case x is an optimal solution
-            # if verbose:
-            #     mp_print("Did %d steps in kkt_check, found True - smallest sn: %.8f" % (iteration - 1, min(sn)))
             return True, 0
 
         entering = a[~bl][np.argmin(sn)]
@@ -101,8 +99,6 @@ def kkt_check(c, A, x, basis, p, m, tol=1e-8, threshold=1e-3, max_iter=100000, v
         i = u > tol  # if none of the u are positive, unbounded
         if not np.any(i):
             mp_print("Warning: unbounded problem in KKT_check")
-            # if verbose:
-            #     mp_print("Did %d steps in kkt_check2" % iteration - 1)
             return True, 1
 
         th = xb[i] / u[i]
@@ -123,8 +119,6 @@ def kkt_check(c, A, x, basis, p, m, tol=1e-8, threshold=1e-3, max_iter=100000, v
         if improvement:
             if not np.dot(c, x) < -threshold:
                 mp_print('Original way of finding non-adjacents does not say these are non-adjacent', True)
-            # if verbose:
-            #     mp_print("Did %d steps in kkt_check, found False - c*x %.8f" % (iteration, np.dot(c, x)))
             return False, 0
 
         iteration += 1
@@ -159,8 +153,6 @@ def cycle_check_with_output(c, A, x, basis, tol=1e-8, threshold=10, max_iter=100
         sn = sn[~bl]
 
         if np.all(sn >= -tol):  # in this case x is an optimal solution
-            # if verbose:
-            #     mp_print("Did %d steps in kkt_check, found True - smallest sn: %.8f" % (iteration - 1, min(sn)))
             return False, 0, [-1]
 
         entering = a[~bl][np.argmin(sn)]
@@ -169,8 +161,6 @@ def cycle_check_with_output(c, A, x, basis, tol=1e-8, threshold=10, max_iter=100
         i = u > tol  # if none of the u are positive, unbounded
         if not np.any(i):
             mp_print("Unbounded problem in cycle detection, so cycle is present")
-            # if verbose:
-            #     mp_print("Did %d steps in kkt_check2" % iteration - 1)
             return True, 0, [entering]
 
         th = xb[i] / u[i]
@@ -189,7 +179,7 @@ def cycle_check_with_output(c, A, x, basis, tol=1e-8, threshold=10, max_iter=100
                 mp_print("Cycle check has invalid exit status. Numerical issue likely occurred.")
             return True, 1, [np.argmax(x)]
 
-    mp_print("Cycling?")
+    mp_print("Cycling might be occuring.")
     return False, 1, [-1]
 
 
@@ -212,12 +202,6 @@ def independent_rows(A):
 
         if rank == prev_rank:  # row added did not increase rank
             basis = prev_basis
-        # else:
-        #     mp_print("added row, condition number is now: %f" % np.linalg.cond(A_float[basis]))
-        #     if np.linalg.cond(A_float[basis]) > 1000:
-        #         basis = prev_basis
-        #         rank = np.linalg.matrix_rank(A_float[basis])
-        #         mp_print("Rejected column based on condition number...")
 
         if rank == original_rank:
             break
@@ -228,9 +212,7 @@ def independent_rows(A):
 
 
 def cancel_with_cycle(R, met, cycle_ind, network, removable_reactions, verbose=True, tol=1e-12, removable_is_ext=False):
-    cancelling_reaction = R[:, cycle_ind]
     reactions_using_met = [i for i in range(R.shape[1]) if R[met, i] != 0 and i != cycle_ind]
-
     next_R = np.copy(R)
     to_be_dropped = [cycle_ind]
 
@@ -295,9 +277,7 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, v
     minus = []
     for reaction in range(R.shape[1]):
         result = R[met, reaction]
-        if abs(result) <= tol:
-            zero.append(reaction)
-        elif result > tol:
+        if result > tol:
             plus.append(reaction)
         elif result < -tol:
             minus.append(reaction)
@@ -325,7 +305,7 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, v
             new_row = (rp * R[:, m] - rm * R[:, p]) / np.gcd(rp, rm)
             if sum(abs(new_row)) > tol:
                 next_matrix.append(new_row)
-    else:  # calculate_adjacency is off
+    else:  # calculate_adjacency is off; consider each +,- pair as adjacent
         for p in plus:
             for m in minus:
                 nr_adjacent += 1
@@ -343,12 +323,9 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, v
             mp_print("Of %d candidates, %d were adjacent (0 percent)" % (len(plus) * len(minus), nr_adjacent))
 
     next_matrix = np.asarray(next_matrix)
-
     rows_removed_redund = 0
-    # redund in case we have too many rows
     if not calculate_adjacency:
         R, rows_removed_redund = redund_wrapper(R, verbose=verbose)
-
     next_matrix = np.transpose(next_matrix)
 
     # delete all-zero row
@@ -360,10 +337,12 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, v
     return next_matrix, rows_removed_redund
 
 
-def get_remove_metabolite(R, network, reaction, verbose=True, allow_external=False):
+def get_remove_metabolite(R, network, reaction, allow_external=False):
+    """ Given a reaction, find an internal metabolite that is non-zero in that reaction.
+    If allow_external is True, also allow external metabolites. """
     column = R[:, reaction]
     for i in range(len(column)):
-        if (not network.metabolites[i].is_external) or (allow_external):
+        if allow_external or not network.metabolites[i].is_external:
             if column[i] != 0:
                 return i
     mp_print("\tWarning: reaction to augment has only external metabolites")
@@ -373,7 +352,6 @@ def get_remove_metabolite(R, network, reaction, verbose=True, allow_external=Fal
 def compress_after_cycle_removing(network, verbose=True):
     original_metabolite_count, original_reaction_count = network.N.shape
     network.cancel_singly(verbose=verbose)
-    # network.cancel_dead_ends(verbose=verbose)
 
     if verbose:
         mp_print('Removed %d reactions and %d metabolites in total' %
@@ -397,6 +375,7 @@ def redund_wrapper(R, verbose=True):
         mp_print("\tRedund took %f seconds" % (end - start))
 
     return R, rows_removed
+
 
 def remove_cycles(R, network, tol=1e-12, verbose=True):
     """Detect whether there are cycles, by doing an LP. If LP is unbounded find a minimal cycle. Cancel one metabolite
