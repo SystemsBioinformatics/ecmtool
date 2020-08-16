@@ -346,7 +346,7 @@ def print_ecms(R, metabolite_ids):
 
         for j in range(R.shape[0]):
             if ecm[j] != 0:
-                mp_print("{0: <20} ->\t{1:.4f}".format(metabolite_ids[j].replace("_in", "").replace("_out", ""),
+                mp_print("{0: <20} ->\t{1: .4f}".format(metabolite_ids[j].replace("_in", "").replace("_out", ""),
                                                        ecm[j] / divisor))
         mp_print("")
 
