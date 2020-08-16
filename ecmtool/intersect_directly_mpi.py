@@ -316,8 +316,7 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, v
 
     nr_adjacent = 0
     if calculate_adjacency:
-        adj = geometric_ray_adjacency(R, plus=plus, minus=minus, verbose=verbose,
-                                      remove_cycles=True)
+        adj = geometric_ray_adjacency(R, plus=plus, minus=minus, verbose=verbose)
         # combine + and - if adjacent
         for (p, m) in adj:
             nr_adjacent += 1
@@ -348,18 +347,7 @@ def eliminate_metabolite(R, met, network, calculate_adjacency=True, tol=1e-12, v
     rows_removed_redund = 0
     # redund in case we have too many rows
     if not calculate_adjacency:
-        rows_before = next_matrix.shape[0]
-
-        if verbose:
-            mp_print("\tDimensions before redund: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
-        start = time()
-        next_matrix = redund(next_matrix)
-        end = time()
-        rows_removed_redund = rows_before - next_matrix.shape[0]
-        if verbose:
-            mp_print("\tDimensions after redund: %d %d" % (next_matrix.shape[0], next_matrix.shape[1]))
-            mp_print("\t\tRows removed by redund: %d" % (rows_before - next_matrix.shape[0]))
-            mp_print("\tRedund took %f seconds" % (end - start))
+        R, rows_removed_redund = redund_wrapper(R, verbose=verbose)
 
     next_matrix = np.transpose(next_matrix)
 
@@ -394,6 +382,22 @@ def compress_after_cycle_removing(network, verbose=True):
     return network
 
 
+def redund_wrapper(R, verbose=True):
+    rows_before = R.shape[0]
+
+    if verbose:
+        mp_print("\tDimensions before redund: %d %d" % (R.shape[0], R.shape[1]))
+    start = time()
+    R = redund(R)
+    end = time()
+    rows_removed = rows_before - R.shape[0]
+    if verbose:
+        mp_print("\tDimensions after redund: %d %d" % (R.shape[0], R.shape[1]))
+        mp_print("\t\tRows removed by redund: %d" % rows_removed)
+        mp_print("\tRedund took %f seconds" % (end - start))
+
+    return R, rows_removed
+
 def remove_cycles(R, network, tol=1e-12, verbose=True):
     """Detect whether there are cycles, by doing an LP. If LP is unbounded find a minimal cycle. Cancel one metabolite
     with the cycle."""
@@ -421,7 +425,7 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
         if np.any(np.isnan(res.x)):
             raise Exception('Remove cycles did not work, because LP-solver had issues. Try to solve this.')
 
-    # if the objective is unbounded, there is a cycle that sums to zero
+    # If the objective is unbounded, there is a cycle that sums to zero
     while cycle_present:
         # Find minimal cycle
         met = -1
@@ -453,19 +457,7 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
         if count_since_last_redund > 10:
             count_since_last_redund = 0
             R = np.transpose(R)
-            rows_before = R.shape[0]
-
-            if verbose:
-                mp_print("\tDimensions before redund: %d %d" % (R.shape[0], R.shape[1]))
-            start = time()
-            R = redund(R)
-            end = time()
-            rows_removed_redund = rows_before - R.shape[0]
-            if verbose:
-                mp_print("\tDimensions after redund: %d %d" % (R.shape[0], R.shape[1]))
-                mp_print("\t\tRows removed by redund: %d" % (rows_before - R.shape[0]))
-                mp_print("\tRedund took %f seconds" % (end - start))
-
+            R, _ = redund_wrapper(R, verbose=verbose)
             R = np.transpose(R)
 
         A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(R)), only_eq=True)
@@ -497,52 +489,11 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
 
     # Do redund one more time
     R = np.transpose(R)
-    rows_before = R.shape[0]
-
-    if verbose:
-        mp_print("\tDimensions before redund: %d %d" % (R.shape[0], R.shape[1]))
-    start = time()
-    R = redund(R)
-    end = time()
-    if verbose:
-        mp_print("\tDimensions after redund: %d %d" % (R.shape[0], R.shape[1]))
-        mp_print("\t\tRows removed by redund: %d" % (rows_before - R.shape[0]))
-        mp_print("\tRedund took %f seconds" % (end - start))
-
+    R, _ = redund_wrapper(R, verbose=verbose)
     R = np.transpose(R)
 
     network.N = R
     return R, network, external_cycles
-
-
-def smallest_positive(arr):
-    a = np.where(np.isfinite(arr), arr, -1)
-    return min(np.where(a < 0, max(a) * 2, a)), np.argmin(np.where(a < 0, max(a) * 2, a))
-
-
-def generate_BFS(R, i, j, eps):
-    ray1 = np.array(np.concatenate((R[:, i], -R[:, i])), dtype='float')
-    ray2 = np.array(np.concatenate((R[:, j], -R[:, j])), dtype='float')
-    with np.errstate(divide='ignore', invalid='ignore'):
-        alpha, k = smallest_positive(eps / ray1)
-        beta = ray2[k] / ray1[k]
-        arr = (eps - alpha * ray1) / (ray2 - beta * ray1)
-        arr[k] = -1  # ignore place k, because it should always be divide by 0
-        delta2, _ = smallest_positive(arr)
-        delta1 = -beta * delta2
-    sbar = eps - (alpha + delta1) * ray1 - delta2 * ray2
-    l = np.zeros(R.shape[1])
-    l[i] = 0.5 + alpha + delta1
-    l[j] = 0.5 + delta2
-
-    res = np.concatenate((l, sbar))
-    # round to 0 when a rounding error made it non-zero
-    res = np.where(abs(res) < 1e-20, 0, res)
-
-    if len(res[res != 0]) != R.shape[0] * 2:
-        mp_print("problem in generate_BFS")
-
-    return res
 
 
 def setup_cycle_LP(R_indep, only_eq=False):
@@ -572,8 +523,6 @@ def setup_cycle_LP(R_indep, only_eq=False):
 def setup_LP(R_indep, i, j):
     number_rays = R_indep.shape[1]
 
-    # A_ub = -np.identity(number_rays)
-    # b_ub = np.zeros(number_rays)
     b_eq = R_indep[:, i] / 2 + R_indep[:, j] / 2
     c = -np.ones(number_rays)
     c[i] = 0
@@ -582,7 +531,6 @@ def setup_LP(R_indep, i, j):
     x0[i] = 0.5
     x0[j] = 0.5
 
-    # return A_ub, b_ub, R_indep, b_eq, c, x0
     return R_indep, b_eq, c, x0
 
 
@@ -596,7 +544,6 @@ def perturb_LP(b_eq, x0, A_eq, basis, epsilon, seed=42):
 
 
 def determine_adjacency(R, i, j, basis, tol=1e-10):
-    # A_ub, b_ub, A_eq, b_eq, c, x0 = setup_LP(R, i, j) # We don't need A_ub, and its causing memory issues
     A_eq, b_eq, c, x0 = setup_LP(R, i, j)
     b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, 1e-10)
     KKT, status = kkt_check(c, A_eq, x0, basis, i, j)
@@ -609,7 +556,7 @@ def determine_adjacency(R, i, j, basis, tol=1e-10):
         counter_seeds = counter_seeds + 1
         if counter_seeds % 20 == 0:
             mp_print(
-                'Warning: Adjacency check keeps cycling, even with different perturbations. Reporting rays as adjacent.',
+                'Warning: Adjacency check keeps cycling, even with different perturbations. Reporting rays as adjacent',
                 PRINT_IF_RANK_NONZERO=True)
             status = 0
             KKT = True
@@ -620,53 +567,52 @@ def determine_adjacency(R, i, j, basis, tol=1e-10):
         mp_print('LinAlgError in an adjacency test. Check if this happens more often.', PRINT_IF_RANK_NONZERO=True)
         mp_print('Now assuming that rays are adjacent.', PRINT_IF_RANK_NONZERO=True)
         return 1
-        # raise Exception("KKT check had non-zero exit status")
 
 
 def add_second_ray(A, B_plus_inv, basis_p, p, m):
+    """
+    Find a new column basis for A that contains column p anb m and is at most one entry different from basis_p.
+    :param A: matrix to find column basis for
+    :param B_plus_inv: matrix inverse of initial column basis; equal to np.linalg.inv(A[:, basis_p])
+    :param basis_p: initial indices of columns in a column basis; must include p
+    :param p: column that must stay in the basis
+    :return: indices for column basis including p and m, and at most one entry different from basis_p
+    """
     res = np.copy(basis_p)
     if m in basis_p:
         return res
 
-    # Faster, but doesnt work (get singular matrix)
     x = np.dot(B_plus_inv, A[:, m])
     x[np.where(basis_p == p)[0][0]] = 0  # exclude p for replacement in basis
     res[np.argmax(abs(x))] = m
     return res
 
-    # for i in range(len(basis_p)):
-    #     if basis_p[i] == p:
-    #         continue
-    #     res[i] = m
-    #     rank = np.linalg.matrix_rank(A[:, res])
-    #     if rank == A.shape[0]:
-    #         return res
-    #     res[i] = basis_p[i]
-
 
 def add_first_ray(A, B_inv, start_basis, p):
-    res = np.copy(start_basis)
+    """
+    Find a new column basis for A that contains column p and is at most one entry different from start_basis.
+    :param A: matrix to find column basis for
+    :param B_inv: matrix inverse of initial column basis; equal to np.linalg.inv(A[:, start_basis])
+    :param start_basis: initial indices of columns in a column basis
+    :param p: column to be inserted into basis
+    :return: indices for column basis including p and at most one entry different from start_basis
+    """
     if p in start_basis:
-        return res
+        return start_basis
+    res = np.copy(start_basis)
 
     x = np.dot(B_inv, A[:, p])
     res[np.argmax(abs(x))] = p
     return res
 
-    # for i in range(len(start_basis)):
-    #     res[i] = p
-    #     rank = np.linalg.matrix_rank(A[:, res])
-    #     if rank == A.shape[0]:
-    #         return res
-    #     res[i] = start_basis[i]
-
 
 def get_start_basis(A):
-    # return any column basis of A
+    """ return any column basis of A """
     m, n = A.shape
 
     rank = 0
     new_basis = np.array([], dtype='int')
+
     for i in range(n):
         if i in new_basis:
             continue
@@ -677,13 +623,6 @@ def get_start_basis(A):
 
         if rank == prev_rank:  # column added did not increase rank
             new_basis = prev_basis
-        # else:
-        #     mp_print("added column, condition number is now: %f" % np.linalg.cond(A[:, new_basis]))
-        #     if np.linalg.cond(A[:, new_basis]) > 1000:
-        #         new_basis = prev_basis
-        #         rank = np.linalg.matrix_rank(A[:, new_basis])
-        #         mp_print("Rejected column based on condition number...")
-
         if rank == m:
             break
 
@@ -692,32 +631,16 @@ def get_start_basis(A):
     return new_basis
 
 
-def get_bases(A, plus, minus):
-    m = A.shape[0]
-    bases = np.zeros((len(plus), len(minus), m), dtype='int')
-
-    start_basis = get_start_basis(A)
-    B_inv = np.linalg.inv(A[:, start_basis])
-
-    for i, p in enumerate(plus):
-        basis_p = add_first_ray(A, B_inv, start_basis, p)
-        B_plus_inv = np.linalg.inv(A[:, basis_p])
-        for j, m in enumerate(minus):
-            basis_pm = add_second_ray(A, B_plus_inv, basis_p, p, m)
-            bases[i][j] = basis_pm
-
-    return bases
-
-
-def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose=True, remove_cycles=True):
+def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], verbose=True):
     """
     Returns r by r adjacency matrix of rays, given
-    ray matrix R. Diagonal is 0, not 1.
+    ray matrix ray_matrix. Diagonal is 0, not 1.
     Calculated using LP adjacency test
-    :param R: ray matrix (columns are generating rays)
-        plus: indices of 'plus' columns
-        minus: indices of 'minus' columns
+    :param ray_matrix: ray matrix (columns are generating rays)
+    :param plus: indices of 'plus' columns
+    :param minus: indices of 'minus' columns
         if plus/minus are not provided, find all adjacencies; otherwise only between each + and - pair
+    :param verbose: set to False to reduce amount of prints
     :return: r by r adjacency matrix
     """
     start = time()
@@ -731,10 +654,8 @@ def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose
     if len(minus) > 0 and minus[0] == -1:
         minus = [x for x in range(matrix_indep_rows.shape[1])]
 
-
     mpi_size = get_process_size()
     mpi_rank = get_process_rank()
-
     adjacency = []
     nr_tests = len(plus) * len(minus)
 
@@ -756,20 +677,9 @@ def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose
                 if res == 1:
                     adjacency.append((p, m))
 
-                if it % (100 * mpi_size) == mpi_rank:
+                if verbose and it % (100 * mpi_size) == mpi_rank:
                     mp_print("Process %d is on adjacency test %d of %d (%f %%)" %
                              (mpi_rank, it, nr_tests, it / nr_tests * 100), PRINT_IF_RANK_NONZERO=True)
-
-    # bases = get_bases(matrix_indep_rows, plus, minus)
-    # for i in range(mpi_rank, nr_tests, mpi_size):
-    #     plus_index = i // len(minus)
-    #     minus_index = i % len(minus)
-    #     basis = bases[plus_index, minus_index]
-    #     res = determine_adjacency(matrix_indep_rows, plus[plus_index], minus[minus_index], basis)
-    #     if res == 1:
-    #         adjacency.append((plus[plus_index], minus[minus_index]))
-    #     if i % 100 == 0:
-    #         mp_print("Process %d is now on adjacency test %d" % (mpi_rank, i))
 
     # MPI communication step
     adj_sets = world_allgather(adjacency)
@@ -779,11 +689,12 @@ def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose
     adjacency.sort()
 
     end = time()
-    mp_print("Did LPs in %f seconds" % (end - start))
+    if verbose:
+        mp_print("Did LPs in %f seconds" % (end - start))
     return adjacency
 
 
-def pick_up_intermediate_cone(internal_metabolites, network, intermediate_cone_path):
+def pick_up_intermediate_cone(network, intermediate_cone_path):
     with open(intermediate_cone_path) as file:
         header = file.readline()
         metab_ids_intermediate = header.split(',')
@@ -821,8 +732,7 @@ def intersect_directly(R, internal_metabolites, network, verbose=True, tol=1e-12
     :return:
     """
     if intermediate_cone_path:
-        R, internal_metabolites, network = pick_up_intermediate_cone(internal_metabolites, network,
-                                                                     intermediate_cone_path)
+        R, internal_metabolites, network = pick_up_intermediate_cone(network, intermediate_cone_path)
 
     # rows are metabolites
     deleted = np.array([])
