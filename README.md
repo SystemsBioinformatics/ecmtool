@@ -16,7 +16,7 @@ path should be replaced with the path ecmtool was downloaded to).
 * Linux only: install _redund_ of package _lrslib_ (e.g. by running `apt install lrslib`).
 
 ### Running
-Ecmtool can be ran by executing `python main.py –model_path <path/to/model.xml> [arguments]` from the command line, after navigating to the ecmtool directory as described above. The possible arguments and their default values are printed when you run `python main.py --help`.
+Ecmtool can be run by executing `python main.py –-model_path <path/to/model.xml> [arguments]` from the command line, after navigating to the ecmtool directory as described above. The possible arguments and their default values are printed when you run `python main.py --help`.
 After execution is done, the found conversions have been written to file (default: _conversions.csv_). The first row of this CSV file contain the metabolite IDs as read from the SBML model.
 
 ### Example
