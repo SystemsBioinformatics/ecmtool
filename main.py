@@ -258,7 +258,7 @@ if __name__ == '__main__':
             network.split_in_out(args.only_rays)
 
         hide_indices = [ind for ind, metab in enumerate(network.metabolites) if
-                        (metab.is_external) & (metab.direction == args.hide_all_in_or_outputs) & (
+                        metab.is_external & (metab.direction == args.hide_all_in_or_outputs) & (
                             not metab.id == 'objective_out') & (
                                     metab.id.replace("_in", "").replace("_out", "") not in tag_ids)]
         network.hide(hide_indices)
