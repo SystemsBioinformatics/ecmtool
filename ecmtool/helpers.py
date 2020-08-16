@@ -323,28 +323,31 @@ def unsplit_metabolites(R, network):
     return res, ids
 
 
-def print_ecms_direct(R, metabolite_ids):
-    obj_id = -1
+def print_ecms(R, metabolite_ids):
+    objective_id = -1
     if "objective" in metabolite_ids:
-        obj_id = metabolite_ids.index("objective")
+        objective_id = metabolite_ids.index("objective")
     elif "objective_out" in metabolite_ids:
-        obj_id = metabolite_ids.index("objective_out")
+        objective_id = metabolite_ids.index("objective_out")
 
-    mp_print("\n--%d ECMs found by intersecting directly--\n" % R.shape[1])
+    mp_print("\n--%d ECMs found--\n" % R.shape[1])
     for i in range(R.shape[1]):
         mp_print("ECM #%d:" % (i + 1))
-        if np.max(R[:,
-                  i]) > 1e100:  # If numbers become too large, they can't be printed, therefore we make them smaller first
+
+        if np.max(R[:, i]) > 1e100:  # If numbers become too large, they can't be printed, so we make them smaller first
             ecm = np.array(R[:, i] / np.max(R[:, i]), dtype='float')
         else:
             ecm = np.array(R[:, i], dtype='float')
 
-        div = 1
-        if obj_id != -1 and R[obj_id][i] != 0:
-            div = ecm[obj_id]
+        # determine divisor to normalize ECM to objective = 1
+        divisor = 1
+        if objective_id != -1 and R[objective_id][i] != 0:
+            divisor = ecm[objective_id]
+
         for j in range(R.shape[0]):
             if ecm[j] != 0:
-                mp_print("%s\t\t->\t%.4f" % (metabolite_ids[j].replace("_in", "").replace("_out", ""), ecm[j] / div))
+                mp_print("{0: <20} ->\t{1:.4f}".format(metabolite_ids[j].replace("_in", "").replace("_out", ""),
+                                                       ecm[j] / divisor))
         mp_print("")
 
 

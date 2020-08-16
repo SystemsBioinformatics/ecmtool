@@ -9,7 +9,7 @@ from scipy.optimize import linprog
 from ecmtool import mpi_wrapper
 from ecmtool.conversion_cone import get_conversion_cone, iterative_conversion_cone
 from ecmtool.helpers import get_metabolite_adjacency, redund, to_fractions
-from ecmtool.helpers import mp_print, unsplit_metabolites, print_ecms_direct, normalize_columns
+from ecmtool.helpers import mp_print, unsplit_metabolites, print_ecms, normalize_columns
 from ecmtool.network import extract_sbml_stoichiometry, add_reaction_tags
 
 
@@ -37,27 +37,6 @@ def ecm_satisfies_stoichiometry(stoichiometry, ecm):
     solution = linprog(c=[0] * stoichiometry.shape[1], A_eq=stoichiometry, b_eq=ecm,
                        bounds=[(-1000, 1000)] * stoichiometry.shape[1], options={'tol': allowed_error})
     return solution.status == 0
-
-
-def print_ECMs(cone, debug_tags, network, orig_N, add_objective_metabolite, check_feasibility):
-    for index, ecm in enumerate(cone):
-        # Normalise by objective metabolite, if applicable
-        objective_index = -1 - len(debug_tags)
-        objective = ecm[objective_index]
-        if add_objective_metabolite and objective > 0:
-            ecm /= objective
-
-        metabolite_ids = [met.id for met in
-                          network.metabolites] if not network.compressed else network.uncompressed_metabolite_ids
-
-        mp_print('\nECM #%d:' % (index + 1))
-        for metabolite_index, stoichiometry_val in enumerate(ecm):
-            if stoichiometry_val != 0.0:
-                mp_print('%s\t\t->\t%.4f' % (metabolite_ids[metabolite_index], stoichiometry_val))
-
-        if check_feasibility:
-            satisfied = ecm_satisfies_stoichiometry(orig_N, cone[index, :])
-            mp_print('ECM satisfies stoichiometry' if satisfied else 'ECM does not satisfy stoichiometry')
 
 
 def remove_close_vectors(matrix, threshold=10 ** -6, verbose=True):
@@ -369,7 +348,7 @@ if __name__ == '__main__':
             np.savetxt(args.out_path, normalised, delimiter=',', header=','.join(ids), comments='')
 
     if args.print_conversions:
-        print_ecms_direct(np.transpose(cone), ids)
+        print_ecms(np.transpose(cone), ids)
 
     end = time()
     mp_print('Ran in %f seconds' % (end - start))

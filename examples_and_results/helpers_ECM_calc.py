@@ -1,7 +1,7 @@
 import copy
 import pandas as pd
 from ecmtool import extract_sbml_stoichiometry, get_conversion_cone
-from ecmtool.helpers import unsplit_metabolites, print_ecms_direct, unique
+from ecmtool.helpers import unsplit_metabolites, print_ecms, unique
 import numpy as np
 import os
 
@@ -83,7 +83,7 @@ def calc_ECMs(file_path, print_results=False, input_file_path=''):
     cone = np.transpose(cone_transpose)
 
     if print_results:
-        print_ecms_direct(np.transpose(cone), ids)
+        print_ecms(np.transpose(cone), ids)
 
     cone = cone.transpose()  # columns will be the different ECMs, rows are metabolites
 
