@@ -8,18 +8,6 @@ from .intersect_directly_mpi import independent_rows
 from ecmtool import mpi_wrapper
 
 
-def normalize_rows(M):
-    row_max = M.max(axis=1)
-    return M / np.transpose(np.asarray(np.asmatrix(row_max, dtype='object'), dtype='object'))
-
-
-def get_rownames(A):
-    rownames = []
-    for row_index in range(A.shape[0]):
-        rownames.append([index for index, value in enumerate(A[row_index, :]) if value != 0])
-    return rownames
-
-
 def deflate_matrix(A, columns_to_keep):
     reduced_A = A[:, columns_to_keep]
 
@@ -60,23 +48,10 @@ def drop_nonextreme(G, zero_set, verbose=False):
         if not remove:
             keep_rows.append(row)
 
-
     if verbose:
         print('Removing %d nonextreme rays' % (G.shape[0] - len(keep_rows)))
 
     return G[keep_rows, :]
-
-
-def split_columns_semipositively(matrix, columns):
-    orig_column_count = matrix.shape[1]
-    matrix = split_columns(matrix, columns)
-    semipositive_columns = columns + [orig_column_count + index for index in range(len(columns))]
-
-    for row in range(matrix.shape[0]):
-        for column in semipositive_columns:
-            matrix[row, column] = max(matrix[row, column], 0)
-
-    return matrix
 
 
 def split_columns(matrix, columns):
