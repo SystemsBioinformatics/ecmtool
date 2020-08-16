@@ -193,22 +193,6 @@ def cycle_check_with_output(c, A, x, basis, tol=1e-8, threshold=10, max_iter=100
     return False, 1, [-1]
 
 
-def get_nonsingular_pair(A, basis, entering, leaving, basis_hashes):
-    for enter in entering:
-        for leave in leaving:
-            original = basis[leave]
-            basis[leave] = enter
-            if np.linalg.matrix_rank(A[:, basis]) >= min(A[:, basis].shape):
-                if hash(np.sort(basis).tostring()) in basis_hashes:
-                    basis[leave] = original
-                    continue
-                return basis
-            basis[leave] = original
-    mp_print("Did not find non-singular entering+leaving index...")
-    basis[leaving[0]] = entering[0]
-    return basis
-
-
 def independent_rows(A):
     m, n = A.shape
     basis = np.asarray([], dtype='int')
@@ -561,46 +545,6 @@ def generate_BFS(R, i, j, eps):
     return res
 
 
-def setup_LP_perturbed(R, i, j, epsilon):
-    np.random.seed(42)
-    m, n = R.shape
-
-    A_ub = -np.identity(n + 2 * m)
-    b_ub = np.zeros(n + 2 * m)
-    A_eq = np.concatenate((np.concatenate((R, -R)), np.identity(2 * m)), axis=1)
-    ray1 = R[:, i]
-    ray2 = R[:, j]
-    tar = 0.5 * ray1 + 0.5 * ray2
-    eps_vector = np.array([epsilon] * (2 * m)) + np.random.uniform(-epsilon / 2, epsilon / 2, 2 * m)
-    b_eq = np.concatenate((tar, -tar)) + eps_vector
-    x0 = generate_BFS(R, i, j, eps_vector)
-    c = np.concatenate((-np.ones(n), np.zeros(2 * m)))
-    c[i] = 0
-    c[j] = 0
-
-    return A_ub, b_ub, A_eq, b_eq, c, x0
-
-
-def setup_cycle_detection_LP(R_indep, cycle_ind):
-    number_rays = R_indep.shape[1]
-
-    A_ub = -np.identity(number_rays)
-    b_ub = np.zeros(number_rays)
-    A_eq = R_indep
-    b_eq = np.zeros(A_eq.shape[0])
-
-    # Add that the cycle_ind should be used
-    extra_row = np.zeros((1, A_eq.shape[1]))
-    extra_row[0, cycle_ind] = 1
-    A_eq2 = np.concatenate((A_eq, extra_row), axis=0)
-    b_eq2 = np.zeros(len(b_eq) + 1)
-    b_eq2[-1] = 1
-
-    c = np.ones(number_rays)
-
-    return A_ub, b_ub, A_eq2, b_eq2, c
-
-
 def setup_cycle_LP(R_indep, only_eq=False):
     number_rays = R_indep.shape[1]
 
@@ -679,21 +623,6 @@ def determine_adjacency(R, i, j, basis, tol=1e-10):
         # raise Exception("KKT check had non-zero exit status")
 
 
-def multiple_adjacencies(R, pairs, basis):
-    return [(p, determine_adjacency(R, p[0], p[1], basis)) for p in pairs]
-
-
-def unpack_results(results, number_rays, adjacency=None):
-    if adjacency is None:
-        adjacency = np.zeros(shape=(number_rays, number_rays))
-    for result in results:
-        for line in result:
-            i = line[0][0]
-            j = line[0][1]
-            adjacency[i][j] = line[1]
-    return adjacency
-
-
 def add_second_ray(A, B_plus_inv, basis_p, p, m):
     res = np.copy(basis_p)
     if m in basis_p:
@@ -730,12 +659,6 @@ def add_first_ray(A, B_inv, start_basis, p):
     #     if rank == A.shape[0]:
     #         return res
     #     res[i] = start_basis[i]
-
-
-def add_rays(A, start_basis, p, m):
-    basis = add_first_ray(A, start_basis, p)
-    basis = add_second_ray(A, basis, p, m)
-    return basis
 
 
 def get_start_basis(A):
@@ -858,28 +781,6 @@ def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose
     end = time()
     mp_print("Did LPs in %f seconds" % (end - start))
     return adjacency
-
-
-def reduce_column_norms(matrix):
-    for i in range(matrix.shape[1]):
-        norm = np.linalg.norm(np.array(matrix[:, i], dtype='float'))
-        if norm > 2:
-            matrix[:, i] /= int(np.floor(norm))
-    return matrix
-
-
-def in_cone(R, tar):
-    number_rays = R.shape[1]
-
-    A_ub = -np.identity(number_rays)
-    b_ub = np.zeros(number_rays)
-    A_eq = R
-    b_eq = tar
-    c = -np.ones(number_rays)
-
-    res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12})
-
-    return A_ub, b_ub, A_eq, b_eq, c
 
 
 def pick_up_intermediate_cone(internal_metabolites, network, intermediate_cone_path):
