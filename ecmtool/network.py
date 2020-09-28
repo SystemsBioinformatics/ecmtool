@@ -1,12 +1,15 @@
 from fractions import Fraction
 import libsbml as sbml
 import cbmpy
-
+from ecmtool.intersect_directly_mpi import independent_rows
 from scipy.optimize import linprog
 import numpy as np
-
-from .helpers import to_fractions, redund
+from scipy.linalg import null_space
+from ecmtool.intersect_directly_mpi import setup_cycle_LP, get_more_basis_columns, perturb_LP, cycle_check_with_output, \
+    normalize_columns, independent_rows_qr, get_basis_columns_qr, remove_cycles, compress_after_cycle_removing
+from .helpers import to_fractions, redund, nullspace
 from ecmtool.helpers import mp_print
+from .nullspace import iterative_nullspace
 
 
 def clementine_equality_compression(N, external_metabolites=[], reversible_reactions=[], input_metabolites=[],
@@ -131,7 +134,7 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     objective_reaction_column = None
     pairs = cbmpy.CBTools.findDeadEndReactions(cbmpy_model)
     external_metabolites, external_reactions = list(zip(*pairs)) if len(pairs) else (
-    list(zip(*cbmpy.CBTools.findDeadEndMetabolites(cbmpy_model)))[0], [])
+        list(zip(*cbmpy.CBTools.findDeadEndMetabolites(cbmpy_model)))[0], [])
 
     # Catch any metabolites that were not recognised automatically, but are likely external
     external_metabolites = list(external_metabolites) + [item.id for item in species if
@@ -178,7 +181,8 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
                 if lowerBound.value < 0 and upperBound.value == 0:
                     # Direction of model is inverted (substrates are products and vice versa. This happens sometimes,
                     # e.g. https://github.com/SBRG/bigg_models/issues/324
-                    print('Swapping direction of reversible reaction %s that can only run in reverse direction.' % reaction_id)
+                    print(
+                        'Swapping direction of reversible reaction %s that can only run in reverse direction.' % reaction_id)
                     stoichiometry *= -1
                     reagents = cbmpy_model.getReaction(reaction_id).reagents
                     for met in reagents:
@@ -201,7 +205,8 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
 
     # Add objective metabolite from objective reaction
     if add_objective and objective_reaction_column is not None:
-        network.metabolites.append(Metabolite('objective', 'Virtual objective metabolite', 'e', is_external=True, direction='output'))
+        network.metabolites.append(
+            Metabolite('objective', 'Virtual objective metabolite', 'e', is_external=True, direction='output'))
         N = np.append(N, to_fractions(np.zeros(shape=(1, N.shape[1]))), axis=0)
         N[-1, objective_reaction_column] = 1
 
@@ -293,8 +298,9 @@ class Network:
                 metabolite.direction == 'output' and metabolite.is_external]
 
     def compress(self, verbose=False, SCEI=True):
+        external_cycles = []
         if verbose:
-            mp_print('Compressing network')
+            mp_print('\n Compressing network')
 
         self.compressed = True
         self.uncompressed_metabolite_ids = [met.id for met in self.metabolites]
@@ -303,37 +309,21 @@ class Network:
         original_metabolite_count, original_reaction_count = self.N.shape
         original_internal = len(self.metabolites) - len(self.external_metabolite_indices())
         original_reversible = len(self.reversible_reaction_indices())
+        no_fixed_point = True
 
-        metabolite_count_intermediate, reaction_count_intermediate = self.N.shape
-        self.cancel_compounds(verbose=verbose)
-        if verbose:
-            mp_print('Removed %d reactions and %d metabolites' %
-                     (reaction_count_intermediate - self.N.shape[1], metabolite_count_intermediate - self.N.shape[0]))
-
-        metabolite_count_intermediate, reaction_count_intermediate = self.N.shape
-        self.cancel_singly(verbose=verbose)
-        # self.cancel_dead_ends(verbose=verbose)
-        if verbose:
-            mp_print('Removed %d reactions and %d metabolites' %
-                     (reaction_count_intermediate - self.N.shape[1], metabolite_count_intermediate - self.N.shape[0]))
-
-        ## This does not seem to do anything on the tested metabolic networks
-        # if not self.right_nullspace:
-        #     if verbose:
-        #         mp_print('Calculating null space')
-        #     self.right_nullspace = np.transpose(helpers.nullspace(np.transpose(self.N), symbolic=False))
-        #
-        # self.remove_infeasible_irreversible_reactions(verbose=verbose)
-
-        metabolite_count_intermediate, reaction_count_intermediate = self.N.shape
-        if SCEI:
-            self.cancel_clementine(verbose=verbose)
-        if verbose:
-            mp_print('Removed %d reactions and %d metabolites' %
-                     (reaction_count_intermediate - self.N.shape[1], metabolite_count_intermediate - self.N.shape[0]))
+        while no_fixed_point:
+            before_met_count, before_reac_count = self.N.shape
+            external_cycles_iter = self.compress_inner(verbose=verbose, SCEI=SCEI)
+            if external_cycles_iter:
+                external_cycles.append(external_cycles_iter)
+            after_met_count, after_reac_count = self.N.shape
+            if (after_met_count - before_met_count == 0) & (after_reac_count - before_reac_count == 0):
+                no_fixed_point = False
+            elif verbose:
+                mp_print('\n Trying another compression cycle')
 
         if verbose:
-            mp_print('Removed %d reactions and %d metabolites in total' %
+            mp_print('\n Removed %d reactions and %d metabolites in total' %
                      (original_reaction_count - self.N.shape[1], original_metabolite_count - self.N.shape[0]))
 
             internal = len(self.metabolites) - len(self.external_metabolite_indices())
@@ -344,9 +334,45 @@ class Network:
             mp_print('Compressed: %d metabolites (%d internal), %d reactions (%d reversible)' %
                      (metabolite_count, internal, reaction_count, reversible))
             mp_print('Compressed size: %.2f%%' % (((float(reaction_count) * metabolite_count) / (
-                        original_reaction_count * original_metabolite_count)) * 100))
+                    original_reaction_count * original_metabolite_count)) * 100))
+        return external_cycles
 
-        pass
+    def compress_inner(self, verbose=False, SCEI=True):
+        self.remove_infeasible_irreversible_reactions(verbose=verbose)
+        self.cancel_compounds(verbose=verbose)
+        self.cancel_singly(verbose=verbose)
+        # self.cancel_dead_ends(verbose=verbose)
+        if SCEI:
+            self.cancel_clementine(verbose=verbose)
+        self.remove_unused_metabs(verbose=verbose)
+        self.split_reversible()
+        self.N = np.transpose(redund(np.transpose(self.N)))
+        self.reactions = [Reaction('R_%d' % i, 'Reaction %d' % i, reversible=False) for i in range(self.N.shape[1])]
+        external_cycles = self.compress_cycles(verbose=verbose)
+        self.reactions = [Reaction('R_%d' % i, 'Reaction %d' % i, reversible=False) for i in range(self.N.shape[1])]
+        return external_cycles
+
+    def compress_cycles(self, verbose=False):
+        R, network, external_cycles = remove_cycles(self.N, self)
+        n_reac_according_to_N = self.N.shape[1]
+        removable_reacs = np.arange(n_reac_according_to_N, len(self.reactions))
+        if len(removable_reacs):
+            mp_print("Warning: in cycle removal, a reaction was removed without keeping track")
+        return external_cycles
+
+    def remove_unused_metabs(self,verbose=False):
+        # Remove unused metabolites
+        mp_print('Removing metabolites that are not used in any reaction.')
+        metabolite_count_intermediate, reaction_count_intermediate = self.N.shape
+        removed = 0
+        for i in np.flip(range(self.N.shape[0]), 0):
+            if sum(abs(self.N[i])) == 0:
+                if not self.metabolites[i].is_external:
+                    self.drop_metabolites([i], force_external=True)
+                    removed += 1
+        if verbose:
+            mp_print('Removed %d reactions and %d metabolites' %
+                     (reaction_count_intermediate - self.N.shape[1], metabolite_count_intermediate - self.N.shape[0]))
 
     def uncompress(self, matrix):
         """
@@ -386,6 +412,7 @@ class Network:
         :param verbose:
         :return:
         """
+        metabolite_count_intermediate, reaction_count_intermediate = self.N.shape
         removable_metabolites, removable_reactions = [], []
 
         if verbose:
@@ -417,14 +444,14 @@ class Network:
                 reactions_to_cancel = consuming_reactions
                 if verbose:
                     mp_print('Metabolite %s is only produced in reaction %s. It will be cancelled through addition' % (
-                    self.metabolites[index].id, self.reactions[reaction_index].id))
+                        self.metabolites[index].id, self.reactions[reaction_index].id))
             elif len(consuming_reactions) == 1:
                 # This internal metabolite is consumed by only 1 reaction
                 reaction_index = consuming_reactions[0]
                 reactions_to_cancel = producing_reactions
                 if verbose:
                     mp_print('Metabolite %s is only consumed in reaction %s. It will be cancelled through addition' % (
-                    self.metabolites[index].id, self.reactions[reaction_index].id))
+                        self.metabolites[index].id, self.reactions[reaction_index].id))
             else:
                 continue
 
@@ -446,6 +473,9 @@ class Network:
 
         self.drop_reactions(removable_reactions)
         self.drop_metabolites(removable_metabolites)
+        if verbose:
+            mp_print('Removed %d reactions and %d metabolites' %
+                     (reaction_count_intermediate - self.N.shape[1], metabolite_count_intermediate - self.N.shape[0]))
 
     def cancel_dead_ends(self, verbose=False):
         """
@@ -489,6 +519,7 @@ class Network:
         :param verbose:
         :return:
         """
+        metabolite_count_intermediate, reaction_count_intermediate = self.N.shape
         if verbose:
             mp_print('Trying to cancel compounds by reversible reactions')
 
@@ -532,7 +563,8 @@ class Network:
             nonzero_count = np.count_nonzero(self.N[metabolite_index, :])
             if nonzero_count == 1:
                 # This metabolite is used in only one reaction
-                reaction_index = [index for index in range(len(self.reactions)) if self.N[metabolite_index, index] != 0][0]
+                reaction_index = \
+                [index for index in range(len(self.reactions)) if self.N[metabolite_index, index] != 0][0]
                 removable_reactions.append(reaction_index)
 
         self.drop_reactions(removable_reactions)
@@ -544,7 +576,12 @@ class Network:
 
         self.drop_metabolites(removable_metabolites)
 
+        if verbose:
+            mp_print('Removed %d reactions and %d metabolites' %
+                     (reaction_count_intermediate - self.N.shape[1], metabolite_count_intermediate - self.N.shape[0]))
+
     def cancel_clementine(self, verbose=False):
+        metabolite_count_intermediate, reaction_count_intermediate = self.N.shape
         if verbose:
             mp_print('Compressing with SCEI')
 
@@ -559,6 +596,9 @@ class Network:
             if np.count_nonzero(self.N[metabolite_index, :]) == 0:
                 drop.append(metabolite_index)
         self.drop_metabolites(drop)
+        if verbose:
+            mp_print('Removed %d reactions and %d metabolites' %
+                     (reaction_count_intermediate - self.N.shape[1], metabolite_count_intermediate - self.N.shape[0]))
 
     def remove_infeasible_irreversible_reactions(self, verbose=False):
         """
@@ -566,34 +606,63 @@ class Network:
         :param verbose:
         :return:
         """
-        reversible = self.reversible_reaction_indices()
-        irreversible_columns = [i for i in range(self.N.shape[1]) if i not in reversible]
-        number_irreversible = len(irreversible_columns)
-        reduced_nullspace = self.right_nullspace[:, irreversible_columns]
-
+        n_reactions_before = len(self.reactions)
         if verbose:
             mp_print('Removing infeasible irreversible reactions')
+        # Find rows that should be zero in stoichiometry
+        internal_indices = [ind for ind, metab in enumerate(self.metabolites) if not metab.is_external]
+        removable_present = True
+        while removable_present:
+            removable_reactions = []
+            N_int = self.N[internal_indices, :]
+            nullspace_int = null_space(N_int.astype(dtype='double'))
+            reacs_notin_nullspace = np.where(np.max(np.abs(nullspace_int), axis=1) < 1e-8)[0]
+            if len(reacs_notin_nullspace):
+                removable_reactions.extend(reacs_notin_nullspace)
+                if verbose:
+                    if len(removable_reactions):
+                        mp_print('Removed ' + str(len(removable_reactions)) + ' reactions that were never used in '
+                                                                              'steady state, with IDs:')
+                        mp_print('\t'.join([self.reactions[ind].id for ind in removable_reactions]))
+                self.drop_reactions(removable_reactions)
+                removable_present = True
+                continue
 
-        c = [1] * number_irreversible
-        result = linprog(c, A_eq=np.transpose(reduced_nullspace), b_eq=[0] * reduced_nullspace.shape[1],
-                         bounds=([(0, 1)] * len(c)), options={'maxiter': 10000, 'disp': verbose},
-                         method='simplex')
+            reversible = self.reversible_reaction_indices()
+            irreversible_columns = [i for i in range(self.N.shape[1]) if i not in reversible]
+            reduced_nullspace = nullspace_int[irreversible_columns, :]
 
-        if result.status > 0:
-            if verbose:
-                mp_print('Linear programming optimisation failed with error: "%s"' % result.message)
-            return
+            indep_eq_matrix = independent_rows_qr((np.transpose(reduced_nullspace)))
+            A_eq, b_eq, c, x0 = setup_cycle_LP(np.array(indep_eq_matrix, dtype='float'), only_eq=True)
 
-        removable_reactions = [irreversible_columns[index] for index, value in enumerate(result.x) if value > 0.001]
-        if verbose:
-            if len(removable_reactions):
-                mp_print('Removed the following infeasible irreversible reactions:')
-                mp_print('\t%s'.join([reaction.name for reaction in self.reactions[removable_reactions]]))
+            basis = get_basis_columns_qr(np.asarray(A_eq, dtype='float'), verbose=False)
+            if len(basis) != A_eq.shape[0]:
+                mp_print(
+                    'No further infeasible irreversible reactions can be found, due to numerical issues. They will be removed later in the process.')
+                removable_present = False
             else:
-                mp_print('No infeasible irreversible reactions found')
+                b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, 1e-8)
+                removable_present, status, removable_indices = cycle_check_with_output(c,
+                                                                                       np.asarray(A_eq, dtype='float'),
+                                                                                       x0, basis,
+                                                                                       find_all_entering=True,
+                                                                                       verbose=False)
+                if removable_present:
+                    removable_reactions.extend(np.array(irreversible_columns)[removable_indices])
+                if verbose:
+                    if len(removable_reactions):
+                        mp_print('Removed ' + str(
+                            len(removable_reactions)) + ' infeasible irreversible reactions, with IDs:')
+                        mp_print('\t'.join([self.reactions[ind].id for ind in removable_reactions]))
+                    else:
+                        mp_print('No further infeasible irreversible reactions found')
 
-        if len(removable_reactions):
-            self.drop_reactions(removable_reactions)
+                if len(removable_reactions):
+                    self.drop_reactions(removable_reactions)
+
+        n_reactions_after = len(self.reactions)
+        if verbose:
+            mp_print("Removed a total of " + str(n_reactions_before - n_reactions_after) + " infeasible reactions.")
 
     def drop_reactions(self, reaction_indices):
         reactions_to_keep = [col for col in range(self.N.shape[1]) if col not in reaction_indices]
@@ -608,14 +677,16 @@ class Network:
     def drop_metabolites(self, metabolite_indices, force_external=False):
 
         # TODO: debug line
+        do_not_drop=[]
         if not force_external:
-            for index in metabolite_indices:
-                if self.metabolites[index].is_external:
+            for metab_index in metabolite_indices:
+                if self.metabolites[metab_index].is_external:
+                    do_not_drop.append(metab_index)
                     mp_print(
                         'Tried to remove external metabolite %s, which was denied. External metabolites must remain.' %
-                        self.metabolites[index].id)
-                    return
+                        self.metabolites[metab_index].id)
 
+        [metabolite_indices.remove(ind) for ind in do_not_drop]
         metabolites_to_keep = [row for row in range(self.N.shape[0]) if row not in metabolite_indices]
         self.N = self.N[metabolites_to_keep, :]
 
@@ -680,7 +751,6 @@ class Network:
                 # column[source, 0] = -1
                 self.N = np.append(self.N, column, axis=1)
 
-
     def prohibit(self, metabolite_indices):
         """
         Prohibits input or output of external metabolites by marking them as internal metabolites.
@@ -689,7 +759,6 @@ class Network:
         """
         for index in metabolite_indices:
             self.metabolites[index].is_external = False
-
 
     def remove_objective_reaction(self):
         reaction_matches = [index for index, reaction in enumerate(self.reactions) if
@@ -800,7 +869,8 @@ class Network:
                         new_out = Metabolite(metabolite.id + "_out", metabolite.name + "_out", metabolite.compartment,
                                              is_external=True, direction='output')
                         self.metabolites.append(new_out)
-                        exchange_out = Reaction(metabolite.id + " exch_out", metabolite.id + " exch_out", reversible=False)
+                        exchange_out = Reaction(metabolite.id + " exch_out", metabolite.id + " exch_out",
+                                                reversible=False)
                         self.reactions.append(exchange_out)
                         new_row = [[int(x)] for x in np.zeros(self.N.shape[1])]
                         self.N = np.append(self.N, np.transpose(np.asarray(new_row)), axis=0)
