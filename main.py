@@ -138,7 +138,7 @@ def set_inoutputs(inputs, outputs, network):
     if len(np.intersect1d(inputs, outputs)):
         for ind in np.intersect1d(inputs, outputs):
             mp_print(
-                'Metabolite %s was marked as both only input and only output, which is impossible. It is set to both, for now.' % (
+                'Metabolite %s was marked as both only input and only output. It is set to both.' % (
                     network.metabolites[ind].id))
         network.set_both(np.intersect1d(inputs, outputs))
     return
@@ -285,18 +285,9 @@ if __name__ == '__main__':
         network.hide(hide_indices)
 
     if args.compress:
-        network.compress(verbose=args.verbose, SCEI=args.scei)
+        external_cycles = network.compress(verbose=args.verbose, SCEI=args.scei)
 
-    # Remove unused metabolites
-    removed = 0
-    for i in np.flip(range(network.N.shape[0]), 0):
-        if sum(abs(network.N[i])) == 0:
-            if not network.metabolites[i].is_external:
-                network.drop_metabolites([i], force_external=True)
-                removed += 1
-    mp_print("Removed %d metabolites that were not in any reactions" % removed)
-
-    if args.direct:
+    if args.direct and not args.compress:
         network.split_reversible()
         network.N = np.transpose(redund(np.transpose(network.N)))
 
@@ -305,7 +296,6 @@ if __name__ == '__main__':
         removable_reacs = np.arange(n_reac_according_to_N, len(network.reactions))
         network.drop_reactions(removable_reacs)
         network = compress_after_cycle_removing(network)
-        R = network.N
 
     if args.print_reactions and args.compress:
         mp_print('Reactions (after compression):')
@@ -319,6 +309,7 @@ if __name__ == '__main__':
 
     if args.direct:
         # Direct intersection method
+        R = network.N
         external = np.asarray(network.external_metabolite_indices())
         internal = np.setdiff1d(range(R.shape[0]), external)
         T_intersected, ids = intersect_directly(R, internal, network, verbose=args.verbose,
@@ -347,6 +338,17 @@ if __name__ == '__main__':
                                        output_metabolites=network.output_metabolite_indices(),
                                        verbose=args.verbose, only_rays=args.only_rays,
                                        redund_after_polco=args.redund_after_polco)
+
+            if len(external_cycles):
+                T_intersected = np.transpose(cone)
+                external_cycles_array = to_fractions(np.zeros((T_intersected.shape[0], len(external_cycles))))
+                for ind, cycle in enumerate(external_cycles):
+                    for cycle_metab in cycle:
+                        metab_ind = [ind for ind, metab in enumerate(ids) if metab == cycle_metab][0]
+                        external_cycles_array[metab_ind, ind] = cycle[cycle_metab]
+
+                T_intersected = np.concatenate((T_intersected, external_cycles_array, -external_cycles_array), axis=1)
+                cone = np.transpose(T_intersected)
 
         cone_transpose, ids = unsplit_metabolites(np.transpose(cone), network)
         cone = np.transpose(cone_transpose)
