@@ -1,7 +1,7 @@
 from time import time
 
 import numpy as np
-from scipy.linalg import LinAlgError
+from scipy.linalg import LinAlgError, qr
 from scipy.optimize import linprog
 
 from ecmtool.helpers import mp_print, unsplit_metabolites, normalize_columns
@@ -19,6 +19,48 @@ def check_if_intermediate_cone_exists(intermediate_cone_path):
         mp_print('Will try to pick up intermediate cone, file found.')
     else:
         mp_print('Tried to pick up intermediate cone, but file not found.')
+
+
+def licols(A, tol=1e-10):
+    """
+    Extracts a linearly independent set of columns from a given matrix A.
+
+    Solution found at https://nl.mathworks.com/matlabcentral/answers/108835-how-to-get-only-linearly-independent-rows-in-a-matrix-or-to-remove-linear-dependency-b-w-rows-in-a-m
+    :param A: matrix
+    :param tol: Rank estimation tolerance
+    :return: index of linearly independent columns
+    """
+    if np.min(A.shape) == 0:
+        return []
+    elif np.min(A.shape) == 1:
+        return [0]
+    else:
+        Q, R, E = qr(A, mode='economic', pivoting=True)
+        diagr = np.abs(np.diagonal(R))
+
+        # Estimate rank
+        rank = np.where(diagr >= tol * diagr[0])[0][-1] + 1
+
+        # Get corresponding columns
+        col_ids = np.sort(E[:rank])
+
+        return col_ids
+
+
+def independent_rows_qr(A, tol=1e-10, verbose=False):
+    if verbose:
+        mp_print("Finding set of independent rows.")
+
+    row_inds = licols(np.transpose(A), tol=tol)
+    return A[row_inds, :]
+
+
+def get_basis_columns_qr(A, tol=1e-10, verbose=False):
+    if verbose:
+        mp_print("Finding set of linearly independent columns.")
+
+    col_inds = licols(A, tol=tol)
+    return col_inds
 
 
 def get_more_basis_columns(A, basis):
@@ -44,7 +86,8 @@ def get_more_basis_columns(A, basis):
         new_basis = np.append(new_basis, i)
         rank = np.linalg.matrix_rank(A[:, new_basis])
 
-        if rank == prev_rank:  # column added did not increase rank
+        if rank <= prev_rank:  # column added did not increase rank
+            rank = prev_rank
             new_basis = prev_basis
         if rank == m:
             break
@@ -136,7 +179,7 @@ def kkt_check(c, A, x, basis, p, m, tol=1e-8, threshold=1e-3, max_iter=100000, v
     return True, 1
 
 
-def cycle_check_with_output(c, A, x, basis, tol=1e-8, threshold=10, max_iter=100000, verbose=True):
+def cycle_check_with_output(c, A, x, basis, tol=1e-8, threshold=10, max_iter=100000, verbose=True,find_all_entering=False):
     """
     Determine whether KKT conditions hold for x0.
     Take size 0 steps if available.
@@ -168,10 +211,20 @@ def cycle_check_with_output(c, A, x, basis, tol=1e-8, threshold=10, max_iter=100
 
         i = u > tol  # if none of the u are positive, unbounded
         if not np.any(i):
-            mp_print("Unbounded problem in cycle detection, so cycle is present")
+            if verbose:
+                mp_print("Unbounded problem in cycle detection, so cycle is present")
             # if verbose:
             #     mp_print("Did %d steps in kkt_check2" % iteration - 1)
-            return True, 0, [entering]
+            if find_all_entering:
+                # x[basis] = x[basis] - 1 * u
+                # x[entering] = 1
+                # all_entering = np.where(x>1e-6)[0]
+
+                all_entering = basis[np.where(u < -1e-5)[0]]
+                all_entering = np.append(all_entering, entering)
+            else:
+                all_entering = [entering]
+            return True, 0, all_entering
 
         th = xb[i] / u[i]
         l = np.argmin(th)  # implicitly selects smallest subscript
@@ -209,7 +262,7 @@ def get_nonsingular_pair(A, basis, entering, leaving, basis_hashes):
     return basis
 
 
-def independent_rows(A):
+def independent_rows(A, verbose=False):
     m, n = A.shape
     basis = np.asarray([], dtype='int')
     A_float = np.asarray(A, dtype='float')
@@ -221,6 +274,8 @@ def independent_rows(A):
 
     rank = 0
     for i in range(m):
+        if (i+1) % 100 == 0:
+            mp_print("Finding independent rows is on row " + str(i) + " of " + str(m))
         prev_rank = rank
         prev_basis = basis
         basis = np.append(basis, i)
@@ -239,11 +294,11 @@ def independent_rows(A):
             break
 
     if rank != original_rank:
-        mp_print("\t(rows) Rank deficiency! Got rank %d instead of %d" % (rank, m))
+        mp_print("\t(rows) Rank deficiency! Got rank %d instead of %d" % (rank, original_rank))
     return A[basis]
 
 
-def cancel_with_cycle(R, met, cycle_ind, network, removable_reactions, verbose=True, tol=1e-12, removable_is_ext=False):
+def cancel_with_cycle(R, met, cycle_ind, network, verbose=True, tol=1e-12, removable_is_ext=False):
     cancelling_reaction = R[:, cycle_ind]
     reactions_using_met = [i for i in range(R.shape[1]) if R[met, i] != 0 and i != cycle_ind]
 
@@ -261,8 +316,6 @@ def cancel_with_cycle(R, met, cycle_ind, network, removable_reactions, verbose=T
 
     # Delete cycle ray that is now the only one that produces met, so has to be zero + rays that are full of zeros now
     next_R = np.delete(next_R, to_be_dropped, axis=1)
-
-    removable_reactions.append(to_be_dropped)
     network.drop_reactions(to_be_dropped)
 
     if not removable_is_ext:
@@ -278,7 +331,7 @@ def cancel_with_cycle(R, met, cycle_ind, network, removable_reactions, verbose=T
             if R[ind, cycle_ind] != 0:
                 external_cycle_dict.update({metab.id: R[ind, cycle_ind]})
 
-    return next_R, removable_reactions, external_cycle_dict
+    return next_R, external_cycle_dict
 
 
 def iteration_without_lps(R, met, network):
@@ -414,12 +467,10 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
     """Detect whether there are cycles, by doing an LP. If LP is unbounded find a minimal cycle. Cancel one metabolite
     with the cycle."""
     external_cycles = []
-    removable_metabolites = []
-    removable_reactions = []
     count_since_last_redund = 0
     A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(R)), only_eq=True)
 
-    basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [])
+    basis = get_basis_columns_qr(np.asarray(A_eq, dtype='float'))
     b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, 1e-10)
     cycle_present, status, cycle_indices = cycle_check_with_output(c, np.asarray(A_eq, dtype='float'), x0, basis)
 
@@ -454,14 +505,11 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
             if counter > len(cycle_indices):
                 mp_print('No internal metabolite was found that was part of the cycle. This might cause problems.')
 
-        if not removable_is_ext:
-            removable_metabolites.append(met)
         if verbose:
-            mp_print("Found an unbounded LP, cancelling metabolite %d (%s) with reaction %d" % (
+            mp_print("Found a cycle, cancelling metabolite %d (%s) with reaction %d" % (
                 met, network.metabolites[met].id, cycle_ind))
 
-        R, removable_reactions, external_cycle = cancel_with_cycle(R, met, cycle_ind, network, removable_reactions,
-                                                                   removable_is_ext=removable_is_ext)
+        R, external_cycle = cancel_with_cycle(R, met, cycle_ind, network, removable_is_ext=removable_is_ext)
         if external_cycle:
             external_cycles.append(external_cycle)
         count_since_last_redund = count_since_last_redund + 1
@@ -476,7 +524,6 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
             start = time()
             R = redund(R)
             end = time()
-            rows_removed_redund = rows_before - R.shape[0]
             if verbose:
                 mp_print("\tDimensions after redund: %d %d" % (R.shape[0], R.shape[1]))
                 mp_print("\t\tRows removed by redund: %d" % (rows_before - R.shape[0]))
@@ -487,7 +534,7 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
         A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(R)), only_eq=True)
 
         # Do new LP to check if there is still a cycle present.
-        basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [])
+        basis = get_basis_columns_qr(np.asarray(A_eq, dtype='float'))
         b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, 1e-10)
         cycle_present, status, cycle_indices = cycle_check_with_output(c, np.asarray(A_eq, dtype='float'), x0, basis)
 
@@ -504,12 +551,6 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
                 cycle_indices = np.where(res.x > 90)[0]
             if np.any(np.isnan(res.x)):
                 raise Exception('Remove cycles did not work, because LP-solver had issues. Try to solve this.')
-
-    internal_metabolite_indices = [i for i, metab in enumerate(network.metabolites) if not metab.is_external]
-    for metabolite_index in internal_metabolite_indices: # This does nothing, I think
-        nonzero_count = np.count_nonzero(network.N[metabolite_index, :])
-        if nonzero_count == 0:
-            removable_metabolites.append(metabolite_index)
 
     # Do redund one more time
     R = np.transpose(R)
@@ -528,6 +569,8 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
     R = np.transpose(R)
 
     network.N = R
+    if not len(external_cycles):
+        external_cycles = None
     return R, network, external_cycles
 
 
@@ -773,7 +816,7 @@ def get_bases(A, plus, minus):
     m = A.shape[0]
     bases = np.zeros((len(plus), len(minus), m), dtype='int')
 
-    start_basis = get_start_basis(A)
+    start_basis = get_basis_columns_qr(A)
     B_inv = np.linalg.inv(A[:, start_basis])
 
     for i, p in enumerate(plus):
@@ -816,7 +859,7 @@ def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose
     nr_tests = len(plus) * len(minus)
 
     # first find any column basis of R_indep
-    start_basis = get_start_basis(matrix_indep_rows)
+    start_basis = get_basis_columns_qr(matrix_indep_rows)
     start_basis_inv = np.linalg.inv(matrix_indep_rows[:, start_basis])
     for i, p in enumerate(plus):
         # add the plus ray into the basis
