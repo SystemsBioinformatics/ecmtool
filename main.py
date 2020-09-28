@@ -315,7 +315,7 @@ if __name__ == '__main__':
         T_intersected, ids = intersect_directly(R, internal, network, verbose=args.verbose,
                                                 sort_order=args.sort_order, manual_override=args.manual_override,
                                                 intermediate_cone_path=args.intermediate_cone_path)
-        if len(external_cycles):
+        if external_cycles:
             external_cycles_array = to_fractions(np.zeros((T_intersected.shape[0], len(external_cycles))))
             for ind, cycle in enumerate(external_cycles):
                 for cycle_metab in cycle:
@@ -339,7 +339,7 @@ if __name__ == '__main__':
                                        verbose=args.verbose, only_rays=args.only_rays,
                                        redund_after_polco=args.redund_after_polco)
 
-            if len(external_cycles):
+            if external_cycles:
                 T_intersected = np.transpose(cone)
                 external_cycles_array = to_fractions(np.zeros((T_intersected.shape[0], len(external_cycles))))
                 for ind, cycle in enumerate(external_cycles):
