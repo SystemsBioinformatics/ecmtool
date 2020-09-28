@@ -146,9 +146,9 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
         # Calculate generating set of the dual of our initial conversion cone C0, C0*
         rays = get_extreme_rays(np.append(linearities, G_rev, axis=0), G_irrev, verbose=verbose)
 
-        if rays.shape[0] == 0:
-            print('Warning: given system has no nonzero inequalities H. Returning empty conversion cone.')
-            return to_fractions(np.ndarray(shape=(0, G.shape[1])))
+        # if rays.shape[0] == 0:
+            # print('Warning: given system has no nonzero inequalities H. Returning empty conversion cone.')
+            # return to_fractions(np.ndarray(shape=(0, G.shape[1])))
 
         if verbose:
             print('Deflating H')

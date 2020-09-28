@@ -9,8 +9,8 @@ try:
     from ecmtool._bglu_dense import BGLU
 except (ImportError, EnvironmentError, OSError):
     from ecmtool.bglu_dense_uncompiled import BGLU
-from ecmtool.intersect_directly_mpi import perturb_LP, independent_rows, get_start_basis, \
-    add_first_ray, get_more_basis_columns, setup_cycle_LP, cycle_check_with_output
+from ecmtool.intersect_directly_mpi import perturb_LP, independent_rows_qr, get_start_basis, \
+    add_first_ray, get_more_basis_columns, setup_cycle_LP, cycle_check_with_output, get_basis_columns_qr
 
 
 def unique(matrix):
@@ -137,7 +137,7 @@ def get_remove_metabolite_redund(R, reaction, verbose=True):
     metab_occupancy = [(ind, np.count_nonzero(R[ind, :])) for ind in range(len(column)) if column[ind] != 0]
     if not len(metab_occupancy):
         print("\tWarning: column with only zeros is part of cycle")
-        return 0
+        return -1
 
     # Choose minimally involved metabolite
     return min(metab_occupancy, key=lambda x: x[1])[0]
@@ -174,12 +174,15 @@ def cancel_with_cycle_redund(R, met, cycle_ind, verbose=True, tol=1e-12):
 def remove_cycles_redund(R, tol=1e-12, verbose=True):
     """Detect whether there are cycles, by doing an LP. If LP is unbounded find a minimal cycle. Cancel one metabolite
     with the cycle."""
+    zero_rays = np.where(np.count_nonzero(R,axis=0)==0)[0]
+    for ray_ind in zero_rays:
+        R = np.delete(R, ray_ind, axis=1)
     cycle_rays = np.zeros((R.shape[0], 0))
-    A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))), only_eq=True)
+    A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows_qr(normalize_columns(np.array(R, dtype='float'))), only_eq=True)
 
     if verbose:
         mp_print('Constructing basis for LP')
-    basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [])
+    basis = get_basis_columns_qr(np.asarray(A_eq, dtype='float'))
     b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, 1e-10)
     if verbose:
         mp_print('Starting linearity check using LP.')
@@ -187,7 +190,7 @@ def remove_cycles_redund(R, tol=1e-12, verbose=True):
 
     if status != 0:
         print("Cycle check failed, trying normal LP")
-        A_ub, b_ub, A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))))
+        A_ub, b_ub, A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows_qr(normalize_columns(np.array(R, dtype='float'))))
         res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12},
                       x0=x0)
         if res.status == 4:
@@ -214,9 +217,9 @@ def remove_cycles_redund(R, tol=1e-12, verbose=True):
         R = cancel_with_cycle_redund(R, met, cycle_ind)
 
         # Do new LP to check if there is still a cycle present.
-        A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(np.array(R, dtype='float'))), only_eq=True)
+        A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows_qr(normalize_columns(np.array(R, dtype='float'))), only_eq=True)
 
-        basis = get_more_basis_columns(np.asarray(A_eq, dtype='float'), [])
+        basis = get_basis_columns_qr(np.asarray(A_eq, dtype='float'))
         b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, 1e-10)
         if verbose:
             mp_print('Starting linearity check in H_ineq using LP.')
@@ -225,7 +228,7 @@ def remove_cycles_redund(R, tol=1e-12, verbose=True):
         if status != 0:
             print("Cycle check failed, trying normal LP")
             A_ub, b_ub, A_eq, b_eq, c, x0 = setup_cycle_LP(
-                independent_rows(normalize_columns(np.array(R, dtype='float'))))
+                independent_rows_qr(normalize_columns(np.array(R, dtype='float'))))
             res = linprog(c, A_ub, b_ub, A_eq, b_eq, method='revised simplex', options={'tol': 1e-12},
                           x0=x0)
             if res.status == 4:
@@ -244,7 +247,7 @@ def remove_cycles_redund(R, tol=1e-12, verbose=True):
 def pre_redund(matrix_indep_rows):
     """In this function, we try to filter out many redundant rays, without claiming that all redundant rays are
     filtered out. Running a redundancy-removal method is still needed after this."""
-    start_basis = get_start_basis(matrix_indep_rows)
+    start_basis = get_basis_columns_qr(matrix_indep_rows)
     start_basis_inv = np.linalg.inv(matrix_indep_rows[:, start_basis])
 
     filtered_inds = start_basis
@@ -299,7 +302,7 @@ def drop_redundant_rays(ray_matrix, verbose=True, use_pre_filter=False, rays_are
 
     if verbose:
         mp_print('Selecting independent rows.')
-    matrix_indep_rows = independent_rows(matrix_normalized)
+    matrix_indep_rows = independent_rows_qr(matrix_normalized)
 
     if use_pre_filter:
         filtered_inds = pre_redund(matrix_indep_rows)
@@ -312,7 +315,7 @@ def drop_redundant_rays(ray_matrix, verbose=True, use_pre_filter=False, rays_are
     matrix_indep_rows = matrix_indep_rows[:, filtered_inds]
 
     # then find any column basis of R_indep
-    start_basis = get_start_basis(matrix_indep_rows)
+    start_basis = get_basis_columns_qr(matrix_indep_rows)
     start_basis_inv = np.linalg.inv(matrix_indep_rows[:, start_basis])
 
     number_rays = matrix_indep_rows.shape[1]
