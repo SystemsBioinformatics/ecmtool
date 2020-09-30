@@ -297,8 +297,14 @@ class Network:
         return [index for index, metabolite in enumerate(self.metabolites) if
                 metabolite.direction == 'output' and metabolite.is_external]
 
-    def compress(self, verbose=False, SCEI=True):
-        external_cycles = []
+    def compress(self, verbose=False, SCEI=True, cycle_removal=False):
+        """
+
+        :param verbose:
+        :param SCEI:
+        :param cycle_removal: Cycle removal should only be done when input/output metabs are already split
+        :return:
+        """
         if verbose:
             mp_print('\n Compressing network')
 
@@ -313,9 +319,7 @@ class Network:
 
         while no_fixed_point:
             before_met_count, before_reac_count = self.N.shape
-            external_cycles_iter = self.compress_inner(verbose=verbose, SCEI=SCEI)
-            if external_cycles_iter:
-                external_cycles.append(external_cycles_iter)
+            self.compress_inner(verbose=verbose, SCEI=SCEI, cycle_removal=cycle_removal)
             after_met_count, after_reac_count = self.N.shape
             if (after_met_count - before_met_count == 0) & (after_reac_count - before_reac_count == 0):
                 no_fixed_point = False
@@ -335,11 +339,15 @@ class Network:
                      (metabolite_count, internal, reaction_count, reversible))
             mp_print('Compressed size: %.2f%%' % (((float(reaction_count) * metabolite_count) / (
                     original_reaction_count * original_metabolite_count)) * 100))
-        if not len(external_cycles):
-            external_cycles = None
-        return external_cycles
 
-    def compress_inner(self, verbose=False, SCEI=True):
+    def compress_inner(self, verbose=False, SCEI=True, cycle_removal=False):
+        """
+
+        :param verbose:
+        :param SCEI:
+        :param cycle_removal: Cycle removal should only be done when input/output metabolites are already split
+        :return:
+        """
         self.remove_infeasible_irreversible_reactions(verbose=verbose)
         self.cancel_compounds(verbose=verbose)
         self.cancel_singly(verbose=verbose)
@@ -350,9 +358,9 @@ class Network:
         self.split_reversible()
         self.N = np.transpose(redund(np.transpose(self.N)))
         self.reactions = [Reaction('R_%d' % i, 'Reaction %d' % i, reversible=False) for i in range(self.N.shape[1])]
-        external_cycles = self.compress_cycles(verbose=verbose)
+        if cycle_removal:
+            self.compress_cycles(verbose=verbose)
         self.reactions = [Reaction('R_%d' % i, 'Reaction %d' % i, reversible=False) for i in range(self.N.shape[1])]
-        return external_cycles
 
     def compress_cycles(self, verbose=False):
         R, network, external_cycles = remove_cycles(self.N, self)
