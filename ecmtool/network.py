@@ -530,14 +530,16 @@ class Network:
         :return:
         """
         metabolite_count_intermediate, reaction_count_intermediate = self.N.shape
+        removed_count = 0
         if verbose:
             mp_print('Trying to cancel compounds by reversible reactions')
 
         internal_metabolite_indices = np.setdiff1d(range(len(self.metabolites)), self.external_metabolite_indices())
-        reversible_reactions = self.reversible_reaction_indices()
+        reversible_reactions = np.array(self.reversible_reaction_indices())
         total_reversible_reactions = len(reversible_reactions)
 
-        for iteration, reaction_index in enumerate(reversible_reactions):
+        for iteration, orig_reaction_index in enumerate(reversible_reactions):
+            reaction_index = orig_reaction_index - removed_count
             if verbose:
                 mp_print('Cancelling compounds - %.2f%%' % (iteration / float(total_reversible_reactions) * 100))
             reaction = self.N[:, reaction_index]
@@ -557,6 +559,7 @@ class Network:
             # Heuristic: we choose to cancel the metabolite that is used in the smallest number of other reactions
             target = metabolite_indices[least_used_metabolite]
 
+
             for other_reaction_index in range(self.N.shape[1]):
                 # Make all other reactions that consume or produce target metabolite zero for that metabolite
                 if other_reaction_index != reaction_index and self.N[target, other_reaction_index] != 0:
@@ -567,6 +570,15 @@ class Network:
                     # self.reactions[other_reaction_index].name = '(%s - %s)' % (self.reactions[other_reaction_index].name,
                     #                                                   reaction_index)
 
+            if np.count_nonzero(self.N[target, :]) == 1 and self.N[target,reaction_index] != 0:
+                # This removes the reversible reaction that was used to cancel the metabolite.
+                # This is the only one left that produces the metabolite, so cannot run in steady-state
+                self.drop_reactions([reaction_index])
+                # Since the reaction is removed, all next reaction indices should be decreased by one
+                removed_count = removed_count + 1
+            else:
+                mp_print("Something went wrong in cancelling by using reversible reactions.")
+
         removable_metabolites, removable_reactions = [], []
 
         for metabolite_index in internal_metabolite_indices:
@@ -576,6 +588,7 @@ class Network:
                 reaction_index = \
                 [index for index in range(len(self.reactions)) if self.N[metabolite_index, index] != 0][0]
                 removable_reactions.append(reaction_index)
+                pass
 
         self.drop_reactions(removable_reactions)
 
@@ -690,7 +703,7 @@ class Network:
     def drop_metabolites(self, metabolite_indices, force_external=False):
 
         # TODO: debug line
-        do_not_drop=[]
+        do_not_drop = []
         if not force_external:
             for metab_index in metabolite_indices:
                 if self.metabolites[metab_index].is_external:
@@ -865,7 +878,7 @@ class Network:
                 if not only_rays:
                     if metabolite.direction == 'both' or metabolite.direction == 'input':
                         make_internal = True
-                        new_in = Metabolite(metabolite.id + "_in", metabolite.name + "_in", metabolite.compartment,
+                        new_in = Metabolite(metabolite.id + "_virtin", metabolite.name + "_virtin", metabolite.compartment,
                                             is_external=True, direction='input')
                         self.metabolites.append(new_in)
                         exchange_in = Reaction(metabolite.id + " exch_in", metabolite.id + " exch_in", reversible=False)
@@ -879,7 +892,7 @@ class Network:
 
                     if metabolite.direction == 'both' or metabolite.direction == 'output':
                         make_internal = True
-                        new_out = Metabolite(metabolite.id + "_out", metabolite.name + "_out", metabolite.compartment,
+                        new_out = Metabolite(metabolite.id + "_virtout", metabolite.name + "_virtout", metabolite.compartment,
                                              is_external=True, direction='output')
                         self.metabolites.append(new_out)
                         exchange_out = Reaction(metabolite.id + " exch_out", metabolite.id + " exch_out",
@@ -894,7 +907,7 @@ class Network:
                 else:  # if only_rays
                     if metabolite.direction == 'input':
                         make_internal = True
-                        new_in = Metabolite(metabolite.id + "_in", metabolite.name + "_in", metabolite.compartment,
+                        new_in = Metabolite(metabolite.id + "_virtin", metabolite.name + "_virtin", metabolite.compartment,
                                             is_external=True, direction='input')
                         self.metabolites.append(new_in)
                         exchange_in = Reaction(metabolite.id + " exch_in", metabolite.id + " exch_in", reversible=False)
@@ -908,7 +921,7 @@ class Network:
 
                     if metabolite.direction == 'output':
                         make_internal = True
-                        new_out = Metabolite(metabolite.id + "_out", metabolite.name + "_out", metabolite.compartment,
+                        new_out = Metabolite(metabolite.id + "_virtout", metabolite.name + "_virtout", metabolite.compartment,
                                              is_external=True, direction='output')
                         self.metabolites.append(new_out)
                         exchange_out = Reaction(metabolite.id + " exch_out", metabolite.id + " exch_out",
@@ -922,6 +935,7 @@ class Network:
                         self.N = np.append(self.N, np.asarray(new_column), axis=1)
 
                 if make_internal:
+                    metabolite.id = metabolite.id + '_int'
                     metabolite.is_external = False
                     metabolite.compartment = 'virtual'
                     count += 1

@@ -307,7 +307,7 @@ def unsplit_metabolites(R, network):
 
     processed = {}
     for i in range(R.shape[0]):
-        metabolite = metabolite_ids[i].replace("_in", "").replace("_out", "")
+        metabolite = metabolite_ids[i].replace("_virtin", "").replace("_virtout", "")
         if metabolite in processed:
             row = processed[metabolite]
             res[row] += R[i, :]
@@ -327,8 +327,8 @@ def print_ecms_direct(R, metabolite_ids):
     obj_id = -1
     if "objective" in metabolite_ids:
         obj_id = metabolite_ids.index("objective")
-    elif "objective_out" in metabolite_ids:
-        obj_id = metabolite_ids.index("objective_out")
+    elif "objective_virtout" in metabolite_ids:
+        obj_id = metabolite_ids.index("objective_virtout")
 
     mp_print("\n--%d ECMs found--\n" % R.shape[1])
     for i in range(R.shape[1]):
@@ -367,6 +367,23 @@ def normalize_columns(R, verbose=False):
     return result
 
 
+def find_remaining_rows(first_mat, second_mat, tol=1e-12):
+    """Checks which rows (indices) of second_mat are still in first_mat"""
+    remaining_inds = []
+    for ind, row in enumerate(first_mat):
+        sec_ind = np.where(np.max(np.abs(second_mat - row), axis=1) < tol)[0]
+        # for sec_ind, sec_row in enumerate(second_mat):
+        #    if np.max(np.abs(row - sec_row)) < tol:
+        #        remaining_inds.append(ind)
+        #        continue
+        if len(sec_ind):
+            remaining_inds.append(sec_ind[0])
+        else:
+            mp_print('Warning: There are rows in the first matrix that are not in the second matrix')
+
+    return remaining_inds
+
+
 def normalize_columns_fraction(R, vectorized=False, verbose=True):
     if not vectorized:
         number_rays = R.shape[1]
@@ -376,7 +393,8 @@ def normalize_columns_fraction(R, vectorized=False, verbose=True):
                     mp_print("Normalize columns is on ray %d of %d (%f %%)" %
                              (i, number_rays, i / number_rays * 100), PRINT_IF_RANK_NONZERO=True)
             norm_column = np.sum(np.abs(np.array(R[:, i])))
-            R[:, i] = np.array(R[:, i]) / norm_column
+            if norm_column!=0:
+                R[:, i] = np.array(R[:, i]) / norm_column
     else:
         R = R / np.sum(np.abs(R), axis=0)
     return R

@@ -280,8 +280,8 @@ if __name__ == '__main__':
 
         hide_indices = [ind for ind, metab in enumerate(network.metabolites) if
                         (metab.is_external) & (metab.direction == args.hide_all_in_or_outputs) & (
-                            not metab.id == 'objective_out') & (
-                                    metab.id.replace("_in", "").replace("_out", "") not in tag_ids)]
+                            not metab.id == 'objective_virtout') & (
+                                    metab.id.replace("_virtin", "").replace("_virtout", "") not in tag_ids)]
         network.hide(hide_indices)
 
     if args.compress:
@@ -352,7 +352,7 @@ if __name__ == '__main__':
 
         cone_transpose, ids = unsplit_metabolites(np.transpose(cone), network)
         cone = np.transpose(cone_transpose)
-        # Keep only information about external metabolites (internals are zero)
+        #
         internal_ids = []
         for metab in network.metabolites:
             if not metab.is_external:
