@@ -1,15 +1,14 @@
 from fractions import Fraction
-import libsbml as sbml
+
 import cbmpy
-from ecmtool.intersect_directly_mpi import independent_rows
-from scipy.optimize import linprog
+import libsbml as sbml
 import numpy as np
 from scipy.linalg import null_space
-from ecmtool.intersect_directly_mpi import setup_cycle_LP, get_more_basis_columns, perturb_LP, cycle_check_with_output, \
-    normalize_columns, independent_rows_qr, get_basis_columns_qr, remove_cycles, compress_after_cycle_removing
-from .helpers import to_fractions, redund, nullspace
+
 from ecmtool.helpers import mp_print
-from .nullspace import iterative_nullspace
+from ecmtool.intersect_directly_mpi import setup_cycle_LP, perturb_LP, cycle_check_with_output, \
+    independent_rows_qr, get_basis_columns_qr, remove_cycles
+from .helpers import to_fractions, redund
 
 
 def clementine_equality_compression(N, external_metabolites=[], reversible_reactions=[], input_metabolites=[],
@@ -131,6 +130,23 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     species = list(cbmpy_model.species)
     species_index = {item.id: index for index, item in enumerate(species)}
     reactions = cbmpy_model.reactions
+
+    # Check if all reactions can run
+    for reaction in reactions:
+        reaction_feasible = True
+        lowerBound, upperBound, _ = cbmpy_model.getFluxBoundsByReactionID(reaction.id)
+        if lowerBound is not None and upperBound is not None:
+            if lowerBound.value == 0 and upperBound.value == 0:
+                reaction_feasible = False
+            elif lowerBound.value > upperBound.value:
+                reaction_feasible = False
+
+        if not reaction_feasible:
+            raise Exception(
+                'Reaction {} has lower bound {} and upper bound {}, '
+                'and is therefore infeasible. Please adjust bounds or delete reaction.'.format(
+                    reaction.id, lowerBound.value, upperBound.value))
+
     objective_reaction_column = None
     pairs = cbmpy.CBTools.findDeadEndReactions(cbmpy_model)
     external_metabolites, external_reactions = list(zip(*pairs)) if len(pairs) else (
@@ -171,14 +187,14 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
 
             if reaction.reversible:
                 # Check if the reaction is truly bidirectional
-                if (lowerBound is not None and lowerBound.value == 0) or \
-                        (upperBound is not None and upperBound.value == 0):
+                if (lowerBound is not None and lowerBound.value >= 0) or \
+                        (upperBound is not None and upperBound.value <= 0):
                     reaction.reversible = False
                 else:
                     # Reversible reactions are both inputs and outputs, so don't mark as either
                     continue
 
-                if lowerBound.value < 0 and upperBound.value == 0:
+                if lowerBound.value < 0 and upperBound.value <= 0:
                     # Direction of model is inverted (substrates are products and vice versa. This happens sometimes,
                     # e.g. https://github.com/SBRG/bigg_models/issues/324
                     print(
