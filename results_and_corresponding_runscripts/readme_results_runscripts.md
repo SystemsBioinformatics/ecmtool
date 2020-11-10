@@ -8,10 +8,13 @@ The `e_coli_core` model was downloaded as an .xml-file from `bigg.ucsd.edu`. For
 
 - Full calculation of all ECMs
 
+- Calculation of ECMs while hiding all metabolites that contain carbon atoms
+
 - Calculation of ECMs while hiding all metabolites that can be excreted
 
-- Calculation of ECMs while hiding all metabolites that can be excreted, while tagging the use of the PDH-reaction
+- Calculation of ECMs while hiding all metabolites that contain carbon atoms, while tagging the use of the PDH-reaction
 
+- Calculation of ECMs while hiding all metabolites that can be excreted, while tagging the use of the PDH-reaction
 
 #### `iIT341`
 
@@ -24,7 +27,7 @@ Furthermore, we calculated the ECMs with hidden outputs on a medium where H2O wa
 
 #### `iJR904`
 
-This model of *E. coli* was downloaded as an .xml-file from `bigg.ucsd.edu`. We calculated the ECMs for this model, but discarding all information about the external metabolites that are not glucose, oxygen of the biomass metabolite.
+This model of *E. coli* was downloaded as an .xml-file from `bigg.ucsd.edu`. We calculated the ECMs for this model, but discarding all information about the external metabolites that are not glucose, oxygen of the biomass metabolite.
 
   
 
