@@ -208,34 +208,25 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
 
         # Remove duplicates from H_ineq and H_eq
         if redund_after_polco:
-            # TODO: Check which rays are removed in unique-function. These should be removed from H_ineq_original as well
-            H_ineq_original = H_ineq
-            H_ineq_normalized = np.transpose(normalize_columns(np.transpose(H_ineq.astype(dtype='float'))))
-            H_ineq_float = unique(H_ineq_normalized)
-
-            # Find out if rows have been thrown away, and if so, do that as well
-            unique_inds = find_remaining_rows(H_ineq_float, H_ineq_normalized)
-            H_ineq_original = H_ineq_original[unique_inds, :]
+            H_ineq = unique(np.transpose(normalize_columns_fraction(np.transpose(H_ineq))))
+            H_eq = unique(np.transpose(normalize_columns_fraction(np.transpose(H_eq))))
     else:
-        H_ineq_float = []
         H_ineq = []
         H_eq = []
 
-    if redund_after_polco:
-        H_ineq_float = mpi_wrapper.world_allgather(H_ineq_float)
-        H_ineq_float = H_ineq_float[0]
-        H_ineq = mpi_wrapper.world_allgather(H_ineq)
-        H_ineq = H_ineq[0]
-        H_eq = mpi_wrapper.world_allgather(H_eq)
-        H_eq = H_eq[0]
-        if verbose:
-            mp_print("Size of H_eq after communication step:", H_eq.shape[0], H_eq.shape[1])
+    H_ineq = mpi_wrapper.world_allgather(H_ineq)
+    H_ineq = H_ineq[0]
+    H_eq = mpi_wrapper.world_allgather(H_eq)
+    H_eq = H_eq[0]
+    print("Size of H_eq after communication step:", H_eq.shape[0], H_eq.shape[1])
 
-        use_custom_redund = True  # If set to false, redundancy removal with redund from lrslib is used
+    use_custom_redund = True  # If set to false, redundancy removal with redund from lrslib is used
+    if redund_after_polco:
         if use_custom_redund:
             mp_print('Using custom redundancy removal')
             t1 = time()
-            nonred_inds_ineq, cycle_rays = drop_redundant_rays(np.transpose(H_ineq_float), rays_are_unique=True, linearities=False, normalised=True)
+            H_ineq_transpose, cycle_rays = drop_redundant_rays(np.transpose(H_ineq), rays_are_unique=True, linearities=False, normalised=True)
+            H_ineq = np.transpose(H_ineq_transpose)
             mp_print("Custom redund took %f sec" % (time()-t1))
 
             t1 = time()
@@ -251,9 +242,6 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
             mp_print("Redund took %f sec" % (time() - t2))
 
     if mpi_wrapper.is_first_process():
-        if redund_after_polco:
-            if use_custom_redund:
-                H_ineq = H_ineq_original[nonred_inds_ineq, :]
         print("Size of H_ineq after redund:", H_ineq.shape[0], H_ineq.shape[1])
         print("Size of H_eq after redund:", H_eq.shape[0], H_eq.shape[1])
         count_after_ineq = len(H_ineq)

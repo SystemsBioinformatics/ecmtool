@@ -174,7 +174,7 @@ def cancel_with_cycle_redund(R, met, cycle_ind, verbose=True, tol=1e-12):
 def remove_cycles_redund(R, tol=1e-12, verbose=True):
     """Detect whether there are cycles, by doing an LP. If LP is unbounded find a minimal cycle. Cancel one metabolite
     with the cycle."""
-    zero_rays = np.where(np.count_nonzero(R, axis=0) == 0)[0]
+    zero_rays = np.where(np.count_nonzero(R,axis=0)==0)[0]
     for ray_ind in zero_rays:
         R = np.delete(R, ray_ind, axis=1)
     cycle_rays = np.zeros((R.shape[0], 0))
@@ -281,8 +281,6 @@ def drop_redundant_rays(ray_matrix, verbose=True, use_pre_filter=False, rays_are
     :param normalised: Boolean indicating if ray_matrix columns are already normalised
     :return:
     """
-    extreme_inds = []
-    non_extreme_inds = []
     if not rays_are_unique:
         # First make sure that no duplicate rays are in the matrix
         ray_matrix = np.transpose(unique(np.transpose(normalize_columns_fraction(ray_matrix))))
@@ -321,23 +319,24 @@ def drop_redundant_rays(ray_matrix, verbose=True, use_pre_filter=False, rays_are
     start_basis_inv = np.linalg.inv(matrix_indep_rows[:, start_basis])
 
     number_rays = matrix_indep_rows.shape[1]
+    non_extreme_rays = []
     for i in range(number_rays):
         if i % mpi_size == mpi_rank:
             if i % (10 * mpi_size) == mpi_rank:
                 mp_print("Process %d is on redundancy test %d of %d (%f %%). Found %d redundant rays." %
-                         (mpi_rank, i, number_rays, i / number_rays * 100, len(non_extreme_inds)), PRINT_IF_RANK_NONZERO=True)
+                         (mpi_rank, i, number_rays, i / number_rays * 100, len(non_extreme_rays)), PRINT_IF_RANK_NONZERO=True)
             basis = add_first_ray(matrix_indep_rows, start_basis_inv, start_basis, i)
             extreme = check_extreme(matrix_indep_rows, i, basis)
-            if extreme:
-                extreme_inds.append(filtered_inds[i])
-            else:
-                non_extreme_inds.append(filtered_inds[i])
+            if not extreme:
+                non_extreme_rays.append(i)
 
     # MPI communication step
-    extreme_sets = mpi_wrapper.world_allgather(extreme_inds)
+    non_extreme_sets = mpi_wrapper.world_allgather(non_extreme_rays)
     for i in range(mpi_size):
         if i != mpi_rank:
-            extreme_inds.extend(extreme_sets[i])
-    extreme_inds.sort()
+            non_extreme_rays.extend(non_extreme_sets[i])
+    non_extreme_rays.sort()
+    extreme_inds = np.delete(filtered_inds, non_extreme_rays)
+    new_ray_matrix = ray_matrix[:, extreme_inds]
 
-    return extreme_inds, cycle_rays
+    return new_ray_matrix, cycle_rays
