@@ -208,19 +208,14 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
 
         # Remove duplicates from H_ineq and H_eq
         if redund_after_polco:
+            # TODO: Check which rays are removed in unique-function. These should be removed from H_ineq_original as well
             H_ineq_original = H_ineq
-            H_ineq_normalized = np.transpose(normalize_columns(np.transpose(H_ineq.astype(dtype='float')), verbose=verbose))
-            unique_inds = find_unique_inds(H_ineq_normalized, verbose=verbose, tol=1e-9)
-            H_ineq_float = H_ineq_normalized[unique_inds, :]
-            H_ineq_original = H_ineq_original[unique_inds, :]
-            # H_ineq_float, unique_inds2 = np.unique(H_ineq_normalized, axis=0, return_index=True)
-            # H_ineq_original2 = H_ineq_original[unique_inds2,:]
-
-            # H_ineq_float = unique(H_ineq_normalized)
+            H_ineq_normalized = np.transpose(normalize_columns(np.transpose(H_ineq.astype(dtype='float'))))
+            H_ineq_float = unique(H_ineq_normalized)
 
             # Find out if rows have been thrown away, and if so, do that as well
-            # unique_inds = find_remaining_rows(H_ineq_float, H_ineq_normalized, verbose=verbose)
-            # H_ineq_original = H_ineq_original[unique_inds, :]
+            unique_inds = find_remaining_rows(H_ineq_float, H_ineq_normalized)
+            H_ineq_original = H_ineq_original[unique_inds, :]
     else:
         H_ineq_float = []
         H_ineq = []
