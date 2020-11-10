@@ -11,8 +11,5 @@ conversion_cone.csv
 intermediate_conversion_cone.csv
 *.png
 *.svg
-results_and_corresponding_runscripts/**
+results_and_corresponding_runscripts/*.csv
 *.csv
-results_and_corresponding_runscripts/iIT341_results_runscripts/iIT.csv
-*.csv
-results_and_corresponding_runscripts/iIT341_results_runscripts/iIT.csv
