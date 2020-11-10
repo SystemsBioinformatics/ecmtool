@@ -179,6 +179,74 @@ def kkt_check(c, A, x, basis, p, m, tol=1e-8, threshold=1e-3, max_iter=100000, v
     return True, 1
 
 
+def reaction_infeasibility_check(c, A, x, basis, tol=1e-8, threshold=10, max_iter=100000, verbose=True,find_all_entering=False):
+    """
+    Determine whether KKT conditions hold for x0.
+    Take size 0 steps if available.
+    """
+    ab = np.arange(A.shape[0])
+    a = np.arange(A.shape[1])
+
+    maxupdate = 10
+    B = BGLU(A, basis, maxupdate, False)
+    for iteration in range(max_iter):
+        bl = np.zeros(len(a), dtype=bool)
+        bl[basis] = 1
+        xb = x[basis]
+
+        try:
+            l = B.solve(c[basis], transposed=True)  # similar to v = linalg.solve(B.T, c[basis])
+        except LinAlgError:
+            return False, 1, [-1]
+        sn = c - l.dot(A)  # reduced cost
+        sn = sn[~bl]
+
+        if np.all(sn >= -tol):  # in this case x is an optimal solution
+            # if verbose:
+            #     mp_print("Did %d steps in kkt_check, found True - smallest sn: %.8f" % (iteration - 1, min(sn)))
+            return False, 0, [-1]
+
+        entering = a[~bl][np.argmin(sn)]
+        u = B.solve(A[:, entering])
+
+        i = u > tol  # if none of the u are positive, unbounded
+        if not np.any(i):
+            if verbose:
+                mp_print("Unbounded problem in cycle detection, so cycle is present")
+            # if verbose:
+            #     mp_print("Did %d steps in kkt_check2" % iteration - 1)
+            if find_all_entering:
+                # x[basis] = x[basis] - 1 * u
+                # x[entering] = 1
+                # all_entering = np.where(x>1e-6)[0]
+
+                all_entering = basis[np.where(u < -1e-5)[0]]
+                all_entering = np.append(all_entering, entering)
+            else:
+                all_entering = [entering]
+            return True, 0, all_entering
+
+        th = xb[i] / u[i]
+        l = np.argmin(th)  # implicitly selects smallest subscript
+        step_size = th[l]  # step size
+
+        # Do pivot
+        x[basis] = x[basis] - step_size * u
+        x[entering] = step_size
+        x[abs(x) < 10e-20] = 0
+        B.update(ab[i][l], entering)  # modify basis
+        basis = B.b
+
+        if np.dot(c, x) < -threshold:  # found a better solution, so not adjacent
+            if verbose:
+                mp_print("Cycle check has invalid exit status. Numerical issue likely occurred.\n"
+                         "Better safe than sorry: no infeasible reaction deleted")
+            return False, 1, [-1]
+
+    mp_print("Cycling?")
+    return False, 1, [-1]
+
+
 def cycle_check_with_output(c, A, x, basis, tol=1e-8, threshold=10, max_iter=100000, verbose=True,find_all_entering=False):
     """
     Determine whether KKT conditions hold for x0.

@@ -7,7 +7,7 @@ from scipy.linalg import null_space
 
 from ecmtool.helpers import mp_print
 from ecmtool.intersect_directly_mpi import setup_cycle_LP, perturb_LP, cycle_check_with_output, \
-    independent_rows_qr, get_basis_columns_qr, remove_cycles
+    independent_rows_qr, get_basis_columns_qr, remove_cycles, reaction_infeasibility_check
 from .helpers import to_fractions, redund
 
 
@@ -703,7 +703,7 @@ class Network:
                 removable_present = False
             else:
                 b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, 1e-8)
-                removable_present, status, removable_indices = cycle_check_with_output(c,
+                removable_present, status, removable_indices = reaction_infeasibility_check(c,
                                                                                        np.asarray(A_eq, dtype='float'),
                                                                                        x0, basis,
                                                                                        find_all_entering=True,
