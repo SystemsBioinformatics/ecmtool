@@ -468,8 +468,8 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
     with the cycle."""
     external_cycles = []
     count_since_last_redund = 0
-    A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(R)), only_eq=True)
-
+    A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows_qr(normalize_columns(R)), only_eq=True)
+    # A_eqtest, b_eqtest, ctest, x0test = setup_cycle_LP(independent_rows(normalize_columns(R)), only_eq=True)
     basis = get_basis_columns_qr(np.asarray(A_eq, dtype='float'))
     b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, 1e-10)
     cycle_present, status, cycle_indices = cycle_check_with_output(c, np.asarray(A_eq, dtype='float'), x0, basis)
@@ -531,7 +531,7 @@ def remove_cycles(R, network, tol=1e-12, verbose=True):
 
             R = np.transpose(R)
 
-        A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows(normalize_columns(R)), only_eq=True)
+        A_eq, b_eq, c, x0 = setup_cycle_LP(independent_rows_qr(normalize_columns(R)), only_eq=True)
 
         # Do new LP to check if there is still a cycle present.
         basis = get_basis_columns_qr(np.asarray(A_eq, dtype='float'))
@@ -843,7 +843,8 @@ def geometric_ray_adjacency(ray_matrix, plus=[-1], minus=[-1], tol=1e-3, verbose
     start = time()
 
     matrix_normalized = normalize_columns(ray_matrix)
-    matrix_indep_rows = independent_rows(matrix_normalized)
+    matrix_indep_rows = independent_rows_qr(matrix_normalized)
+    # matrix_indep_rows = independent_rows(matrix_normalized)
 
     # set default plus and minus
     if len(plus) > 0 and plus[0] == -1:
