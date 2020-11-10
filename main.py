@@ -285,9 +285,9 @@ if __name__ == '__main__':
         network.hide(hide_indices)
 
     if args.compress:
-        network.compress(verbose=args.verbose, SCEI=args.scei, cycle_removal=args.splitting_before_polco)
+        external_cycles = network.compress(verbose=args.verbose, SCEI=args.scei)
 
-    if args.direct:
+    if args.direct and not args.compress:
         network.split_reversible()
         network.N = np.transpose(redund(np.transpose(network.N)))
 
@@ -339,16 +339,16 @@ if __name__ == '__main__':
                                        verbose=args.verbose, only_rays=args.only_rays,
                                        redund_after_polco=args.redund_after_polco)
 
-            # if external_cycles:
-            #     T_intersected = np.transpose(cone)
-            #     external_cycles_array = to_fractions(np.zeros((T_intersected.shape[0], len(external_cycles))))
-            #     for ind, cycle in enumerate(external_cycles):
-            #         for cycle_metab in cycle:
-            #             metab_ind = [ind for ind, metab in enumerate(ids) if metab == cycle_metab][0]
-            #             external_cycles_array[metab_ind, ind] = cycle[cycle_metab]
-            #
-            #     T_intersected = np.concatenate((T_intersected, external_cycles_array, -external_cycles_array), axis=1)
-            #     cone = np.transpose(T_intersected)
+            if external_cycles:
+                T_intersected = np.transpose(cone)
+                external_cycles_array = to_fractions(np.zeros((T_intersected.shape[0], len(external_cycles))))
+                for ind, cycle in enumerate(external_cycles):
+                    for cycle_metab in cycle:
+                        metab_ind = [ind for ind, metab in enumerate(ids) if metab == cycle_metab][0]
+                        external_cycles_array[metab_ind, ind] = cycle[cycle_metab]
+
+                T_intersected = np.concatenate((T_intersected, external_cycles_array, -external_cycles_array), axis=1)
+                cone = np.transpose(T_intersected)
 
         cone_transpose, ids = unsplit_metabolites(np.transpose(cone), network)
         cone = np.transpose(cone_transpose)

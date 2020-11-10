@@ -15,7 +15,6 @@ EFMTOOL_PATH = 'C:\\Users\\Daan\\surfdrive\\PhD\\Software\\efmtool'
 
 models = ['active_subnetwork_KO_' + str(i) for i in range(9)]
 models = models + ['active_subnetwork', 'active_subnetwork_FVA', 'e_coli_core']
-models=['e_coli_core']
 
 number_info_df = pd.DataFrame(columns=['model', 'ECMs', 'EFMs', 'n_reacs'])
 
@@ -48,9 +47,6 @@ for model_str in models:
 
     efms = get_efms(ex_N, reversibilities, verbose=True,
                     efmtool_path=EFMTOOL_PATH)
-
-    """"Split in and out metabolites, to facilitate ECM computation"""
-    network.split_in_out(only_rays=False)
 
     network.compress(verbose=True)
 
