@@ -194,7 +194,7 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
                     # Reversible reactions are both inputs and outputs, so don't mark as either
                     continue
 
-                if (lowerBound.value < 0 or lowerBound is None) and upperBound.value <= 0:
+                if lowerBound.value < 0 and upperBound.value <= 0:
                     # Direction of model is inverted (substrates are products and vice versa. This happens sometimes,
                     # e.g. https://github.com/SBRG/bigg_models/issues/324
                     print(
