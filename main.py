@@ -273,9 +273,6 @@ if __name__ == '__main__':
     if args.direct or args.splitting_before_polco:
         # Split metabolites in input and output
         network.split_in_out(args.only_rays)
-        cycle_removal_boolean = True if not args.only_rays else False
-    else:
-        cycle_removal_boolean = False
 
     if args.hide_all_in_or_outputs:
         if not args.direct and not args.splitting_before_polco:
@@ -288,7 +285,7 @@ if __name__ == '__main__':
         network.hide(hide_indices)
 
     if args.compress:
-        network.compress(verbose=args.verbose, SCEI=args.scei, cycle_removal=cycle_removal_boolean)
+        network.compress(verbose=args.verbose, SCEI=args.scei, cycle_removal=args.splitting_before_polco)
 
     if args.direct:
         network.split_reversible()
