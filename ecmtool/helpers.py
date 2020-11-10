@@ -330,7 +330,7 @@ def print_ecms_direct(R, metabolite_ids):
     elif "objective_out" in metabolite_ids:
         obj_id = metabolite_ids.index("objective_out")
 
-    mp_print("\n--%d ECMs found--\n" % R.shape[1])
+    mp_print("\n--%d ECMs found by intersecting directly--\n" % R.shape[1])
     for i in range(R.shape[1]):
         mp_print("ECM #%d:" % (i + 1))
         if np.max(R[:,
@@ -361,9 +361,8 @@ def normalize_columns(R, verbose=False):
             part_normalized_column = np.array(R[:, i] / np.max(R[:, i]), dtype='float')
             result[:, i] = part_normalized_column / np.linalg.norm(part_normalized_column)
         else:
-            norm_column = np.linalg.norm(np.array(R[:, i], dtype='float'), ord=1)
-            if norm_column != 0:
-                result[:, i] = np.array(R[:, i], dtype='float') / norm_column
+            norm_column = np.linalg.norm(np.array(R[:, i], dtype='float'))
+            result[:, i] = np.array(R[:, i], dtype='float') / norm_column
     return result
 
 
