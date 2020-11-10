@@ -1,14 +1,12 @@
 import os
 import sys
-
-import psutil
-from fractions import Fraction, gcd
-from subprocess import check_call, STDOUT, PIPE
+from fractions import Fraction
 from os import remove, devnull as os_devnull, system
+from random import randint
+from subprocess import check_call
 
 import numpy as np
-from random import randint
-
+import psutil
 from numpy.linalg import svd
 from sympy import Matrix
 
@@ -18,6 +16,31 @@ from ecmtool.mpi_wrapper import get_process_rank
 def unique(matrix):
     unique_set = list({tuple(row) for row in matrix if np.count_nonzero(row) > 0})
     return np.vstack(unique_set) if len(unique_set) else to_fractions(np.ndarray(shape=(0, matrix.shape[1])))
+
+
+def find_unique_inds(matrix, verbose=False, tol=1e-9):
+    n_rays = matrix.shape[0]
+    n_nonunique = 0
+    original_inds_remaining = np.arange(n_rays)
+    unique_inds = []
+    counter = 0
+    while matrix.shape[0] > 0:
+        row = matrix[0, :]
+        unique_inds.append(original_inds_remaining[0])
+        if verbose:
+            if counter % 100 == 0:
+                mp_print("Find unique rows has tested %d of %d (%f %%). Removed %d non-unique rows." %
+                         (counter, n_rays, counter / n_rays * 100, n_nonunique))
+        counter = counter + 1
+        equal_rows = np.where(np.max(np.abs(matrix - row), axis=1) < tol)[0]
+        if len(equal_rows):
+            n_nonunique = n_nonunique + len(equal_rows) - 1
+            matrix = np.delete(matrix, equal_rows, axis=0)
+            original_inds_remaining = np.delete(original_inds_remaining, equal_rows)
+        else:  # Something is wrong, at least the row itself should be equal to itself
+            mp_print('Something is wrong in the unique_inds function!!')
+
+    return unique_inds
 
 
 def relative_path(file_path):
@@ -356,9 +379,9 @@ def normalize_columns(R, verbose=False):
             if i % 10000 == 0:
                 mp_print("Normalize columns is on ray %d of %d (%f %%)" %
                          (i, number_rays, i / number_rays * 100), PRINT_IF_RANK_NONZERO=True)
-        if np.max(R[:,
-                  i]) > 1e100:  # If numbers are very large, converting to float might give issues, therefore we first divide by another int
-            part_normalized_column = np.array(R[:, i] / np.max(R[:, i]), dtype='float')
+        largest_number = np.max(np.abs(R[:,i]))
+        if largest_number > 1e100:  # If numbers are very large, converting to float might give issues, therefore we first divide by another int
+            part_normalized_column = np.array(R[:, i] / largest_number, dtype='float')
             result[:, i] = part_normalized_column / np.linalg.norm(part_normalized_column)
         else:
             norm_column = np.linalg.norm(np.array(R[:, i], dtype='float'), ord=1)
@@ -367,10 +390,15 @@ def normalize_columns(R, verbose=False):
     return result
 
 
-def find_remaining_rows(first_mat, second_mat, tol=1e-12):
+def find_remaining_rows(first_mat, second_mat, tol=1e-12, verbose=False):
     """Checks which rows (indices) of second_mat are still in first_mat"""
     remaining_inds = []
+    number_rays = first_mat.shape[0]
     for ind, row in enumerate(first_mat):
+        if verbose:
+            if ind % 10000 == 0:
+                mp_print("Find remaining rows is on row %d of %d (%f %%)" %
+                         (ind, number_rays, ind / number_rays * 100))
         sec_ind = np.where(np.max(np.abs(second_mat - row), axis=1) < tol)[0]
         # for sec_ind, sec_row in enumerate(second_mat):
         #    if np.max(np.abs(row - sec_row)) < tol:
