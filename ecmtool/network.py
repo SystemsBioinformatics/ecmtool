@@ -335,8 +335,6 @@ class Network:
                      (metabolite_count, internal, reaction_count, reversible))
             mp_print('Compressed size: %.2f%%' % (((float(reaction_count) * metabolite_count) / (
                     original_reaction_count * original_metabolite_count)) * 100))
-        if not len(external_cycles):
-            external_cycles = None
         return external_cycles
 
     def compress_inner(self, verbose=False, SCEI=True):
@@ -617,10 +615,7 @@ class Network:
         while removable_present:
             removable_reactions = []
             N_int = self.N[internal_indices, :]
-            if np.min(N_int.shape) == 0:
-                break
-            else:
-                nullspace_int = null_space(N_int.astype(dtype='double'))
+            nullspace_int = null_space(N_int.astype(dtype='double'))
             reacs_notin_nullspace = np.where(np.max(np.abs(nullspace_int), axis=1) < 1e-8)[0]
             if len(reacs_notin_nullspace):
                 removable_reactions.extend(reacs_notin_nullspace)
