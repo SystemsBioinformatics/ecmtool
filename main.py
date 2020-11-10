@@ -164,8 +164,8 @@ if __name__ == '__main__':
                         help='Print the names and IDs of reactions in the (compressed) metabolic network (default: true)')
     parser.add_argument('--print_conversions', type=str2bool, default=True,
                         help='Print the calculated conversion modes (default: true)')
-    parser.add_argument('--use_external_compartment', type=str, default=None,
-                        help='If a string is given, this string indicates how the external compartment in metabolite_ids of SBML-file is marked. By default, dead-end reaction-detection is used to find external metabolites, and no compartment-information. Please check if external compartment detection works by checking metabolite information before compression and with --primt metabolites true')
+    parser.add_argument('--external_compartment', type=str, default='e',
+                        help='String indicating how the external compartment in metabolite_ids of SBML-file is marked. Please check if external compartment detection works by checking metabolite information before compression and with --primt metabolites true')
     parser.add_argument('--auto_direction', type=str2bool, default=True,
                         help='Automatically determine external metabolites that can only be consumed or produced (default: true)')
     parser.add_argument('--inputs', type=str, default='',
@@ -227,7 +227,7 @@ if __name__ == '__main__':
     network = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite,
                                          determine_inputs_outputs=args.auto_direction,
                                          skip_external_reactions=True,
-                                         use_external_compartment=args.use_external_compartment)
+                                         external_compartment=args.external_compartment)
 
     tagged_reaction_indices = []
 

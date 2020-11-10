@@ -113,7 +113,7 @@ def get_sbml_model(path):
 
 
 def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions=True, determine_inputs_outputs=False,
-                               use_external_compartment=None):
+                               external_compartment='e'):
     """
     Parses an SBML file containing a metabolic network, and returns a Network instance
     with the metabolites, reactions, and stoichiometry initialised. By default will look
@@ -122,9 +122,7 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     :param add_objective: Look for SBML v3 FBC objective definition
     :param skip_external_reactions: Ignore external reactions, as identified by '_EX_' in their ID
     :param determine_inputs_outputs: Automatically determine input and output metabolites from analysing the network.
-    :param use_external_compartment: If true, then all metabolites in the external compartment are marked as 'external',
-            which means that they do not have to satisfy the steady-state constraint, and can pop up in the computed
-            conversions. By default, ecmtool does not use this but does print a warning.
+    :param external_compartment: The compartment name for the external environment in the SBML model. Usually 'e'.
     :return: Network
     """
     cbmpy_model = cbmpy.readSBML3FBC(path)
@@ -154,23 +152,9 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     external_metabolites, external_reactions = list(zip(*pairs)) if len(pairs) else (
         list(zip(*cbmpy.CBTools.findDeadEndMetabolites(cbmpy_model)))[0], [])
 
-    # Catch any metabolites that were not recognised automatically, but might be external
-    for item in species:
-        if use_external_compartment is None:
-            if (item.compartment == 'e') & (item.id not in external_metabolites):
-                mp_print('!!\n'
-                         'Warning: metabolite %s appears to be in the external compartment, '
-                         'but does not have an exchange reaction in the SBML-model. \n'
-                         'We will impose the steady-state constraint on this metabolite, and it will '
-                         'thus not appear in the computed conversion modes.\n'
-                         'This behaviour can be changed with the ecmtool-argument \"use_external_compartment\"'
-                         % item.id)
-
-    if use_external_compartment is not None:
-        external_metabolites_extended = list(external_metabolites) + [item.id for item in species if
-                                                                      (item.compartment == use_external_compartment) & (
-                                                                                  item.id not in external_metabolites)]
-        external_metabolites = external_metabolites_extended
+    # Catch any metabolites that were not recognised automatically, but are likely external
+    external_metabolites = list(external_metabolites) + [item.id for item in species if
+                                                         item.compartment == external_compartment]
 
     network = Network()
     network.metabolites = [Metabolite(item.id, item.name, item.compartment, item.id in external_metabolites) for item
@@ -190,14 +174,10 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     if determine_inputs_outputs:
         for metabolite in [network.metabolites[index] for index in network.external_metabolite_indices()]:
             index = external_metabolites.index(metabolite.id)
-            if use_external_compartment is not None:
-                if index >= len(external_reactions):
-                    mp_print(
-                        'Warning: missing exchange reaction for metabolite %s. '
-                        'Skipping marking this metabolite as input or output.\n '
-                        'This behaviour can be changed with the ecmtool-argument \"use_external_compartment\"'
-                        % metabolite.id)
-                    continue
+            if index >= len(external_reactions):
+                mp_print(
+                    'Warning: missing exchange reaction for metabolite %s. Skipping marking this metabolite as input or output.' % metabolite.id)
+                continue
 
             reaction_id = external_reactions[index]
             reaction = cbmpy_model.getReaction(reaction_id)
@@ -406,7 +386,7 @@ class Network:
             mp_print("Warning: in cycle removal, a reaction was removed without keeping track")
         return external_cycles
 
-    def remove_unused_metabs(self, verbose=False):
+    def remove_unused_metabs(self,verbose=False):
         # Remove unused metabolites
         mp_print('Removing metabolites that are not used in any reaction.')
         metabolite_count_intermediate, reaction_count_intermediate = self.N.shape
@@ -595,6 +575,7 @@ class Network:
             # Heuristic: we choose to cancel the metabolite that is used in the smallest number of other reactions
             target = metabolite_indices[least_used_metabolite]
 
+
             for other_reaction_index in range(self.N.shape[1]):
                 # Make all other reactions that consume or produce target metabolite zero for that metabolite
                 if other_reaction_index != reaction_index and self.N[target, other_reaction_index] != 0:
@@ -605,7 +586,7 @@ class Network:
                     # self.reactions[other_reaction_index].name = '(%s - %s)' % (self.reactions[other_reaction_index].name,
                     #                                                   reaction_index)
 
-            if np.count_nonzero(self.N[target, :]) == 1 and self.N[target, reaction_index] != 0:
+            if np.count_nonzero(self.N[target, :]) == 1 and self.N[target,reaction_index] != 0:
                 # This removes the reversible reaction that was used to cancel the metabolite.
                 # This is the only one left that produces the metabolite, so cannot run in steady-state
                 self.drop_reactions([reaction_index])
@@ -621,7 +602,7 @@ class Network:
             if nonzero_count == 1:
                 # This metabolite is used in only one reaction
                 reaction_index = \
-                    [index for index in range(len(self.reactions)) if self.N[metabolite_index, index] != 0][0]
+                [index for index in range(len(self.reactions)) if self.N[metabolite_index, index] != 0][0]
                 removable_reactions.append(reaction_index)
                 pass
 
@@ -913,8 +894,7 @@ class Network:
                 if not only_rays:
                     if metabolite.direction == 'both' or metabolite.direction == 'input':
                         make_internal = True
-                        new_in = Metabolite(metabolite.id + "_virtin", metabolite.name + "_virtin",
-                                            metabolite.compartment,
+                        new_in = Metabolite(metabolite.id + "_virtin", metabolite.name + "_virtin", metabolite.compartment,
                                             is_external=True, direction='input')
                         self.metabolites.append(new_in)
                         exchange_in = Reaction(metabolite.id + " exch_in", metabolite.id + " exch_in", reversible=False)
@@ -928,8 +908,7 @@ class Network:
 
                     if metabolite.direction == 'both' or metabolite.direction == 'output':
                         make_internal = True
-                        new_out = Metabolite(metabolite.id + "_virtout", metabolite.name + "_virtout",
-                                             metabolite.compartment,
+                        new_out = Metabolite(metabolite.id + "_virtout", metabolite.name + "_virtout", metabolite.compartment,
                                              is_external=True, direction='output')
                         self.metabolites.append(new_out)
                         exchange_out = Reaction(metabolite.id + " exch_out", metabolite.id + " exch_out",
@@ -944,8 +923,7 @@ class Network:
                 else:  # if only_rays
                     if metabolite.direction == 'input':
                         make_internal = True
-                        new_in = Metabolite(metabolite.id + "_virtin", metabolite.name + "_virtin",
-                                            metabolite.compartment,
+                        new_in = Metabolite(metabolite.id + "_virtin", metabolite.name + "_virtin", metabolite.compartment,
                                             is_external=True, direction='input')
                         self.metabolites.append(new_in)
                         exchange_in = Reaction(metabolite.id + " exch_in", metabolite.id + " exch_in", reversible=False)
@@ -959,8 +937,7 @@ class Network:
 
                     if metabolite.direction == 'output':
                         make_internal = True
-                        new_out = Metabolite(metabolite.id + "_virtout", metabolite.name + "_virtout",
-                                             metabolite.compartment,
+                        new_out = Metabolite(metabolite.id + "_virtout", metabolite.name + "_virtout", metabolite.compartment,
                                              is_external=True, direction='output')
                         self.metabolites.append(new_out)
                         exchange_out = Reaction(metabolite.id + " exch_out", metabolite.id + " exch_out",
