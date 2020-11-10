@@ -152,11 +152,11 @@ def cancel_with_cycle_redund(R, met, cycle_ind, verbose=True, tol=1e-12):
     to_be_dropped = [cycle_ind]
 
     n_reacs = len(reactions_using_met)
-    for enum_ind, reac_ind in enumerate(reactions_using_met):
+    for reac_ind in reactions_using_met:
         if verbose:
-            if enum_ind % 10000 == 0:
+            if reac_ind % 10000 == 0:
                 mp_print("Removed cycle metab from %d of %d reactions (%f %%)" %
-                         (enum_ind, n_reacs, enum_ind / n_reacs * 100))
+                         (reac_ind, n_reacs, reac_ind / n_reacs * 100))
         coeff_cycle = cycle_ray[met]
         coeff_reac = R[met, reac_ind]
         new_ray = R[:, reac_ind] - (coeff_reac / coeff_cycle) * cycle_ray
