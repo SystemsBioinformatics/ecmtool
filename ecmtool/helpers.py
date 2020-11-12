@@ -119,6 +119,9 @@ def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
 
 
 def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True, verbose=False):
+    if not os.path.isdir(relative_path('tmp')):
+        os.makedirs(relative_path('tmp'))
+
     rand = randint(1, 10 ** 6)
 
     if inequality_matrix is not None and inequality_matrix.shape[0] == 0:
@@ -230,6 +233,8 @@ def get_redund_binary():
 
 
 def redund(matrix, verbose=False):
+    if not os.path.isdir(relative_path('tmp')):
+        os.makedirs(relative_path('tmp'))
     rank = str(get_process_rank())
     matrix = to_fractions(matrix)
     binary = get_redund_binary()
