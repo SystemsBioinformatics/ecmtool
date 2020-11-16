@@ -147,17 +147,24 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
         rays = get_extreme_rays(np.append(linearities, G_rev, axis=0), G_irrev, verbose=verbose)
 
         # if rays.shape[0] == 0:
-            # print('Warning: given system has no nonzero inequalities H. Returning empty conversion cone.')
-            # return to_fractions(np.ndarray(shape=(0, G.shape[1])))
+        #     print('Warning: given system has no nonzero inequalities H. Returning empty conversion cone.')
+        #     return to_fractions(np.ndarray(shape=(0, G.shape[1])))
 
         if verbose:
             print('Deflating H')
-        rays_deflated = deflate_matrix(rays, external_metabolites)
+        if rays.shape[0] == 0:
+            mp_print('Warning: first polco-application did not give any rays. Check if this is expected behaviour.')
+            rays_deflated = rays
+        else:
+            rays_deflated = deflate_matrix(rays, external_metabolites)
 
         if verbose:
             print('Expanding H with metabolite direction constraints')
         # Add bidirectional (in- and output) metabolites in reverse direction
-        rays_split = split_columns(rays_deflated, in_out_indices) if not only_rays else rays_deflated
+        if rays_deflated.shape[0] == 0:
+            rays_split = rays_deflated
+        else:
+            rays_split = split_columns(rays_deflated, in_out_indices) if not only_rays else rays_deflated
         linearities_split = split_columns(linearities_deflated, in_out_indices) if not only_rays else linearities_deflated
 
         H_ineq = rays_split
