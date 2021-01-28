@@ -4,7 +4,7 @@ from distutils.extension import Extension
 
 setup(
     name='ecmtool',
-    version='0.1.5',
+    version='0.1.9',
     packages=['ecmtool'],
     install_requires=['numpy',
                       'scipy',
@@ -14,10 +14,10 @@ setup(
                       'psutil',
                       'sklearn'],
     include_dirs=[np.get_include()],
-    url='https://github.com/tjclement/ecmtool',
+    url='https://github.com/SystemsBioinformatics/ecmtool',
     license='MIT',
-    author='Tom Clement',
-    author_email='mr@tomclement.nl',
+    author='Tom Clement, Erik Baalhuis, Daan de Groot',
+    author_email='science@tomclement.nl',
     description='Calculates elementary conversion modes (Urbanczik & Wagner, 2005) of metabolic networks.',
     include_package_data=True
 )
