@@ -1,4 +1,5 @@
 .idea
+.DS_Store
 data
 ecmtool.egg-info
 ecmtoollocal
@@ -17,3 +18,4 @@ results_and_corresponding_runscripts/**
 results_and_corresponding_runscripts/iIT341_results_runscripts/iIT.csv
 *.csv
 results_and_corresponding_runscripts/iIT341_results_runscripts/iIT.csv
+ecntoollocal/
