@@ -4,7 +4,6 @@ scipy
 sympy
 python-libsbml
 cbmpy
-pycddlib
 psutil
 sklearn
 cython
