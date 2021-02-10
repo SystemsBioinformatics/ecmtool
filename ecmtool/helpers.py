@@ -114,7 +114,7 @@ def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
             nullspace_matrix = nullspace_matrix.row_insert(-1, nullspace_vectors[i].T)
 
         return to_fractions(
-            np.transpose(np.asarray(nullspace_matrix.rref()[0], dtype='object'))) if nullspace_matrix \
+            np.transpose(np.asarray(nullspace_matrix, dtype='object'))) if nullspace_matrix \
             else np.ndarray(shape=(N.shape[0], 0))
 
 
