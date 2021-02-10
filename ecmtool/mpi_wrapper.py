@@ -1,6 +1,13 @@
 import sys, os
 
-if not sys.platform.startswith('win32'):
+try:
+    from mpi4py import MPI
+    has_mpi4py = True
+except:
+    has_mpi4py = False
+
+
+if has_mpi4py and not sys.platform.startswith('win32'):
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
     os.environ['OPENBLAS_NUM_THREADS'] = '1'
