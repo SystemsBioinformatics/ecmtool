@@ -45,6 +45,15 @@ ecms = get_conversion_cone(stoichiometry, network.external_metabolite_indices(),
 ## Advanced usage
 After testing how the tool works, most users will want to run their workloads on computing clusters instead of on single machines. This section describes some of the steps that are useful for running on clusers
 
+### Parallel computing with mpi4py
+On Linux or Mac, ecmtool can make use of mpi4py for parallel computing. To make use of this feature, an implementation of MPI (e.g. OpenMPI) and mpi4py are required. They can be installed, for example, with
+
+```
+apt install openmpi-bin
+pip3 install mpi4py
+
+```
+
 ### Doubling direct enumeration method speed
 The direct enumeration method can be sped up by compiling our LU decomposition code with Cython. The following describes the steps needed on Linux, but the same concept also applies to Mac OS and Windows. First make sure all dependencies are satisfied. Then execute:
 
