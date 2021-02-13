@@ -51,7 +51,6 @@ On Linux or Mac, ecmtool can make use of mpi4py for parallel computing. To make 
 ```
 apt install openmpi-bin
 pip3 install mpi4py
-
 ```
 
 ### Doubling direct enumeration method speed
