@@ -1,6 +1,15 @@
 import sys, os
 
-if not sys.platform.startswith('win32'):
+try:
+    from mpi4py import MPI
+    has_mpi4py = True
+except:
+    has_mpi4py = False
+    print("Since the mpi4py-package is not installed, parallel computation is not possible for ecmtool. "
+          "This package does not work properly on Windows, but can be installed on other operating systems.")
+
+
+if has_mpi4py and not sys.platform.startswith('win32'):
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
     os.environ['OPENBLAS_NUM_THREADS'] = '1'
