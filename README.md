@@ -68,7 +68,7 @@ For example: mpiexec -n 4 python3 main.py --model_path models/e_coli_core.xml
 
 
 ## Citing ecmtool
-ecmtool has been published here: [https://www.cell.com/patterns/fulltext/S2666-3899(20)30241-5](https://www.cell.com/patterns/fulltext/S2666-3899(20)30241-5).
+Please refer to the following paper when using ecmtool: [https://www.cell.com/patterns/fulltext/S2666-3899(20)30241-5](https://www.cell.com/patterns/fulltext/S2666-3899(20)30241-5).
 
 
 ## Acknowledgements
