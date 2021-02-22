@@ -6,7 +6,7 @@ ecmtool can be used in two different modes: either as a standalone command line 
 
 ### Prerequisites
 * Download and install Python. Ecmtool is compatible with python 3.x. Ensure both python and its package manager _pip_ are added to your PATH environment variable. If this last step is omitted, an error like the following will be thrown when you try to run python: `’python’ is not recognized as an internal or external command [..]`.
-* Download and install Java.
+* Download and install Java. Make sure you have a 64bit version; you can check this with `java -version`. Otherwise, you might get an error `Invalid maximum heap size`.
 
 ## Mode 1: standalone command line tool
 In this mode, you can call ecmtool like a normal program from your command line. It reads metabolic networks in the SBML format, and writes resulting ECMs into a CSV file for later analysis. Most researchers will use this method. For running ecmtool on computing clusters efficiently, see the Advanced Usage section in this readme.
