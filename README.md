@@ -4,11 +4,14 @@ With this tool you can calculate _Elementary Conversion Modes_ (ECMs) from metab
 
 ecmtool can be used in two different modes: either as a standalone command line tool, or as a Python library for your own scripts. We will describe how to install and use both modes.
 
+### Prerequisites
+* Download and install Python. Ecmtool is compatible with python 3.x. Ensure both python and its package manager _pip_ are added to your PATH environment variable. If this last step is omitted, an error like the following will be thrown when you try to run python: `’python’ is not recognized as an internal or external command [..]`.
+* Download and install Java.
+
 ## Mode 1: standalone command line tool
 In this mode, you can call ecmtool like a normal program from your command line. It reads metabolic networks in the SBML format, and writes resulting ECMs into a CSV file for later analysis. Most researchers will use this method. For running ecmtool on computing clusters efficiently, see the Advanced Usage section in this readme.
 
 ### Installation
-* Download and install Python. Ecmtool is compatible with python 3.x. Ensure both python and its package manager _pip_ are added to your PATH environment variable. If this last step is omitted, an error like the following will be thrown when you try to run python: `’python’ is not recognized as an internal or external command [..]`.
 * Download the latest ecmtool source through `git clone`, or as a zip file from https://github.com/tjclement/ecmtool.
 * Open a command prompt, and navigate to the ecmtool directory (e.g. `cd C:\Users\You\Git\ecmtool`, where the
 path should be replaced with the path ecmtool was downloaded to).
@@ -22,7 +25,7 @@ After execution is done, the found conversions have been written to file (defaul
 ### Example
 
 ```bash
-python3 main.py --model_path models/e_coli_core.xml --auto_direction true --out_path core_conversions.csv
+python main.py --model_path models/e_coli_core.xml --auto_direction true --out_path core_conversions.csv
 ```
 
 ## Mode 2: Python library
