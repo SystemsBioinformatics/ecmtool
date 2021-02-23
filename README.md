@@ -53,7 +53,7 @@ ecms = get_conversion_cone(stoichiometry, network.external_metabolite_indices(),
 ### Example scripts
 See the scripts in the folder examples_and_results for examples on how to use ecmtool as a library. In particular: ECM_calc_script.py, compare_efms_ecms_number.py.
 
-### Enumerating ECMs without an SBMl-file 
+### Enumerating ECMs without an SBML-file 
 See the script examples_and_results/minimal_run_wo_sbml.py for an example on how to compute ECMs starting from a stoichiometric matrix, and some additional information.
 
 
