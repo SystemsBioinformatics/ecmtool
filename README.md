@@ -28,8 +28,13 @@ After execution is done, the found conversions have been written to file (defaul
 python main.py --model_path models/e_coli_core.xml --auto_direction true --out_path core_conversions.csv
 ```
 
+### Benefiting from optional arguments of ecmtool
+For an elaborate discussion of all optional arguments that can be used when ecmtool is run as a command line tool, please see the extensive manual that was uploaded as a Supplementary File with the ecmtool-publication at: https://doi.org/10.1016/j.patter.2020.100177
+
 ## Mode 2: Python library
 ecmtool can also be used as a separate programming interface from within your own Python code. To do so, install ecmtool using _pip_ (e.g. `pip install ecmtool`). The most crucial method is ecmtool.conversion_cone:get_conversion_cone(), which returns the ECMs of a given stoichiometric matrix. For information on how to use advanced features like SBML parsing, network compression, and metabolite direction estimation, please see ecmtool/main.py.
+
+*We strongly advise the user to either use ecmtool as a command line tool, or to pay much attention to carefully copy the order from ecmtool/main.py.*
 
 
 ### Example
@@ -44,6 +49,13 @@ ecms = get_conversion_cone(stoichiometry, network.external_metabolite_indices(),
  network.reversible_reaction_indices(), network.input_metabolite_indices(), 
  network.output_metabolite_indices())
 ```
+
+### Example scripts
+See the scripts in the folder examples_and_results for examples on how to use ecmtool as a library. In particular: ECM_calc_script.py, compare_efms_ecms_number.py.
+
+### Enumerating ECMs without an SBMl-file 
+See the script examples_and_results/minimal_run_wo_sbml.py for an example on how to compute ECMs starting from a stoichiometric matrix, and some additional information.
+
 
 ## Advanced usage
 After testing how the tool works, most users will want to run their workloads on computing clusters instead of on single machines. This section describes some of the steps that are useful for running on clusers
