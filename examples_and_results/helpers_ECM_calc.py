@@ -6,7 +6,7 @@ import numpy as np
 import os
 
 
-def calc_ECMs(file_path, print_results=False, input_file_path=''):
+def calc_ECMs(file_path, print_results=False, input_file_path='', print_metabolites_info=True):
     """
     Calculates ECMs using ECMtool
     :return ecms: np.array
@@ -63,6 +63,10 @@ def calc_ECMs(file_path, print_results=False, input_file_path=''):
         print(','.join(map(str, output_inds)))
         print(','.join(map(str, hide_inds)))
         print(','.join(map(str, prohibit_inds)))
+
+    if print_metabolites_info:
+        for index, item in enumerate(network.metabolites):
+            print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
 
     """Keep a copy of the full network before compression. This can be nice for later."""
     full_network = copy.deepcopy(network)
