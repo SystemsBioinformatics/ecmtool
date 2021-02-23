@@ -112,6 +112,56 @@ def get_sbml_model(path):
     return model
 
 
+def get_network_from_stoich(stoich_mat, ext_inds, reversible_inds=[], input_inds=[], output_inds=[], metab_names=[]):
+    """
+    Returns a Network instance with the metabolites, reactions, and stoichiometry initialised. Starts from a basic
+    information about the network:
+    :param stoich_mat: ndarray with stoichiometric matrix (make sure that exchange reactions should not be present)
+    :param ext_inds: list of metabolites that should be taken as external (no steady-state, will show up in ECMs)
+    :param reversible_inds: list of indices of reversible reactions
+    :param input_inds: list of external metabolite indices that can be taken up
+    :param output_inds: list of external metabolite indices that can be exported
+    If an external metabolite is not in input_inds and output_inds, or if the external metabolite is in both, it will
+    be considered as a metabolite that can be both imported and exported.
+    :param metab_names: list of metabolite IDs
+    :return: Network
+    """
+    n_metabs, n_reacs = stoich_mat.shape
+
+    if len(metab_names) != n_metabs:
+        metab_names = ["Metab_" + str(ind) for ind in range(n_metabs)]
+    reac_names = ["Reac_" + str(ind) for ind in range(n_reacs)]
+
+    network = Network()
+    network.metabolites = [Metabolite(metab, metab, 'NA', ind in ext_inds) for ind, metab
+                           in enumerate(metab_names)]
+
+    # Build stoichiometry matrix N
+    N = np.zeros(shape=(n_metabs, n_reacs), dtype='object')
+    for reac_ind, reac in enumerate(reac_names):
+        network.reactions.append(Reaction(reac, reac, reac_ind in reversible_inds))
+
+        for metab_ind in range(n_metabs):
+            N[metab_ind, reac_ind] = Fraction(str(stoich_mat[metab_ind,reac_ind]))
+
+    network.N = N
+
+    # Set directionality of metabolites
+    for metab_ind in range(n_metabs):
+        if metab_ind in input_inds:
+            if metab_ind in output_inds:
+                network.metabolites[metab_ind].direction = 'both'
+            else:
+                network.metabolites[metab_ind].direction = 'input'
+        else:
+            if metab_ind in output_inds:
+                network.metabolites[metab_ind].direction = 'output'
+            else:
+                network.metabolites[metab_ind].direction = 'both'
+
+    return network
+
+
 def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions=True, determine_inputs_outputs=False,
                                use_external_compartment=None):
     """
@@ -169,7 +219,7 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
     if use_external_compartment is not None:
         external_metabolites_extended = list(external_metabolites) + [item.id for item in species if
                                                                       (item.compartment == use_external_compartment) & (
-                                                                                  item.id not in external_metabolites)]
+                                                                              item.id not in external_metabolites)]
         external_metabolites = external_metabolites_extended
 
     network = Network()
@@ -706,10 +756,11 @@ class Network:
             else:
                 b_eq, x0 = perturb_LP(b_eq, x0, A_eq, basis, 1e-8)
                 removable_present, status, removable_indices = reaction_infeasibility_check(c,
-                                                                                       np.asarray(A_eq, dtype='float'),
-                                                                                       x0, basis,
-                                                                                       find_all_entering=True,
-                                                                                       verbose=False)
+                                                                                            np.asarray(A_eq,
+                                                                                                       dtype='float'),
+                                                                                            x0, basis,
+                                                                                            find_all_entering=True,
+                                                                                            verbose=False)
                 if removable_present:
                     removable_reactions.extend(np.array(irreversible_columns)[removable_indices])
                 if verbose:
