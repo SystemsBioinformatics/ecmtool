@@ -5,7 +5,7 @@ import libsbml as sbml
 import numpy as np
 from scipy.linalg import null_space
 
-from ecmtool.helpers import mp_print
+from ecmtool.helpers import mp_print, normalize_columns
 from ecmtool.intersect_directly_mpi import setup_cycle_LP, perturb_LP, independent_rows_qr, get_basis_columns_qr, \
     remove_cycles, reaction_infeasibility_check
 from .helpers import to_fractions, redund
@@ -402,11 +402,13 @@ class Network:
         original_internal = len(self.metabolites) - len(self.external_metabolite_indices())
         original_reversible = len(self.reversible_reaction_indices())
         no_fixed_point = True
+        debug_counter = 0
 
         while no_fixed_point:
             before_met_count, before_reac_count = self.N.shape
             self.compress_inner(verbose=verbose, SCEI=SCEI, cycle_removal=cycle_removal,
-                                remove_infeasible=remove_infeasible)
+                                remove_infeasible=remove_infeasible, debug_counter=debug_counter)
+            debug_counter = debug_counter + 1
             after_met_count, after_reac_count = self.N.shape
             if (after_met_count - before_met_count == 0) & (after_reac_count - before_reac_count == 0):
                 no_fixed_point = False
@@ -427,7 +429,7 @@ class Network:
             mp_print('Compressed size: %.2f%%' % (((float(reaction_count) * metabolite_count) / (
                     original_reaction_count * original_metabolite_count)) * 100))
 
-    def compress_inner(self, verbose=False, SCEI=True, cycle_removal=False, remove_infeasible=True):
+    def compress_inner(self, verbose=False, SCEI=True, cycle_removal=False, remove_infeasible=True, debug_counter=0):
         """
 
         :param verbose:
@@ -728,7 +730,7 @@ class Network:
             if np.min(N_int.shape) == 0:
                 break
             else:
-                nullspace_int = null_space(N_int.astype(dtype='double'))
+                nullspace_int = null_space(normalize_columns(N_int))  # TODO: See if you can make normalize_columns faster
             reacs_notin_nullspace = np.where(np.max(np.abs(nullspace_int), axis=1) < 1e-8)[0]
             if len(reacs_notin_nullspace):
                 removable_reactions.extend(reacs_notin_nullspace)
@@ -773,6 +775,7 @@ class Network:
 
                 if len(removable_reactions):
                     self.drop_reactions(removable_reactions)
+                    pass
 
         n_reactions_after = len(self.reactions)
         if verbose:
