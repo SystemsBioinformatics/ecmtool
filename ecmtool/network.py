@@ -773,7 +773,6 @@ class Network:
 
                 if len(removable_reactions):
                     self.drop_reactions(removable_reactions)
-                    pass
 
         n_reactions_after = len(self.reactions)
         if verbose:
