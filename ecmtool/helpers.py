@@ -376,7 +376,7 @@ def print_ecms_direct(R, metabolite_ids):
         mp_print("")
 
 
-def normalize_columns(R, verbose=False):
+def normalize_columns_slower(R, verbose=False):  # This was the original function, but seems slower and further equivalent to new function below
     result = np.zeros(R.shape)
     number_rays = R.shape[1]
     for i in range(result.shape[1]):
@@ -387,11 +387,22 @@ def normalize_columns(R, verbose=False):
         largest_number = np.max(np.abs(R[:,i]))
         if largest_number > 1e100:  # If numbers are very large, converting to float might give issues, therefore we first divide by another int
             part_normalized_column = np.array(R[:, i] / largest_number, dtype='float')
-            result[:, i] = part_normalized_column / np.linalg.norm(part_normalized_column)
+            result[:, i] = part_normalized_column / np.linalg.norm(part_normalized_column, ord=1)
         else:
             norm_column = np.linalg.norm(np.array(R[:, i], dtype='float'), ord=1)
             if norm_column != 0:
                 result[:, i] = np.array(R[:, i], dtype='float') / norm_column
+    return result
+
+
+def normalize_columns(R, verbose=False):
+    result = R
+    largest_number = max(np.max(R), -np.min(R))
+    if largest_number > 1e100:
+        result = result / largest_number # If numbers are very large, converting to float might give issues, therefore we first divide by another int
+    norms = np.linalg.norm(result, axis=0, ord=1)
+    norms[np.where(norms==0)[0]] = 1
+    result = np.array(np.divide(result, norms), dtype='float')
     return result
 
 

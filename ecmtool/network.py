@@ -5,7 +5,7 @@ import libsbml as sbml
 import numpy as np
 from scipy.linalg import null_space
 
-from ecmtool.helpers import mp_print
+from ecmtool.helpers import mp_print, normalize_columns
 from ecmtool.intersect_directly_mpi import setup_cycle_LP, perturb_LP, independent_rows_qr, get_basis_columns_qr, \
     remove_cycles, reaction_infeasibility_check
 from .helpers import to_fractions, redund
@@ -728,7 +728,7 @@ class Network:
             if np.min(N_int.shape) == 0:
                 break
             else:
-                nullspace_int = null_space(N_int.astype(dtype='double'))
+                nullspace_int = null_space(normalize_columns(N_int))
             reacs_notin_nullspace = np.where(np.max(np.abs(nullspace_int), axis=1) < 1e-8)[0]
             if len(reacs_notin_nullspace):
                 removable_reactions.extend(reacs_notin_nullspace)
