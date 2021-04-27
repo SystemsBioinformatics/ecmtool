@@ -402,13 +402,11 @@ class Network:
         original_internal = len(self.metabolites) - len(self.external_metabolite_indices())
         original_reversible = len(self.reversible_reaction_indices())
         no_fixed_point = True
-        debug_counter = 0
 
         while no_fixed_point:
             before_met_count, before_reac_count = self.N.shape
             self.compress_inner(verbose=verbose, SCEI=SCEI, cycle_removal=cycle_removal,
-                                remove_infeasible=remove_infeasible, debug_counter=debug_counter)
-            debug_counter = debug_counter + 1
+                                remove_infeasible=remove_infeasible)
             after_met_count, after_reac_count = self.N.shape
             if (after_met_count - before_met_count == 0) & (after_reac_count - before_reac_count == 0):
                 no_fixed_point = False
@@ -429,7 +427,7 @@ class Network:
             mp_print('Compressed size: %.2f%%' % (((float(reaction_count) * metabolite_count) / (
                     original_reaction_count * original_metabolite_count)) * 100))
 
-    def compress_inner(self, verbose=False, SCEI=True, cycle_removal=False, remove_infeasible=True, debug_counter=0):
+    def compress_inner(self, verbose=False, SCEI=True, cycle_removal=False, remove_infeasible=True):
         """
 
         :param verbose:
