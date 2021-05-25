@@ -41,13 +41,46 @@ ecmtool can also be used as a separate programming interface from within your ow
 ```python
 from ecmtool.network import extract_sbml_stoichiometry
 from ecmtool.conversion_cone import get_conversion_cone
+from ecmtool.helpers import unsplit_metabolites, print_ecms_direct
+import numpy as np
 
-network = extract_sbml_stoichiometry('models/sxp_toy.xml', add_objective=True)
+DETERMINE_INPUTS_OUTPUTS = False # Determines whether ecmtool tries to infer directionality (input/output/both)
+PRINT_CONVERSIONS = True # Prints the resulting ECMs on the console
+
+network = extract_sbml_stoichiometry('models/sxp_toy.xml', add_objective=True, determine_inputs_outputs=DETERMINE_INPUTS_OUTPUTS)
+
+# Some steps of compression only work when cone is in one orthant, so we need to split external metabolites with
+# direction "both" into two metabolites, one of which is output, and one is input
+network.split_in_out(only_rays=False)
+
+# It is generally a good idea to compress the network before computation
+network.compress(verbose=True, SCEI=True, cycle_removal=True, remove_infeasible=True)
+
 stoichiometry = network.N
 
 ecms = get_conversion_cone(stoichiometry, network.external_metabolite_indices(),
  network.reversible_reaction_indices(), network.input_metabolite_indices(), 
- network.output_metabolite_indices())
+ network.output_metabolite_indices(), verbose=True)
+ 
+# Since we have split the "both" metabolites, we now need to unsplit them again
+cone_transpose, ids = unsplit_metabolites(np.transpose(ecms), network)
+cone = np.transpose(cone_transpose)
+
+# We can remove all internal metabolites, since their values are zero in the conversions (by definition of internal)
+internal_ids = []
+for metab in network.metabolites:
+    if not metab.is_external:
+        id_ind = [ind for ind, id in enumerate(ids) if id == metab.id]
+        if len(id_ind):
+            internal_ids.append(id_ind[0])
+
+ids = list(np.delete(ids, internal_ids))
+cone = np.delete(cone, internal_ids, axis=1)
+
+# If you wish, one can print the ECM results:
+if PRINT_CONVERSIONS:
+    print_ecms_direct(np.transpose(cone), ids)
+
 ```
 
 ### Example scripts
