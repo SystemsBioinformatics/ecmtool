@@ -4,7 +4,7 @@ from distutils.extension import Extension
 
 setup(
     name='ecmtool',
-    version='0.1.9',
+    version='0.1.11',
     packages=['ecmtool'],
     install_requires=['numpy',
                       'scipy',
