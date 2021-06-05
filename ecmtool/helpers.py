@@ -257,6 +257,12 @@ def redund(matrix, verbose=False):
 
     system('%s %s > %s' % (binary, matrix_path, matrix_nonredundant_path))
 
+    if not os.path.exists(matrix_nonredundant_path):
+        raise ValueError('An error occurred during removal of redundant vectors from an input matrix: '
+                         'redund did not write an output file after being presented input file "%s". \r\n\r\n'
+                         'Please check if your input matrix contains erroneous data, and let us know via https://github.com/SystemsBioinformatics/ecmtool/issues '
+                         'if you think the input matrix seems fine. It helps if you attach the matrix file mentioned above when creating an issue.')
+
     matrix_nored = np.ndarray(shape=(0, matrix.shape[1] + 1), dtype='object')
 
     with open(matrix_nonredundant_path) as file:
