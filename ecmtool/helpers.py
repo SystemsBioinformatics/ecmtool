@@ -346,6 +346,11 @@ def unsplit_metabolites(R, network):
             row = processed[metabolite]
             res[row] += R[i, :]
         else:
+            if metabolite[-4:] == '_int':
+                if np.sum(np.abs(R[i, :])) == 0:
+                    continue
+                else:
+                    mp_print("Metabolite " + metabolite + " was made internal, but now is nonzero in ECMs.")
             res.append(R[i, :].tolist())
             processed[metabolite] = len(res) - 1
             ids.append(metabolite)
