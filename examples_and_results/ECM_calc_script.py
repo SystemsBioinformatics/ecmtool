@@ -23,8 +23,8 @@ ecms_df = pd.DataFrame(np.transpose(ecms_matrix), columns=metab_ids)
 ext_metab_inds = []
 ext_metab_ids = []
 for ind_id, metab_id in enumerate(metab_ids):
-    ext_metab_bool = [metab.is_external for ind, metab in enumerate(full_network.metabolites) if metab.id == metab_id][0]
-    if ext_metab_bool:
+    ext_metab_bool = [metab.is_external for ind, metab in enumerate(full_network.metabolites) if metab.id == metab_id]
+    if len(ext_metab_bool) > 0 and ext_metab_bool[0]:
         ext_metab_inds.append(ind_id)
         ext_metab_ids.append(metab_id)
 
