@@ -383,7 +383,7 @@ class Network:
         return [index for index, metabolite in enumerate(self.metabolites) if
                 metabolite.direction == 'output' and metabolite.is_external]
 
-    def compress(self, verbose=False, SCEI=True, cycle_removal=False, remove_infeasible=True):
+    def compress(self, verbose=False, SCEI=True, cycle_removal=False, remove_infeasible=False):
         """
 
         :param verbose:
@@ -427,7 +427,7 @@ class Network:
             mp_print('Compressed size: %.2f%%' % (((float(reaction_count) * metabolite_count) / (
                     original_reaction_count * original_metabolite_count)) * 100))
 
-    def compress_inner(self, verbose=False, SCEI=True, cycle_removal=False, remove_infeasible=True):
+    def compress_inner(self, verbose=False, SCEI=True, cycle_removal=False, remove_infeasible=False):
         """
 
         :param verbose:
@@ -449,6 +449,7 @@ class Network:
         if cycle_removal:
             self.compress_cycles(verbose=verbose)
         self.reactions = [Reaction('R_%d' % i, 'Reaction %d' % i, reversible=False) for i in range(self.N.shape[1])]
+
 
     def compress_cycles(self, verbose=False):
         R, network, external_cycles = remove_cycles(self.N, self)
@@ -728,8 +729,19 @@ class Network:
             if np.min(N_int.shape) == 0:
                 break
             else:
-                nullspace_int = null_space(normalize_columns(N_int))
-            reacs_notin_nullspace = np.where(np.max(np.abs(nullspace_int), axis=1) < 1e-8)[0]
+                # null_space may have problems with very large numbers, so we divide by the maximum before
+                max_val = np.max(np.abs(N_int.astype(dtype='float')))
+                nullspace_int = null_space(N_int.astype(dtype='float') / max_val)
+
+            # Get largest fold difference in nonzero stoichiometric coefficients
+            # We use this to determine when a reaction is really zero in the nullspace. If its value times the maximal
+            # fold difference in stoich coeffs is still small, we are sure that it can never give rise to any reasonable
+            # flux value
+            N_int_abs = np.abs(N_int.astype(dtype='float'))
+            min_stoich_coeff = np.min(N_int_abs[N_int_abs>0])
+            max_stoich_coeff = np.max(N_int_abs)
+            max_fold_diff_stoich = max_stoich_coeff/min_stoich_coeff
+            reacs_notin_nullspace = np.where(np.max(np.abs(nullspace_int), axis=1) < 1e-6/max_fold_diff_stoich)[0]
             if len(reacs_notin_nullspace):
                 removable_reactions.extend(reacs_notin_nullspace)
                 if verbose:

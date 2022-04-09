@@ -408,12 +408,13 @@ def normalize_columns_slower(R, verbose=False):  # This was the original functio
 
 def normalize_columns(R, verbose=False):
     result = R
-    largest_number = max(np.max(R), -np.min(R))
+    largest_number = np.max(np.abs(R))
     if largest_number > 1e100:
         result = result / largest_number # If numbers are very large, converting to float might give issues, therefore we first divide by another int
+    result = result.astype(dtype='float')
     norms = np.linalg.norm(result, axis=0, ord=1)
-    norms[np.where(norms==0)[0]] = 1
-    result = np.array(np.divide(result, norms), dtype='float')
+    norms[np.where(norms == 0)[0]] = 1
+    result = np.array(np.divide(result, norms))
     return result
 
 

@@ -154,8 +154,11 @@ if __name__ == '__main__':
     parser.add_argument('--direct', type=str2bool, default=False, help='Enable to intersect with equalities directly. Direct intersection works better than indirect when many metabolites are hidden, and on large networks (default: False)')
     parser.add_argument('--compress', type=str2bool, default=True,
                         help='Perform compression to which the conversions are invariant, and reduce the network size considerably (default: True)')
-    parser.add_argument('--remove_infeasible', type=str2bool, default=True,
-                        help='Remove reactions that cannot carry flux dsquring compression. Switch off when this gives rise to numerical linear algebra problems. (default: True)')
+    parser.add_argument('--remove_infeasible', type=str2bool, default=False,
+                        help='Remove reactions that cannot carry flux dsquring compression. '
+                             'Switch off when this gives rise to numerical linear algebra problems.'
+                             'Set to defulat = False, because should be tested more. Seems to work now, and does '
+                             'speed up computation. (default: False)')
     parser.add_argument('--out_path', default='conversion_cone.csv',
                         help='Relative or absolute path to the .csv file you want to save the calculated conversions to (default: conversion_cone.csv)')
     parser.add_argument('--add_objective_metabolite', type=str2bool, default=True,
