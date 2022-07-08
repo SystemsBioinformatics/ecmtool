@@ -1,13 +1,15 @@
 import sys, os
 
-try:
-    from mpi4py import MPI
-    has_mpi4py = True
-except:
-    has_mpi4py = False
-    print("Since the mpi4py-package is not installed, parallel computation is not possible for ecmtool. "
-          "This package does not work properly on Windows, but can be installed on other operating systems.")
+##bb
+# try:
+#     from mpi4py import MPI
+#     has_mpi4py = True
+# except:
+#     has_mpi4py = False
+#     print("Since the mpi4py-package is not installed, parallel computation is not possible for ecmtool. "
+#           "This package does not work properly on Windows, but can be installed on other operating systems.")
 
+has_mpi4py = False
 
 if has_mpi4py and not sys.platform.startswith('win32'):
     from mpi4py import MPI

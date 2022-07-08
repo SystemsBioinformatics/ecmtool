@@ -6,6 +6,8 @@ from time import time
 import numpy as np
 from scipy.optimize import linprog
 
+from subprocess import run
+
 from ecmtool import mpi_wrapper
 from ecmtool.conversion_cone import get_conversion_cone, iterative_conversion_cone
 from ecmtool.helpers import get_metabolite_adjacency, redund, to_fractions
@@ -154,11 +156,8 @@ if __name__ == '__main__':
     parser.add_argument('--direct', type=str2bool, default=False, help='Enable to intersect with equalities directly. Direct intersection works better than indirect when many metabolites are hidden, and on large networks (default: False)')
     parser.add_argument('--compress', type=str2bool, default=True,
                         help='Perform compression to which the conversions are invariant, and reduce the network size considerably (default: True)')
-    parser.add_argument('--remove_infeasible', type=str2bool, default=False,
-                        help='Remove reactions that cannot carry flux dsquring compression. '
-                             'Switch off when this gives rise to numerical linear algebra problems.'
-                             'Set to defulat = False, because should be tested more. Seems to work now, and does '
-                             'speed up computation. (default: False)')
+    parser.add_argument('--remove_infeasible', type=str2bool, default=True,
+                        help='Remove reactions that cannot carry flux dsquring compression. Switch off when this gives rise to numerical linear algebra problems. (default: True)')
     parser.add_argument('--out_path', default='conversion_cone.csv',
                         help='Relative or absolute path to the .csv file you want to save the calculated conversions to (default: conversion_cone.csv)')
     parser.add_argument('--add_objective_metabolite', type=str2bool, default=True,
@@ -167,8 +166,8 @@ if __name__ == '__main__':
                         help='Print the names and IDs of metabolites in the (compressed) metabolic network (default: true)')
     parser.add_argument('--print_reactions', type=str2bool, default=False,
                         help='Print the names and IDs of reactions in the (compressed) metabolic network (default: true)')
-    parser.add_argument('--print_conversions', type=str2bool, default=True,
-                        help='Print the calculated conversion modes (default: true)')
+    parser.add_argument('--print_conversions', type=str2bool, default=False,
+                        help='Print the calculated conversion modes (default: false)')
     parser.add_argument('--use_external_compartment', type=str, default=None,
                         help='If a string is given, this string indicates how the external compartment in metabolite_ids of SBML-file is marked. By default, dead-end reaction-detection is used to find external metabolites, and no compartment-information. Please check if external compartment detection works by checking metabolite information before compression and with --primt metabolites true')
     parser.add_argument('--auto_direction', type=str2bool, default=True,
@@ -205,9 +204,44 @@ if __name__ == '__main__':
                         help='Filename where intermediate cone result can be found. If an empty string is given (default), then no intermediate result is picked up and the calculation is done in full')
     parser.add_argument('--manual_override', type=str, default='',
                         help='Index indicating which metabolite should be intersected in first step. Advanced option, can be used in combination with --intermediate_cone_path, to pick a specific intersection at a specific time.')
+    
+    parser.add_argument('--polco', type=str2bool, default=False,
+                        help='Uses polco instead of mplrs for extreme ray enumeration (default: false)')
+    parser.add_argument('--processes', type=int, default=3,
+                        help='Numer of processes for calculations (default: 3 - minimum required for mplrs)')
+    parser.add_argument('--jvm_mem', type=int, default=None, nargs='*', action='store',
+                        help='Two values given the minimum and maximum memeory for java machine in GB e.g. 50 300 (default: maximum memory available)')
+    parser.add_argument('--path2mplrs', type=str, default=None,
+                        help='if mplrs binary is not accessable via PATH variable "mplrs", the absolute path to the binary can be provided with "--path2mplrs" e.g. "--path2mplrs /home/user/mplrs/lrslib-071b/mplrs" ')
 
     args = parser.parse_args()
+    
+    if args.jvm_mem is not None and len(args.jvm_mem) not in (0, 2):
+        parser.error('Either give no values for jvm_mem, or two - "minGB maxGB" e.g. 50 200, not {}.'.format(len(args.jvm_mem)))
+   
+    if args.polco is False and args.path2mplrs is None:
+        try:
+            mplrs_check = run(['mplrs'],capture_output=True)
+            if args.verbose is True:
+                print('Found mplrs path variable')
+        except:
+            print('\x1b[0;31;40m' + 'WARNING1: mplrs NOT found' + '\x1b[0m')
+            print('\x1b[0;31;40m' + 'Make sure mplrs is installed properly, see http://cgm.cs.mcgill.ca/~avis/C/lrslib/USERGUIDE.html' + '\x1b[0m')
+            print('\x1b[0;31;40m' + 'Make sure mplrs is added to the PATH variable or provide absolute path to mplrs binary via command line argument --path2mplrs' + '\x1b[0m')
+            exit(-1)
 
+    if args.polco is False and args.path2mplrs is not None:
+        path2mplrs = args.path2mplrs
+        try:
+            mplrs_check = run([path2mplrs],capture_output=True)
+            if args.verbose is True:
+                print('Found mplrs')
+        except:
+            print('\x1b[0;31;40m' + 'WARNING2: mplrs NOT found' + '\x1b[0m')
+            print('\x1b[0;31;40m' + 'Make sure mplrs is installed properly, see http://cgm.cs.mcgill.ca/~avis/C/lrslib/USERGUIDE.html' + '\x1b[0m')
+            print('\x1b[0;31;40m' + 'Make sure mplrs is added to the PATH variable or provide absolute path to mplrs binary via command line argument --path2mplrs' + '\x1b[0m')
+            exit(-1)
+            
     if args.model_path == '':
         mp_print('No model given, please specify --model_path')
         exit()
@@ -346,7 +380,9 @@ if __name__ == '__main__':
                                        input_metabolites=network.input_metabolite_indices(),
                                        output_metabolites=network.output_metabolite_indices(),
                                        verbose=args.verbose, only_rays=args.only_rays,
-                                       redund_after_polco=args.redund_after_polco)
+                                       redund_after_polco=args.redund_after_polco,
+                                       polco=args.polco, processes=args.processes, jvm_mem=args.jvm_mem,
+                                       path2mplrs=args.path2mplrs)
 
             # if external_cycles:
             #     T_intersected = np.transpose(cone)
@@ -379,8 +415,13 @@ if __name__ == '__main__':
             normalised = np.transpose(normalize_columns(np.transpose(cone)))
             np.savetxt(args.out_path, normalised, delimiter=',', header=','.join(ids), comments='')
 
-    if args.print_conversions:
+            
+    if args.verbose is True:
+        print('Found %s ECMs' % cone.shape[0])
+          
+    if args.print_conversions is True:
         print_ecms_direct(np.transpose(cone), ids)
-
+    
     end = time()
     mp_print('Ran in %f seconds' % (end - start))
+    os._exit(0)
