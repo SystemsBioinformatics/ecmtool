@@ -122,7 +122,8 @@ def vectors_in_cone(vector_matrix, cone_matrix, network, verbose=True):
                         metabolite_index, network.metabolites[metabolite_index].id, stoichiometry_val))
             in_cone = False
         elif verbose:
-            print('Support: ' + str([index for index, _ in enumerate(solution['x']) if abs(solution['x'][index]) > 1e-6]))
+            print(
+                'Support: ' + str([index for index, _ in enumerate(solution['x']) if abs(solution['x'][index]) > 1e-6]))
 
     return in_cone
 
@@ -132,7 +133,8 @@ def set_inoutputs(inputs, outputs, network):
     outputs = [int(index) for index in outputs.split(',') if len(index)]
     if len(outputs) < 1 and len(inputs) >= 1:
         # If no outputs are given, define all external metabolites that are not inputs as outputs
-        mp_print('No output metabolites given or determined from model. All non-input metabolites will be defined as outputs.')
+        mp_print(
+            'No output metabolites given or determined from model. All non-input metabolites will be defined as outputs.')
         outputs = np.setdiff1d(network.external_metabolite_indices(), inputs)
 
     network.set_inputs(inputs)
@@ -153,7 +155,8 @@ if __name__ == '__main__':
         description='Calculate Elementary Conversion Modes from an SBML model. For medium-to large networks, be sure to define --inputs and --outputs. This reduces the enumeration problem complexity considerably.')
     parser.add_argument('--model_path', type=str, default='models/active_subnetwork_KO_5.xml',
                         help='Relative or absolute path to an SBML model .xml file')
-    parser.add_argument('--direct', type=str2bool, default=False, help='Enable to intersect with equalities directly. Direct intersection works better than indirect when many metabolites are hidden, and on large networks (default: False)')
+    parser.add_argument('--direct', type=str2bool, default=False,
+                        help='Enable to intersect with equalities directly. Direct intersection works better than indirect when many metabolites are hidden, and on large networks (default: False)')
     parser.add_argument('--compress', type=str2bool, default=True,
                         help='Perform compression to which the conversions are invariant, and reduce the network size considerably (default: True)')
     parser.add_argument('--remove_infeasible', type=str2bool, default=True,
@@ -204,7 +207,7 @@ if __name__ == '__main__':
                         help='Filename where intermediate cone result can be found. If an empty string is given (default), then no intermediate result is picked up and the calculation is done in full')
     parser.add_argument('--manual_override', type=str, default='',
                         help='Index indicating which metabolite should be intersected in first step. Advanced option, can be used in combination with --intermediate_cone_path, to pick a specific intersection at a specific time.')
-    
+
     parser.add_argument('--polco', type=str2bool, default=False,
                         help='Uses polco instead of mplrs for extreme ray enumeration (default: false)')
     parser.add_argument('--processes', type=int, default=3,
@@ -215,33 +218,26 @@ if __name__ == '__main__':
                         help='if mplrs binary is not accessable via PATH variable "mplrs", the absolute path to the binary can be provided with "--path2mplrs" e.g. "--path2mplrs /home/user/mplrs/lrslib-071b/mplrs" ')
 
     args = parser.parse_args()
-    
-    if args.jvm_mem is not None and len(args.jvm_mem) not in (0, 2):
-        parser.error('Either give no values for jvm_mem, or two - "minGB maxGB" e.g. 50 200, not {}.'.format(len(args.jvm_mem)))
-   
-    if args.polco is False and args.path2mplrs is None:
-        try:
-            mplrs_check = run(['mplrs'],capture_output=True)
-            if args.verbose is True:
-                print('Found mplrs path variable')
-        except:
-            print('\x1b[0;31;40m' + 'WARNING1: mplrs NOT found' + '\x1b[0m')
-            print('\x1b[0;31;40m' + 'Make sure mplrs is installed properly, see http://cgm.cs.mcgill.ca/~avis/C/lrslib/USERGUIDE.html' + '\x1b[0m')
-            print('\x1b[0;31;40m' + 'Make sure mplrs is added to the PATH variable or provide absolute path to mplrs binary via command line argument --path2mplrs' + '\x1b[0m')
-            exit(-1)
 
-    if args.polco is False and args.path2mplrs is not None:
-        path2mplrs = args.path2mplrs
+    if args.jvm_mem is not None and len(args.jvm_mem) not in (0, 2):
+        parser.error(
+            'Either give no values for jvm_mem, or two - "minGB maxGB" e.g. 50 200, not {}.'.format(len(args.jvm_mem)))
+
+    if args.polco is False:
+        path2mplrs = args.path2mplrs if args.path2mplrs is not None else 'mplrs'
         try:
-            mplrs_check = run([path2mplrs],capture_output=True)
+            mplrs_check = run([path2mplrs], capture_output=True)
             if args.verbose is True:
                 print('Found mplrs')
         except:
-            print('\x1b[0;31;40m' + 'WARNING2: mplrs NOT found' + '\x1b[0m')
-            print('\x1b[0;31;40m' + 'Make sure mplrs is installed properly, see http://cgm.cs.mcgill.ca/~avis/C/lrslib/USERGUIDE.html' + '\x1b[0m')
-            print('\x1b[0;31;40m' + 'Make sure mplrs is added to the PATH variable or provide absolute path to mplrs binary via command line argument --path2mplrs' + '\x1b[0m')
-            exit(-1)
-            
+            print('\x1b[0;31;40m' + 'WARNING1: mplrs NOT found' + '\x1b[0m')
+            print(
+                '\x1b[0;31;40m' + 'Make sure mplrs is installed properly, see http://cgm.cs.mcgill.ca/~avis/C/lrslib/USERGUIDE.html' + '\x1b[0m')
+            print(
+                '\x1b[0;31;40m' + 'Make sure mplrs is added to the PATH variable or provide absolute path to mplrs binary via command line argument --path2mplrs' + '\x1b[0m')
+            print('\x1b[0;31;40m' + 'Switching to POLCO' + '\x1b[0m')
+            args.polco = True
+
     if args.model_path == '':
         mp_print('No model given, please specify --model_path')
         exit()
@@ -302,6 +298,10 @@ if __name__ == '__main__':
     orig_N = network.N
 
     if args.direct:
+        # Initialise mpi4py only here, because it can not be started when using mplrs due to
+        # only being able to run one instance at a time, and mpi4py creates an instance on import.
+        mpi_init()
+
         from ecmtool.intersect_directly_mpi import intersect_directly, remove_cycles, \
             compress_after_cycle_removing, check_if_intermediate_cone_exists
 
@@ -323,7 +323,7 @@ if __name__ == '__main__':
         hide_indices = [ind for ind, metab in enumerate(network.metabolites) if
                         (metab.is_external) & (metab.direction == args.hide_all_in_or_outputs) & (
                             not metab.id == 'objective_virtout') & (
-                                    metab.id.replace("_virtin", "").replace("_virtout", "") not in tag_ids)]
+                                metab.id.replace("_virtin", "").replace("_virtout", "") not in tag_ids)]
         network.hide(hide_indices)
 
     if args.compress:
@@ -415,13 +415,12 @@ if __name__ == '__main__':
             normalised = np.transpose(normalize_columns(np.transpose(cone)))
             np.savetxt(args.out_path, normalised, delimiter=',', header=','.join(ids), comments='')
 
-            
     if args.verbose is True:
         print('Found %s ECMs' % cone.shape[0])
-          
+
     if args.print_conversions is True:
         print_ecms_direct(np.transpose(cone), ids)
-    
+
     end = time()
     mp_print('Ran in %f seconds' % (end - start))
     os._exit(0)
