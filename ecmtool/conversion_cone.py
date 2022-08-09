@@ -85,7 +85,7 @@ def split_columns(matrix, columns):
 
 
 def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], input_metabolites=[], output_metabolites=[],
-                        only_rays=False, verbose=False, redund_after_polco=True):
+                        only_rays=False, verbose=False, redund_after_polco=True, polco=False, processes=None, jvm_mem=None, path2mplrs=None):
     """
     Calculates the conversion cone as described in (Urbanczik, 2005).
     :param N: stoichiometry matrix
@@ -96,8 +96,13 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
     :param only_rays: return only the extreme rays of the conversion cone, and not the elementary vectors (ECMs instead of ECVs)
     :param verbose: print status messages during enumeration
     :param redund_after_polco: Optionally remove redundant rays from H_eq and H_ineq before final extreme ray enumeration by Polco
+    :param polco: set to True to make computation with polco
+    :param processes: integer value giving the number of processes
+    :param jvm_mem: tuple of integer giving the minimum and maximum number of java VM memory in GB
+    :param path2mplrs: absolute path to mplrs binary
     :return: matrix with conversion cone "c" as row vectors
     """
+    
     if mpi_wrapper.is_first_process():
         amount_metabolites, amount_reactions = N.shape[0], N.shape[1]
 
@@ -144,7 +149,7 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
              print('Calculating extreme rays H of inequalities system G')
 
         # Calculate generating set of the dual of our initial conversion cone C0, C0*
-        rays = get_extreme_rays(np.append(linearities, G_rev, axis=0), G_irrev, verbose=verbose)
+        rays = get_extreme_rays(np.append(linearities, G_rev, axis=0), G_irrev, verbose=verbose, polco=polco, processes=processes, jvm_mem=jvm_mem, path2mplrs=path2mplrs)
 
         # if rays.shape[0] == 0:
         #     print('Warning: given system has no nonzero inequalities H. Returning empty conversion cone.')
@@ -290,8 +295,9 @@ def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], inp
 
                 H_eq = np.append(H_eq, linearities, axis=0)
 
-        rays = get_extreme_rays(H_eq if len(H_eq) else None, H_ineq, verbose=verbose)
-
+        rays = get_extreme_rays(H_eq if len(H_eq) else None, H_ineq, verbose=verbose, polco=polco, processes=processes, jvm_mem=jvm_mem, path2mplrs=path2mplrs)
+        
+        
         # When calculating only extreme rays, we need to add linealities in both directions
         if only_rays and len(in_out_metabolites) > 0:
             rays = np.append(rays, linearity_rays, axis=0)

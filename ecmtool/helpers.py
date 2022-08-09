@@ -118,33 +118,204 @@ def nullspace(N, symbolic=True, atol=1e-13, rtol=0):
             else np.ndarray(shape=(N.shape[0], 0))
 
 
-def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True, verbose=False):
-    if not os.path.isdir(relative_path('tmp')):
-        os.makedirs(relative_path('tmp'))
+def write_mplrs_matrix(textfile, matrix):
+    """
+    Writes ndarray to ine file for calculations with mplrs.
+    :param textfile: path to output file
+    :param matrix: ndarray
+    :return: None
+    """
+    for line in matrix:
+        textfile.write('0' + ' ')
+        for val in line:
+            textfile.write(str(val) + ' ')
+        textfile.write('\n')
+    
 
-    rand = randint(1, 10 ** 6)
+def write_header_no_linearity(textfile, inequality_matrix, d):
+    """
+    Writes header of ine file for calculations with mplrs if equality matrix is None.
+    :param textfile: path to output file
+    :param inequality_matrix: ndarray with inequalities
+    :param d: dimensional parameter for ine file giving the width of the matrix
+    :return: None
+    """
+    textfile.write('H-representation' + ' \n')
+    textfile.write('begin' + ' \n')
+    textfile.write(str(len(inequality_matrix)) + ' ' + str(d) +  ' ' + 'rational' + ' \n')
+    
+    
+def write_header_with_linearity(textfile, linearity, d, m=None):
+    """
+    Writes header of ine file for calculations with mplrs.
+    :param textfile: path to output file
+    :param linearity: number of rows that are equations (mplrs parameter)
+    :param d: dimensional parameter for ine file giving the width of the matrix (mplrs parameter)
+    :param m: dimensional parameter for ine file giving the number of rows (mplrs parameter)
+    :return: None
+    """
+    linearity_list = [*range(1,linearity+1,1)]
+    textfile.write('H-representation' + ' \n')
+    textfile.write('linearity' + ' ' + str(linearity) + ' ')
+    for i in linearity_list:
+        textfile.write(str(i) + ' ')
+    textfile.write(' \n')
+    textfile.write('begin' + ' \n')
 
-    if inequality_matrix is not None and inequality_matrix.shape[0] == 0:
-        inequality_matrix = None
+    if m is None:
+        textfile.write(str(linearity) + ' ' + str(d) +  ' ' + 'rational' + ' \n')
+    else:
+        textfile.write(str(m) + ' ' + str(d) +  ' ' + 'rational' + ' \n')
+          
+    
+def write_mplrs_input(equality_matrix, inequality_matrix, mplrs_path, verbose=False):
+    """
 
-    if equality_matrix is not None and equality_matrix.shape[0] == 0:
-        equality_matrix = None
+    :param equality_matrix: ndarray with equalities
+    :param inequality_matrix: ndarray with inequalities
+    :param mplrs_path: absolute path to mplrs binary
+    :param verbose: print status messages during enumeration
+    :return: d dimensional parameter for ine file giving the width of the matrix
+    """
+    if inequality_matrix is not None:
+        inequality_matrix = inequality_matrix.tolist()
 
-    if inequality_matrix is None:
-        if equality_matrix is not None:
-            # inequality_matrix = np.identity(equality_matrix.shape[1])
-            inequality_matrix = np.zeros(shape=(1, equality_matrix.shape[1]))
-        else:
-            raise Exception('No equality or inequality argument given')
+    if equality_matrix is not None:
+        equality_matrix = equality_matrix.tolist()
 
-    # if inequality_matrix.shape[1] < 50:
-    #     if verbose:
-    #         print('Using CDD instead of Polco for enumeration of small system')
-    #     ineq = np.append(np.append(equality_matrix, -equality_matrix, axis=0), inequality_matrix, axis=0)
-    #     for ray in get_extreme_rays_cdd(ineq):
-    #         yield ray
-    #     return
+    textfile = open(mplrs_path, "w")
 
+    if equality_matrix is None:
+        d = len(inequality_matrix[0] ) + 1
+        write_header_no_linearity(textfile, inequality_matrix, d, m=None)
+        if verbose:
+            print('Writing inequalities to file')
+        write_mplrs_matrix(textfile, inequality_matrix)
+
+    elif inequality_matrix is None:
+        linearity = len(equality_matrix)
+        d = len(equality_matrix[0] ) + 1
+        write_header_with_linearity(textfile, linearity, d, m=None)
+        if verbose:
+            print('Writing equalities to file')
+        write_mplrs_matrix(textfile, equality_matrix)
+
+    else:
+        linearity = len(equality_matrix)
+        d = len(equality_matrix[0] ) + 1
+        m = linearity + len(inequality_matrix)
+        write_header_with_linearity(textfile, linearity, d, m)
+        if verbose:
+            print('Writing equalities to file')
+        write_mplrs_matrix(textfile, equality_matrix)
+        if verbose:
+            print('Writing inequalities to file')
+        write_mplrs_matrix(textfile, inequality_matrix)
+
+    textfile.write('end' + ' \n')
+    textfile.close()
+    return d
+
+
+def parse_mplrs_output(mplrs_output_path, d, verbose=False):
+    """
+    Parses mplrs output file. Removes header and footer, as well as origin vertex (first column in matrix of outputfile)
+    :param mplrs_output_path: absolute path to mplrs binary
+    :param d: dimensional parameter for ine file giving the width of the matrix
+    :param verbose: print status messages during enumeration
+    :return: computed rays as ndarray
+    """
+    if verbose:
+        print('Parsing computed rays')
+        
+    with open(mplrs_output_path, 'r') as file:
+        lines = file.readlines()
+        rays_vertices = np.ndarray(shape=(0, d))
+
+        if len(lines) > 0:
+            begin = lines.index("begin\n")
+            start = begin + 3
+            stop = lines.index("end\n")
+            end = len(lines) - stop
+            del lines[-end:]
+            del lines[:start]
+            
+            number_lines = len(lines)
+            rays_vertices = np.repeat(np.repeat(to_fractions(np.zeros(shape=(1, 1))), d, axis=1), number_lines, axis=0)
+
+            for row, line in enumerate(lines):
+                for column, value in enumerate(line.replace('\n', '').split()):
+                    if value != '0':
+                        rays_vertices[row, column] = Fraction(str(value))
+                        
+    rays = rays_vertices[:,1:]
+    
+    return rays
+
+
+def get_extreme_rays_mplrs(equality_matrix, inequality_matrix, processes, rand, path2mplrs, verbose=False):
+    """
+    Calculates extreme rays using mplrs. Includes generation of input file, calculations and parsing of output file.
+    :param equality_matrix: ndarray containing all equalities
+    :param inequality_matrix: ndarray containing all inequalities
+    :param processes: integer value giving the number of processes
+    :param rand: random integer value for generating tmp file names
+    :param path2mplrs: absolute path to mplrs binary
+    :param verbose: print status messages during enumeration
+    :return: ndarray with computed rays
+    """
+
+    mplrs_input_path = relative_path('tmp' + os.sep + 'mplrs_%d.ine' % rand)
+    mplrs_redund_path = relative_path('tmp' + os.sep + 'redund_%d.ine' % rand)
+    mplrs_output_path = relative_path('tmp' + os.sep + 'mplrs_%d.out' % rand)
+
+    # Write mplrs input files to disk
+    width_matrix = write_mplrs_input(equality_matrix, inequality_matrix, mplrs_input_path, verbose=False)
+    
+    if path2mplrs is None:
+        if verbose:
+            print('Running mplrs redund')
+        check_call((('mpirun -np 3 mplrs -redund %s' % mplrs_input_path) + (' %s' % mplrs_redund_path)),shell=True)
+        
+        if verbose:
+            print('Running mplrs with %s processes' % processes)
+        check_call((('mpirun -np %s' % processes) + (' mplrs %s' % mplrs_redund_path) + (' %s' % mplrs_output_path)),shell=True)
+ 
+    else:
+        if verbose:
+            print('Running mplrs redund')
+        check_call((('mpirun -np 3 %s' % path2mplrs) + (' -redund %s' % mplrs_input_path) + (' %s' % mplrs_redund_path)),shell=True)
+        
+        if verbose:
+            print('Running mplrs with %s processes' % processes)
+        check_call((('mpirun -np %s' % processes) + (' %s' % path2mplrs) + (' %s' % mplrs_redund_path) + (' %s' % mplrs_output_path)),shell=True)
+
+    # Parse resulting extreme rays
+    rays = parse_mplrs_output(mplrs_output_path, width_matrix, verbose=False)
+
+    if verbose:
+        print('Done parsing rays')
+
+    # Clean up the files created above
+    remove(mplrs_input_path)
+    remove(mplrs_redund_path)
+    remove(mplrs_output_path)
+
+    return rays
+
+    
+def get_extreme_rays_polco(equality_matrix, inequality_matrix, rand, jvm_mem, processes, symbolic=True, verbose=False):
+    """
+    Calculates extreme rays using polco. Includes generation of input file, calculations and parsing of output file.
+    :param equality_matrix: equality_matrix: ndarray containing all equalities
+    :param inequality_matrix: inequality_matrix: ndarray containing all inequalities
+    :param rand: random integer value for generating tmp file names
+    :param jvm_mem: tuple of integer giving the minimum and maximum number of java VM memory in GB
+    :param processes: integer value giving the number of processes
+    :param symbolic: set to False to compute nullspace numerically instead of symbolically
+    :param verbose: print status messages during enumeration
+    :return: ndarray with computed rays
+    """
     # Write equalities system to disk as space separated file
     if verbose:
         print('Writing equalities to file')
@@ -161,9 +332,13 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True
             file.write(' '.join([str(val) for val in inequality_matrix[row, :]]) + '\n')
 
     # Run external extreme ray enumeration tool
-    min_mem, max_mem = get_min_max_java_memory()
+    if jvm_mem == None:
+        min_mem, max_mem = get_min_max_java_memory()
+    else:
+        min_mem, max_mem = jvm_mem   
+    
     if verbose:
-        print('Running polco (%d-%d GiB java VM memory)' % (min_mem, max_mem))
+        print('Running polco (%d-%d GiB java VM memory)' % (min_mem, max_mem), 'with "-maxthreads" %s' % processes)
 
     equality_path = relative_path('tmp' + os.sep + 'eq_%d.txt' % rand)
     inequality_path = relative_path('tmp' + os.sep + 'iq_%d.txt' % rand)
@@ -172,6 +347,7 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True
         polco_path = relative_path('polco' + os.sep + 'polco.jar')
         check_call(('java -Xms%dg -Xmx%dg ' % (min_mem, max_mem) +
                     '-jar %s -kind text -sortinput AbsLexMin ' % polco_path +
+                    '-maxthreads %s ' % processes +
                     '-arithmetic %s ' % (' '.join(['fractional' if symbolic else 'double'] * 3)) +
                     '-zero %s ' % (' '.join(['NaN' if symbolic else '1e-10'] * 3)) +
                     ('' if equality_matrix is None else '-eq %s ' % equality_path) +
@@ -204,9 +380,50 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, symbolic=True
     # Clean up the files created above
     if equality_matrix is not None:
         remove(equality_path)
-
     remove(inequality_path)
     remove(generators_path)
+
+    return rays
+
+
+def get_extreme_rays(equality_matrix=None, inequality_matrix=None, verbose=False, polco=False, processes=None, jvm_mem=None, path2mplrs=None):
+    """
+    Calculates extreme rays using either mplrs or polco.
+    :param equality_matrix: equality_matrix: ndarray containing all equalities
+    :param inequality_matrix: inequality_matrix: ndarray containing all inequalities
+    :param verbose: print status messages during enumeration
+    :param polco: set to True to make computation with polco
+    :param processes: integer value giving the number of processes
+    :param jvm_mem: tuple of integer giving the minimum and maximum number of java VM memory in GB
+    :param path2mplrs: absolute path to mplrs binary
+    :return: ndarray with computed rays
+    """
+    if not os.path.isdir(relative_path('tmp')):
+        os.makedirs(relative_path('tmp'))
+
+    rand = randint(1, 10 ** 6)
+
+    if inequality_matrix is not None and inequality_matrix.shape[0] == 0:
+        inequality_matrix = None
+
+    if equality_matrix is not None and equality_matrix.shape[0] == 0:
+        equality_matrix = None
+
+    if inequality_matrix is None:
+        if equality_matrix is not None:
+            inequality_matrix = np.zeros(shape=(1, equality_matrix.shape[1]))
+        else:
+            raise Exception('No equality or inequality argument given')
+
+    if polco is True:
+        if verbose:
+            print('Starting enumeration with polco')
+        rays = get_extreme_rays_polco(equality_matrix, inequality_matrix, rand, jvm_mem, processes, symbolic=True, verbose=verbose)
+    else:
+        if verbose:
+            print('Starting enumeration with mplrs')
+        rays = get_extreme_rays_mplrs(equality_matrix, inequality_matrix, processes, rand, path2mplrs, verbose=verbose)
+        
 
     return rays
 
