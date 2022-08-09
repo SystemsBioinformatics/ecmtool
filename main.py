@@ -300,7 +300,7 @@ if __name__ == '__main__':
     if args.direct:
         # Initialise mpi4py only here, because it can not be started when using mplrs due to
         # only being able to run one instance at a time, and mpi4py creates an instance on import.
-        mpi_init()
+        mpi_wrapper.mpi_init()
 
         from ecmtool.intersect_directly_mpi import intersect_directly, remove_cycles, \
             compress_after_cycle_removing, check_if_intermediate_cone_exists
