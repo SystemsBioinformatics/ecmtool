@@ -273,22 +273,15 @@ def get_extreme_rays_mplrs(equality_matrix, inequality_matrix, processes, rand, 
     width_matrix = write_mplrs_input(equality_matrix, inequality_matrix, mplrs_input_path, verbose=False)
     
     if path2mplrs is None:
-        if verbose:
-            print('Running mplrs redund')
-        check_call((('mpirun -np 3 mplrs -redund %s' % mplrs_input_path) + (' %s' % mplrs_redund_path)),shell=True)
-        
-        if verbose:
-            print('Running mplrs with %s processes' % processes)
-        check_call((('mpirun -np %s' % processes) + (' mplrs %s' % mplrs_redund_path) + (' %s' % mplrs_output_path)),shell=True)
- 
-    else:
-        if verbose:
-            print('Running mplrs redund')
-        check_call((('mpirun -np 3 %s' % path2mplrs) + (' -redund %s' % mplrs_input_path) + (' %s' % mplrs_redund_path)),shell=True)
-        
-        if verbose:
-            print('Running mplrs with %s processes' % processes)
-        check_call((('mpirun -np %s' % processes) + (' %s' % path2mplrs) + (' %s' % mplrs_redund_path) + (' %s' % mplrs_output_path)),shell=True)
+        path2mplrs = 'mplrs'
+
+    if verbose:
+        print('Running mplrs redund')
+    check_call(f'mpirun -np 3 mplrs -redund {mplrs_input_path} {mplrs_redund_path}', shell=True)
+
+    if verbose:
+        print(f'Running mplrs with {processes} processes')
+    check_call(f'mpirun -np {processes} mplrs {mplrs_redund_path} {mplrs_output_path}', shell=True)
 
     # Parse resulting extreme rays
     rays = parse_mplrs_output(mplrs_output_path, width_matrix, verbose=False)
@@ -485,6 +478,11 @@ def redund(matrix, verbose=False):
     with open(matrix_nonredundant_path) as file:
         lines = file.readlines()
         for line in [line for line in lines if line not in ['\n', '']]:
+            # Stop after "end" line has been read
+            # (needed as from lrslib 0.71a onwards, a row of numbers for deleted column
+            # was added, that otherwise erroneously gets added to matrix_nored)
+            if line.startswith('end'):
+                break
             # Skip comment and INE format lines
             if np.any([target in line for target in ['*', 'V-representation', 'begin', 'end', 'rational']]):
                 continue

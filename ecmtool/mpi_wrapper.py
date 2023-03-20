@@ -11,7 +11,7 @@ def mpi_init():
     try:
         from mpi4py import MPI
     except ImportError:
-        print("Since the mpi4py-package is not installed, parallel computation is not possible for ecmtool. "
+        print("Since the mpi4py-package is not installed, parallel computation is not possible for direct enumeration. "
               "This package does not work properly on Windows, but can be installed on other operating systems.")
         return
 
