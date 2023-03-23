@@ -277,11 +277,11 @@ def get_extreme_rays_mplrs(equality_matrix, inequality_matrix, processes, rand, 
 
     if verbose:
         print('Running mplrs redund')
-    check_call(f'mpirun -np 3 mplrs -redund {mplrs_input_path} {mplrs_redund_path}', shell=True)
+    check_call(f'mpirun -np 3 {path2mplrs} -redund {mplrs_input_path} {mplrs_redund_path}', shell=True)
 
     if verbose:
         print(f'Running mplrs with {processes} processes')
-    check_call(f'mpirun -np {processes} mplrs {mplrs_redund_path} {mplrs_output_path}', shell=True)
+    check_call(f'mpirun -np {processes} {path2mplrs} {mplrs_redund_path} {mplrs_output_path}', shell=True)
 
     # Parse resulting extreme rays
     rays = parse_mplrs_output(mplrs_output_path, width_matrix, verbose=False)
