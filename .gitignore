@@ -22,3 +22,4 @@ ecntoollocal/
 .idea/inspectionProfiles/Project_Default.xml
 *.ini
 *.bak
+ecmtool_timestamps/*
