@@ -22,3 +22,6 @@ ecntoollocal/
 .idea/inspectionProfiles/Project_Default.xml
 *.ini
 *.bak
+lrslib-071a/
+ecmtool_timestamps/
+/lrslib-071a.tar.gz
