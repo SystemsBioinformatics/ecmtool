@@ -1,0 +1,12 @@
+name: 'Run in docker'
+description: 'Runs the specified command inside a Docker container using the ecmtool Dockerfile'
+inputs:
+  command:  # id of input
+    description: 'Command to execute in shell'
+    required: true
+
+runs:
+  using: 'docker'
+  image: 'docker/Dockerfile'
+  args:
+    - ${{ inputs.command }}
