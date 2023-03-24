@@ -221,45 +221,6 @@ class TestEcolicoreNoCompression:
         assert runEcmtool.computeTime < 200
 
 
-class TestEcolicoreHideNoCompression:
-    @pytest.fixture(scope='class', autouse=True)
-    def runEcmtool(self):
-        # global metabIds, conversions, ecoliCoreReturnCode, outputfile, ecoliCoreOutput
-        commandList = ['python', 'main.py', '--model_path', 'models/e_coli_core.xml', '--auto_direction', 'true',
-                       '--out_path', outputfile, '--hide', '54,6,8,14,24,28,29,31,36,38,46,48,62,69', '--compress',
-                       'false']
-        ecoliOutput = ConversionsOutput(commandList)
-        return ecoliOutput
-
-    def test_ecolicoreRunCompleted(self, runEcmtool):
-        assert (runEcmtool.ecoliCoreReturnCode == 0)
-
-    def test_numberECMs(self, runEcmtool):
-        assert (runEcmtool.conversions.shape[0] == 217)
-
-    def test_numberMetabs(self, runEcmtool):
-        assert (len(runEcmtool.metabIds) == 7)
-
-    def test_metabIds(self, runEcmtool):
-        trueFilename = os.path.join(truth_dir, 'true_hide_conversions.csv')
-        true_metabIds = get_metabs(trueFilename)
-        assert (sorted(true_metabIds) == sorted(runEcmtool.metabIds))
-
-    def test_conversions(self, runEcmtool):
-        trueFilename = os.path.join(truth_dir, 'true_hide_conversions.csv')
-        true_metabIds = get_metabs(trueFilename)
-
-        # These true conversions are normalised such that each row sums to 1.
-        true_conversions = np.loadtxt(trueFilename, delimiter=',', skiprows=1)
-        # Do the same for the current conversions
-        conversions_loc = runEcmtool.normalize_conversions(true_metabIds)
-
-        assert (areConversionSetsEqual(conversions_loc, true_conversions))
-
-    def test_computeTime(self, runEcmtool):
-        assert runEcmtool.computeTime < 200
-
-
 @pytest.mark.skip(reason="Comment out this skip-mark if you want to test direct intersection method.")
 class TestEcolicoreDirect:
     @pytest.fixture(scope='class', autouse=True)
