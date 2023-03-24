@@ -266,7 +266,11 @@ if __name__ == '__main__':
 
     parser = ArgumentParser(
         description='Calculate Elementary Conversion Modes from an SBML model. For medium-to large networks, be sure to define --inputs and --outputs. This reduces the enumeration problem complexity considerably.')
-    parser.add_argument('command', nargs='?', default='all')
+    parser.add_argument('command', nargs='?', default='all',
+                        help='Optional: run only a single step of ecmtool, continuing from the state of the previous step. \n'
+                             'Allowed values (in order of execution): preprocess, direct_intersect (only when --direct true),\n'
+                             'calc_linearities, prep_C0_rays, calc_C0_rays, process_C0_rays, calc_H, prep_C_rays, calc_C_rays,\n'
+                             'process_C_rays, postprocess, save_ecms. Omit to run all steps.')
     parser.add_argument('--model_path', type=str, default='models/active_subnetwork_KO_5.xml',
                         help='Relative or absolute path to an SBML model .xml file')
     parser.add_argument('--direct', type=str2bool, default=False,
