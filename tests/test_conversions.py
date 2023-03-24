@@ -144,51 +144,50 @@ class TestEcolicoreHide:
         assert runEcmtool.computeTime < 100
 
 
-class TestEcolicoreHideTag:
+class TestKO4Tag:
     @pytest.fixture(scope='class', autouse=True)
     def runEcmtool(self):
         # global metabIds, conversions, ecoliCoreReturnCode, outputfile, ecoliCoreOutput
-        commandList = ['python', 'main.py', '--model_path', 'models/sxp_toy.xml', '--auto_direction', 'true', '--tag',
-                       '0', '--out_path', outputfile]
+        commandList = ['python', 'main.py', '--model_path', 'models/active_subnetwork_KO_4.xml', '--auto_direction',
+                       'true', '--tag', '7', '--out_path', outputfile]
         ecoliOutput = ConversionsOutput(commandList)
-        ecoliOutput.conversions = ecoliOutput.conversions[None, :]
         return ecoliOutput
 
     def test_ecolicoreRunCompleted(self, runEcmtool):
         assert (runEcmtool.ecoliCoreReturnCode == 0)
 
     def test_numberECMs(self, runEcmtool):
-        assert (runEcmtool.conversions.shape[0] == 1)
+        assert (runEcmtool.conversions.shape[0] == 83)
 
     def test_numberMetabs(self, runEcmtool):
-        assert (len(runEcmtool.metabIds) == 4)
+        assert (len(runEcmtool.metabIds) == 13)
 
     def test_metabIds(self, runEcmtool):
-        trueFilename = os.path.join(truth_dir, 'true_sxp_tag_conversions.csv')
+        trueFilename = os.path.join(truth_dir, 'true_KO4_tag.csv')
         true_metabIds = get_metabs(trueFilename)
         assert (sorted(true_metabIds) == sorted(runEcmtool.metabIds))
 
     def test_conversions(self, runEcmtool):
-        trueFilename = os.path.join(truth_dir, 'true_sxp_tag_conversions.csv')
+        trueFilename = os.path.join(truth_dir, 'true_KO4_tag.csv')
         true_metabIds = get_metabs(trueFilename)
 
         # These true conversions are normalised such that each row sums to 1.
-        true_conversions = np.loadtxt(trueFilename, delimiter=',', skiprows=1)[None, :]
+        true_conversions = np.loadtxt(trueFilename, delimiter=',', skiprows=1)
         # Do the same for the current conversions
         conversions_loc = runEcmtool.normalize_conversions(true_metabIds)
 
         assert (areConversionSetsEqual(conversions_loc, true_conversions))
 
     def test_computeTime(self, runEcmtool):
-        assert runEcmtool.computeTime < 10
+        assert runEcmtool.computeTime < 20
 
 
-class TestEcolicoreNoCompression:
+class TestKO2NoCompression:
     @pytest.fixture(scope='class', autouse=True)
     def runEcmtool(self):
         # global metabIds, conversions, ecoliCoreReturnCode, outputfile, ecoliCoreOutput
-        commandList = ['python', 'main.py', '--model_path', 'models/e_coli_core.xml', '--auto_direction', 'true',
-                       '--out_path', outputfile, '--compress', 'false']
+        commandList = ['python', 'main.py', '--model_path', 'models/active_subnetwork_KO_2.xml', '--auto_direction',
+                       'true', '--out_path', outputfile, '--compress', 'false']
         ecoliOutput = ConversionsOutput(commandList)
         return ecoliOutput
 
@@ -196,18 +195,18 @@ class TestEcolicoreNoCompression:
         assert (runEcmtool.ecoliCoreReturnCode == 0)
 
     def test_numberECMs(self, runEcmtool):
-        assert (runEcmtool.conversions.shape[0] == 689)
+        assert (runEcmtool.conversions.shape[0] == 11)
 
     def test_numberMetabs(self, runEcmtool):
-        assert (len(runEcmtool.metabIds) == 21)
+        assert (len(runEcmtool.metabIds) == 11)
 
     def test_metabIds(self, runEcmtool):
-        trueFilename = os.path.join(truth_dir, 'true_ecolicore_conversions.csv')
+        trueFilename = os.path.join(truth_dir, 'true_KO2.csv')
         true_metabIds = get_metabs(trueFilename)
         assert (sorted(true_metabIds) == sorted(runEcmtool.metabIds))
 
     def test_conversions(self, runEcmtool):
-        trueFilename = os.path.join(truth_dir, 'true_ecolicore_conversions.csv')
+        trueFilename = os.path.join(truth_dir, 'true_KO2.csv')
         true_metabIds = get_metabs(trueFilename)
 
         # These true conversions are normalised such that each row sums to 1.
@@ -221,12 +220,12 @@ class TestEcolicoreNoCompression:
         assert runEcmtool.computeTime < 200
 
 
-@pytest.mark.skip(reason="Comment out this skip-mark if you want to test direct intersection method.")
-class TestEcolicoreDirect:
+# @pytest.mark.skip(reason="Comment out this skip-mark if you want to test direct intersection method.")
+class TestKO2Direct:
     @pytest.fixture(scope='class', autouse=True)
     def runEcmtool(self):
         # global metabIds, conversions, ecoliCoreReturnCode, outputfile, ecoliCoreOutput
-        commandList = ['python', 'main.py', '--model_path', 'models/e_coli_core.xml', '--auto_direction', 'true',
+        commandList = ['python', 'main.py', '--model_path', 'models/active_subnetwork_KO_2.xml', '--auto_direction', 'true',
                        '--out_path', outputfile, '--direct', 'True']
         ecoliOutput = ConversionsOutput(commandList)
         return ecoliOutput
@@ -235,18 +234,18 @@ class TestEcolicoreDirect:
         assert (runEcmtool.ecoliCoreReturnCode == 0)
 
     def test_numberECMs(self, runEcmtool):
-        assert (runEcmtool.conversions.shape[0] == 689)
+        assert (runEcmtool.conversions.shape[0] == 11)
 
     def test_numberMetabs(self, runEcmtool):
-        assert (len(runEcmtool.metabIds) == 21)
+        assert (len(runEcmtool.metabIds) == 11)
 
     def test_metabIds(self, runEcmtool):
-        trueFilename = os.path.join(truth_dir, 'true_ecolicore_conversions.csv')
+        trueFilename = os.path.join(truth_dir, 'true_KO2.csv')
         true_metabIds = get_metabs(trueFilename)
         assert (sorted(true_metabIds) == sorted(runEcmtool.metabIds))
 
     def test_conversions(self, runEcmtool):
-        trueFilename = os.path.join(truth_dir, 'true_ecolicore_conversions.csv')
+        trueFilename = os.path.join(truth_dir, 'true_KO2.csv')
         true_metabIds = get_metabs(trueFilename)
 
         # These true conversions are normalised such that each row sums to 1.
