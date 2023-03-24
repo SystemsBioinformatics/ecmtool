@@ -8,18 +8,6 @@ from .intersect_directly_mpi import independent_rows
 from ecmtool import mpi_wrapper
 
 
-def normalize_rows(M):
-    row_max = abs(M.max(axis=1))
-    return M / np.transpose(np.asarray(np.asmatrix(row_max, dtype='object'), dtype='object'))
-
-
-def get_rownames(A):
-    rownames = []
-    for row_index in range(A.shape[0]):
-        rownames.append([index for index, value in enumerate(A[row_index, :]) if value != 0])
-    return rownames
-
-
 def deflate_matrix(A, columns_to_keep):
     reduced_A = A[:, columns_to_keep]
 
@@ -38,50 +26,10 @@ def inflate_matrix(A, kept_columns, original_width):
     return B
 
 
-def get_zero_set(G, equalities):
-    dot_products = np.transpose(np.asarray([np.dot(G, equality) for equality in equalities]))
-    zero_set = [set([index for index, value in enumerate(row) if value == 0]) for row in dot_products]
-    return zero_set
-
-
-def drop_nonextreme(G, zero_set, verbose=False):
-    keep_rows = []
-
-    for row in range(G.shape[0]):
-        remove = False
-        for other_row in range(G.shape[0]):
-            # The current row (reaction) has a zero set that is
-            # a proper subset of another row's. This means the other
-            # row represents a more extreme vector in the same plane.
-            if zero_set[row] < zero_set[other_row]:
-                remove = True
-                break
-
-        if not remove:
-            keep_rows.append(row)
-
-
-    if verbose:
-        print('Removing %d nonextreme rays' % (G.shape[0] - len(keep_rows)))
-
-    return G[keep_rows, :]
-
-
-def split_columns_semipositively(matrix, columns):
-    orig_column_count = matrix.shape[1]
-    matrix = split_columns(matrix, columns)
-    semipositive_columns = columns + [orig_column_count + index for index in range(len(columns))]
-
-    for row in range(matrix.shape[0]):
-        for column in semipositive_columns:
-            matrix[row, column] = max(matrix[row, column], 0)
-
-    return matrix
-
-
 def split_columns(matrix, columns):
     matrix = np.append(matrix, -matrix[:, columns], axis=1)
     return matrix
+
 
 def calculate_linearities(N, reversible_reactions, external_metabolites, input_metabolites, output_metabolites, verbose=False):
     """
@@ -360,145 +308,3 @@ def post_process_rays(G, rays, linearity_rays, external_metabolites, extended_ex
         print('Enumerated %d rays' % len(rays_unique))
 
     return rays_unique
-
-
-def get_conversion_cone(N, external_metabolites=[], reversible_reactions=[], input_metabolites=[], output_metabolites=[],
-                        only_rays=False, verbose=False, redund_after_polco=True, polco=False, processes=None, jvm_mem=None, path2mplrs=None):
-    """
-    Calculates the conversion cone as described in (Urbanczik, 2005).
-
-    :param only_rays: return only the extreme rays of the conversion cone, and not the elementary vectors (ECMs instead of ECVs)
-    :param verbose: print status messages during enumeration
-    :param redund_after_polco: Optionally remove redundant rays from H_eq and H_ineq before final extreme ray enumeration by Polco
-    :param polco: set to True to make computation with polco
-    :param processes: integer value giving the number of processes
-    :param jvm_mem: tuple of integer giving the minimum and maximum number of java VM memory in GB
-    :param path2mplrs: absolute path to mplrs binary
-    :return: matrix with conversion cone "c" as row vectors
-    """
-    calculate_linearities()
-    calc_C0_dual_extreme_rays()
-    calc_H()
-    calc_C_extreme_rays()
-    post_process_rays()
-
-
-def get_pseudo_external_direction(network, metabolite_index):
-    number_pos = 0
-    number_neg = 0
-
-    involved_reactions = np.where(network.N[metabolite_index, :] != 0)[0]
-
-    for reaction_index in involved_reactions:
-        reaction = network.reactions[reaction_index]
-        if reaction.reversible:
-            return 'both'
-
-        stoich = network.N[metabolite_index, reaction_index]
-        if stoich > 0:
-            number_pos += 1
-        elif stoich < 0:
-            number_neg += 1
-
-    return 'output' if number_neg == 0 else ('input' if number_pos == 0 else 'both')
-
-
-def get_adjacent_metabolites(adjacency_matrix, metabolite_index):
-    return np.where(adjacency_matrix[metabolite_index, :] != 0)[0]
-
-
-def get_matrix_information(matrix):
-    total_cells = matrix.shape[0] * matrix.shape[1]
-    total_nonzero = np.count_nonzero(matrix)
-    density = float(total_nonzero) / total_cells
-    max = np.max(matrix)
-
-    return density, max
-
-
-def print_network_information(name, network, only_count=False):
-    density, max = get_matrix_information(network.N)
-    metabolites, reactions = network.N.shape
-    number_external = len(network.external_metabolite_indices())
-    print('%s: density %.2f, %d metabolites (%d ext), %d reactions, max %.2f' %
-          (name, density, metabolites, number_external, reactions, max))
-
-    if not only_count:
-        print('metabolites: %s' % ', '.join(['%s (%s)' % (met.id, 'ext' if met.is_external else 'int') for met in network.metabolites]))
-
-
-def replace_conversions_into_network(network, temp_network, conversions, active_reactions, verbose=False):
-    if conversions.shape[0] == 0:
-        print('The following metabolites have no viable conversion:',
-              ', '.join([met.id for met in temp_network.metabolites]))
-        return
-
-    if verbose:
-        print('Got %d conversions' % conversions.shape[0])
-
-    if conversions.shape[0] > 400:
-        print('Running redund on conversions')
-        input("now at redund 547")
-        conversions = redund(conversions)
-
-    if verbose:
-        print('Removing %d reactions used in conversions from network, and nullified %d metabolites' %
-              (len(active_reactions),
-               len(temp_network.metabolites) - len(temp_network.external_metabolite_indices())))
-
-    keep_reactions = np.setdiff1d(range(len(network.reactions)), active_reactions)
-    network.N = network.N[:, keep_reactions]
-    network.reactions = list(np.asarray(network.reactions)[keep_reactions])
-
-    if verbose:
-        print('Adding %d uncompressed conversions to network' % conversions.shape[0])
-    network.N = np.append(network.N, np.transpose(temp_network.uncompress(conversions)), axis=1)
-
-    for _ in conversions:
-        network.reactions.append(Reaction('conversion', 'conversion', reversible=False))
-
-    if verbose:
-        print('Running redund on conversions in full network stoichiometry')
-    conversion_indices = np.where([r.id == 'conversion' for r in network.reactions])[0]
-    natural_reaction_indices = np.setdiff1d(range(network.N.shape[1]), conversion_indices)
-    all_conversions = network.N[:, conversion_indices]
-    all_naturals = network.N[:, natural_reaction_indices]
-    input("now at redund 574")
-    reduced_conversions = np.transpose(redund(np.transpose(all_conversions)))
-    network.N = np.append(all_naturals, reduced_conversions, axis=1)
-    network.reactions = [r for index, r in enumerate(network.reactions) if index in natural_reaction_indices] + \
-                        [Reaction('conversion', 'conversion', reversible=False) for _ in
-                         range(reduced_conversions.shape[1])]
-    return
-
-
-def subnetwork(network, metabolite_indices, reaction_indices):
-    temp_network = Network()
-    temp_network.N = network.N[:, reaction_indices]
-    temp_network.N = temp_network.N[metabolite_indices, :]
-    # temp_network.N = np.transpose(redund(np.transpose(temp_network.N)))
-    temp_network.reactions = list(np.asarray(network.reactions)[reaction_indices])
-    temp_network.compressed = True
-    temp_network.uncompressed_metabolite_ids = [met.id for met in network.metabolites]
-    temp_network.metabolites = [Metabolite(network.metabolites[index].id, network.metabolites[index].name,
-                                           network.metabolites[index].compartment,
-                                           network.metabolites[index].is_external,
-                                           network.metabolites[index].direction) for index in metabolite_indices]
-    return temp_network
-
-
-if __name__ == '__main__':
-    start = time()
-
-    S = np.asarray([
-        [-1, 0, 0],
-        [0, -1, 0],
-        [1, 0, -1],
-        [0, 1, -1],
-        [0, 0, 1]])
-    c = get_conversion_cone(S, [0, 1, 4], verbose=True)
-    print(c)
-
-    end = time()
-    print('Ran in %f seconds' % (end - start))
-    pass

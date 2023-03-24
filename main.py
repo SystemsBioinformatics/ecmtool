@@ -10,7 +10,7 @@ from scipy.optimize import linprog
 from subprocess import run
 
 from ecmtool import mpi_wrapper
-from ecmtool.conversion_cone import get_conversion_cone, calculate_linearities, calc_C0_dual_extreme_rays, calc_H, \
+from ecmtool.conversion_cone import calculate_linearities, calc_C0_dual_extreme_rays, calc_H, \
     calc_C_extreme_rays, post_process_rays
 from ecmtool.helpers import get_metabolite_adjacency, redund, to_fractions
 from ecmtool.helpers import mp_print, unsplit_metabolites, print_ecms_direct, normalize_columns
@@ -514,4 +514,4 @@ if __name__ == '__main__':
 
     end = time()
     mp_print('Ran in %f seconds' % (end - start))
-    os._exit(0)
+    # os._exit(0)
