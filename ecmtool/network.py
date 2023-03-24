@@ -1,4 +1,4 @@
-from fractions import Fraction
+from gmpy2 import mpq as Fraction
 
 import cbmpy
 import libsbml as sbml

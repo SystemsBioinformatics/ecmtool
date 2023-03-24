@@ -1,6 +1,6 @@
 import os
 import sys
-from fractions import Fraction
+from gmpy2 import mpq as Fraction
 from os import remove, devnull as os_devnull, system
 from random import randint
 from subprocess import check_call
