@@ -27,3 +27,4 @@ results/iIT_minII_4bac2849.csv
 examples_and_results/ecms.csv
 iIT.csv
 test_conversions.csv
+ecmtool_timestamps/*
