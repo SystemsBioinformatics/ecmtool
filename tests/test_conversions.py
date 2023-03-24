@@ -5,7 +5,9 @@ import os
 import csv
 from dataclasses import dataclass
 
-outputfile = 'test_conversions.csv'
+outputfile = os.path.join(os.getcwd(), 'tests', 'test_conversions.csv')
+truth_dir = os.path.join(os.getcwd(), 'tests', 'true_test_results')
+
 
 @dataclass
 class ConversionsOutput:
@@ -81,12 +83,12 @@ class TestEcolicore:
         assert (len(runEcolicore.metabIds) == 21)
 
     def test_metabIds(self, runEcolicore):
-        trueFilename = os.path.join(os.getcwd(), 'true_test_results', 'true_ecolicore_conversions.csv')
+        trueFilename = os.path.join(truth_dir, 'true_ecolicore_conversions.csv')
         true_metabIds = get_metabs(trueFilename)
         assert (sorted(true_metabIds) == sorted(runEcolicore.metabIds))
 
     def test_conversions(self, runEcolicore):
-        trueFilename = os.path.join(os.getcwd(), 'true_test_results', 'true_ecolicore_conversions.csv')
+        trueFilename = os.path.join(truth_dir, 'true_ecolicore_conversions.csv')
         true_metabIds = get_metabs(trueFilename)
 
         # These true conversions are normalised such that each row sums to 1.
@@ -116,12 +118,12 @@ class TestEcolicoreDirect:
         assert (len(runEcolicore.metabIds) == 21)
 
     def test_metabIds(self, runEcolicore):
-        trueFilename = os.path.join(os.getcwd(), 'true_test_results', 'true_ecolicore_conversions.csv')
+        trueFilename = os.path.join(truth_dir, 'true_ecolicore_conversions.csv')
         true_metabIds = get_metabs(trueFilename)
         assert (sorted(true_metabIds) == sorted(runEcolicore.metabIds))
 
     def test_conversions(self, runEcolicore):
-        trueFilename = os.path.join(os.getcwd(), 'true_test_results', 'true_ecolicore_conversions.csv')
+        trueFilename = os.path.join(truth_dir, 'true_ecolicore_conversions.csv')
         true_metabIds = get_metabs(trueFilename)
 
         # These true conversions are normalised such that each row sums to 1.
