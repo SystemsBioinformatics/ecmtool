@@ -264,14 +264,23 @@ def get_extreme_rays_mplrs(equality_matrix, inequality_matrix, processes, rand, 
     :param verbose: print status messages during enumeration
     :return: ndarray with computed rays
     """
+    width_matrix = prep_mplrs_input(equality_matrix, inequality_matrix)
+    execute_mplrs(processes=processes, path2mplrs=path2mplrs, verbose=verbose)
+    return process_mplrs_ouput(width_matrix=width_matrix, verbose=verbose)
 
-    mplrs_input_path = relative_path('tmp' + os.sep + 'mplrs_%d.ine' % rand)
-    mplrs_redund_path = relative_path('tmp' + os.sep + 'redund_%d.ine' % rand)
-    mplrs_output_path = relative_path('tmp' + os.sep + 'mplrs_%d.out' % rand)
 
+mplrs_input_path = relative_path('tmp' + os.sep + 'mplrs.ine')
+mplrs_redund_path = relative_path('tmp' + os.sep + 'redund.ine')
+mplrs_output_path = relative_path('tmp' + os.sep + 'mplrs.out')
+
+
+def prep_mplrs_input(equality_matrix, inequality_matrix):
     # Write mplrs input files to disk
     width_matrix = write_mplrs_input(equality_matrix, inequality_matrix, mplrs_input_path, verbose=False)
-    
+    return width_matrix
+
+
+def execute_mplrs(processes=3, path2mplrs=None, verbose=True):
     if path2mplrs is None:
         path2mplrs = 'mplrs'
 
@@ -283,6 +292,8 @@ def get_extreme_rays_mplrs(equality_matrix, inequality_matrix, processes, rand, 
         print(f'Running mplrs with {processes} processes')
     check_call(f'mpirun -np {processes} {path2mplrs} {mplrs_redund_path} {mplrs_output_path}', shell=True)
 
+
+def process_mplrs_ouput(width_matrix, verbose=True):
     # Parse resulting extreme rays
     rays = parse_mplrs_output(mplrs_output_path, width_matrix, verbose=False)
 

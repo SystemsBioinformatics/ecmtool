@@ -12,7 +12,8 @@ from subprocess import run
 from ecmtool import mpi_wrapper
 from ecmtool.conversion_cone import calculate_linearities, calc_C0_dual_extreme_rays, calc_H, \
     calc_C_extreme_rays, post_process_rays
-from ecmtool.helpers import get_metabolite_adjacency, redund, to_fractions
+from ecmtool.helpers import get_metabolite_adjacency, redund, to_fractions, prep_mplrs_input, execute_mplrs, \
+    process_mplrs_ouput
 from ecmtool.helpers import mp_print, unsplit_metabolites, print_ecms_direct, normalize_columns
 from ecmtool.intersect_directly_mpi import intersect_directly
 from ecmtool.network import extract_sbml_stoichiometry, add_reaction_tags, Network
@@ -249,6 +250,17 @@ def preprocess_sbml(args):
     return network, external_cycles
 
 
+def restore_data(filename):
+    with open(os.path.join('ecmtool', 'tmp', filename), 'rb') as file:
+        data = pickle.load(file)
+    return data
+
+
+def save_data(data, filename):
+    with open(os.path.join('ecmtool', 'tmp', filename), 'wb') as file:
+        pickle.dump(data, file)
+
+
 if __name__ == '__main__':
     start = time()
 
@@ -330,7 +342,7 @@ if __name__ == '__main__':
             if args.verbose is True:
                 mp_print('Found mplrs')
         except:
-            mp_print('\x1b[0;31;40m' + 'WARNING1: mplrs NOT found' + '\x1b[0m')
+            mp_print('\x1b[0;31;40m' + 'WARNING: mplrs NOT found' + '\x1b[0m')
             mp_print(
                 '\x1b[0;31;40m' + 'Make sure mplrs is installed properly, see http://cgm.cs.mcgill.ca/~avis/C/lrslib/USERGUIDE.html' + '\x1b[0m')
             mp_print(
@@ -354,19 +366,15 @@ if __name__ == '__main__':
 
     if args.command in ['preprocess', 'all']:
         network, external_cycles = preprocess_sbml(args)
-        with open(os.path.join('tmp', 'network.dat'), 'wb') as file:
-            pickle.dump(network, file)
-        with open(os.path.join('tmp', 'external_cycles.dat'), 'wb') as file:
-            pickle.dump(external_cycles, file)
+        save_data(network, 'network.dat')
+        save_data(external_cycles, 'external_cycles.dat')
 
     if args.direct:
         if args.command in ['direct_intersect', 'all']:
             if 'network' not in locals():
-                with open(os.path.join('tmp', 'network.dat'), 'rb') as file:
-                    network = pickle.load(file)
+                network = restore_data('network.dat')
             if 'external_cycles' not in locals():
-                with open(os.path.join('tmp', 'external_cycles.dat'), 'rb') as file:
-                    external_cycles = pickle.load(file)
+                external_cycles = restore_data('external_cycles.dat')
 
             # Direct intersection method
             R = network.N
@@ -385,110 +393,129 @@ if __name__ == '__main__':
                 T_intersected = np.concatenate((T_intersected, external_cycles_array, -external_cycles_array), axis=1)
 
             cone = np.transpose(T_intersected)
-            with open(os.path.join('tmp', 'cone.dat'), 'wb') as file:
-                pickle.dump(cone, file)
+            save_data(cone, 'cone.dat')
     else:
         # Indirect enumeration
         if args.command in ['calc_linearities', 'all']:
             if 'network' not in locals():
-                with open(os.path.join('tmp', 'network.dat'), 'rb') as file:
-                    network = pickle.load(file)
+                network = restore_data('network.dat')
 
             linearity_data = calculate_linearities(network.N, network.reversible_reaction_indices(),
                                                    network.external_metabolite_indices(),
                                                    network.input_metabolite_indices(),
                                                    network.output_metabolite_indices(), args.verbose)
-            with open(os.path.join('tmp', 'linearity_data.dat'), 'wb') as file:
-                pickle.dump(linearity_data, file)
+            save_data(linearity_data, 'linearity_data.dat')
 
-        if args.command in ['calc_C0_rays', 'all']:
-            if 'linearity_data' not in locals():
-                with open(os.path.join('tmp', 'linearity_data.dat'), 'rb') as file:
-                    linearity_data = pickle.load(file)
-            linearities, linearities_deflated, G_rev, G_irrev, amount_metabolites, \
-            extended_external_metabolites, in_out_indices = linearity_data
+        if args.polco:
+            if args.command in ['calc_C0_rays', 'all']:
+                if 'linearity_data' not in locals():
+                    linearity_data = restore_data('linearity_data.dat')
+                linearities, linearities_deflated, G_rev, G_irrev, amount_metabolites, \
+                extended_external_metabolites, in_out_indices = linearity_data
 
-            C0_dual_rays = calc_C0_dual_extreme_rays(linearities, G_rev, G_irrev,
-                                                     polco=args.polco, processes=args.processes, jvm_mem=args.jvm_mem,
-                                                     path2mplrs=args.path2mplrs)
-            with open(os.path.join('tmp', 'C0_dual_rays.dat'), 'wb') as file:
-                pickle.dump(C0_dual_rays, file)
+                C0_dual_rays = calc_C0_dual_extreme_rays(linearities, G_rev, G_irrev,
+                                                         polco=args.polco, processes=args.processes, jvm_mem=args.jvm_mem,
+                                                         path2mplrs=args.path2mplrs)
+                save_data(C0_dual_rays, 'C0_dual_rays.dat')
+        else:
+            # Using mplrs for enumeration
+            if args.command in ['prep_C0_rays', 'all']:
+                if 'linearity_data' not in locals():
+                    linearity_data = restore_data('linearity_data.dat')
+                linearities, linearities_deflated, G_rev, G_irrev, amount_metabolites, \
+                extended_external_metabolites, in_out_indices = linearity_data
+
+                width_matrix = prep_mplrs_input(np.append(linearities, G_rev, axis=0), G_irrev)
+                save_data(width_matrix, 'width_matrix.dat')
+            if args.command in ['calc_C0_rays', 'all']:
+                # This step gets skipped when running on a computing cluster,
+                # in order to run mplrs directly with mpirun.
+                execute_mplrs(processes=args.processes, path2mplrs=args.path2mplrs, verbose=args.verbose)
+            if args.command in ['process_C0_rays', 'all']:
+                if 'width_matrix' not in locals():
+                    width_matrix = restore_data('width_matrix.dat')
+                C0_dual_rays = process_mplrs_ouput(width_matrix, verbose=args.verbose)
+                save_data(C0_dual_rays, 'C0_dual_rays.dat')
 
         if args.command in ['calc_H', 'all']:
             if 'C0_dual_rays' not in locals():
-                with open(os.path.join('tmp', 'C0_dual_rays.dat'), 'rb') as file:
-                    C0_dual_rays = pickle.load(file)
+                C0_dual_rays = restore_data('C0_dual_rays.dat')
 
             if 'linearity_data' not in locals():
-                with open(os.path.join('tmp', 'linearity_data.dat'), 'rb') as file:
-                    linearity_data = pickle.load(file)
+                linearity_data = restore_data('linearity_data.dat')
             linearities, linearities_deflated, G_rev, G_irrev, amount_metabolites, \
             extended_external_metabolites, in_out_indices = linearity_data
 
             if 'network' not in locals():
-                with open(os.path.join('tmp', 'network.dat'), 'rb') as file:
-                    network = pickle.load(file)
+                network = restore_data('network.dat')
 
             H = calc_H(C0_dual_rays, linearities_deflated, network.external_metabolite_indices(),
                        network.input_metabolite_indices(),
                        network.output_metabolite_indices(), in_out_indices, redund_after_polco=args.redund_after_polco,
                        only_rays=args.only_rays, verbose=args.verbose)
+            save_data(H, 'H.dat')
 
-            with open(os.path.join('tmp', 'H.dat'), 'wb') as file:
-                pickle.dump(H, file)
+        if args.polco:
+            if args.command in ['calc_C_rays', 'all']:
+                if 'H' not in locals():
+                    H = restore_data('H.dat')
+                H_eq, H_ineq, linearity_rays = H
+                C_rays = calc_C_extreme_rays(H_eq, H_ineq,
+                                             polco=args.polco, processes=args.processes, jvm_mem=args.jvm_mem,
+                                             path2mplrs=args.path2mplrs)
 
-        if args.command in ['calc_C_rays', 'all']:
-            if 'H' not in locals():
-                with open(os.path.join('tmp', 'H.dat'), 'rb') as file:
-                    H = pickle.load(file)
-            H_eq, H_ineq, linearity_rays = H
-            C_rays = calc_C_extreme_rays(H_eq, H_ineq,
-                                         polco=args.polco, processes=args.processes, jvm_mem=args.jvm_mem,
-                                         path2mplrs=args.path2mplrs)
+                save_data(C_rays, 'C_rays.dat')
+        else:
+            # Using mplrs for enumeration
+            if args.command in ['prep_C_rays', 'all']:
+                if 'H' not in locals():
+                    H = restore_data('H.dat')
+                H_eq, H_ineq, linearity_rays = H
 
-            with open(os.path.join('tmp', 'C_rays.dat'), 'wb') as file:
-                pickle.dump(C_rays, file)
+                width_matrix = prep_mplrs_input(H_eq, H_ineq)
+                save_data(width_matrix, 'width_matrix.dat')
+            if args.command in ['calc_C_rays', 'all']:
+                # This step gets skipped when running on a computing cluster,
+                # in order to run mplrs directly with mpirun.
+                execute_mplrs(processes=args.processes, path2mplrs=args.path2mplrs, verbose=args.verbose)
+            if args.command in ['process_C_rays', 'all']:
+                if 'width_matrix' not in locals():
+                    width_matrix = restore_data('width_matrix.dat')
+                C_rays = process_mplrs_ouput(width_matrix, verbose=args.verbose)
+                save_data(C_rays, 'C_rays.dat')
 
-        if args.command in ['post_process', 'all']:
+        if args.command in ['postprocess', 'all']:
             if 'C_rays' not in locals():
-                with open(os.path.join('tmp', 'C_rays.dat'), 'rb') as file:
-                    C_rays = pickle.load(file)
+                C_rays = restore_data('C_rays.dat')
 
             if 'H' not in locals():
-                with open(os.path.join('tmp', 'H.dat'), 'rb') as file:
-                    H = pickle.load(file)
+                H = restore_data('H.dat')
             H_eq, H_ineq, linearity_rays = H
 
             if 'linearity_data' not in locals():
-                with open(os.path.join('tmp', 'linearity_data.dat'), 'rb') as file:
-                    linearity_data = pickle.load(file)
+                linearity_data = restore_data('linearity_data.dat')
             linearities, linearities_deflated, G_rev, G_irrev, amount_metabolites, \
             extended_external_metabolites, in_out_indices = linearity_data
 
             if 'network' not in locals():
-                with open(os.path.join('tmp', 'network.dat'), 'rb') as file:
-                    network = pickle.load(file)
+                network = restore_data('network.dat')
 
             G = np.transpose(network.N)
             cone = post_process_rays(G, C_rays, linearity_rays, network.external_metabolite_indices(),
                                      extended_external_metabolites,
                                      in_out_indices, amount_metabolites, only_rays=args.only_rays, verbose=args.verbose)
+            save_data(cone, 'cone.dat')
 
-            with open(os.path.join('tmp', 'cone.dat'), 'wb') as file:
-                pickle.dump(C_rays, file)
-
-    if args.command in ['save_ecms', 'all']:
+    if args.command in ['save_ecms', 'all'] and mpi_wrapper.is_first_process():
         if 'cone' not in locals():
-            with open(os.path.join('tmp', 'cone.dat'), 'rb') as file:
-                cone = pickle.load(file)
+                cone = restore_data('cone.dat')
 
         if 'network' not in locals():
-            with open(os.path.join('tmp', 'network.dat'), 'rb') as file:
-                network = pickle.load(file)
+                network = restore_data('network.dat')
 
         cone_transpose, ids = unsplit_metabolites(np.transpose(cone), network)
         cone = np.transpose(cone_transpose)
-        #
+
         internal_ids = []
         for metab in network.metabolites:
             if not metab.is_external:
@@ -499,12 +526,11 @@ if __name__ == '__main__':
         ids = list(np.delete(ids, internal_ids))
         cone = np.delete(cone, internal_ids, axis=1)
 
-        if mpi_wrapper.is_first_process():
-            try:
-                np.savetxt(args.out_path, cone, delimiter=',', header=','.join(ids), comments='')
-            except OverflowError:
-                normalised = np.transpose(normalize_columns(np.transpose(cone)))
-                np.savetxt(args.out_path, normalised, delimiter=',', header=','.join(ids), comments='')
+        try:
+            np.savetxt(args.out_path, cone, delimiter=',', header=','.join(ids), comments='')
+        except OverflowError:
+            normalised = np.transpose(normalize_columns(np.transpose(cone)))
+            np.savetxt(args.out_path, normalised, delimiter=',', header=','.join(ids), comments='')
 
         if args.verbose is True:
             mp_print('Found %s ECMs' % cone.shape[0])
