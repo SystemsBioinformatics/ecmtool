@@ -120,7 +120,7 @@ Please refer to the following papers when using ecmtool:
 
 Initial version - [https://www.cell.com/patterns/fulltext/S2666-3899(20)30241-5](https://www.cell.com/patterns/fulltext/S2666-3899(20)30241-5).
 
-`mplrs`-improved version - [https://doi.org/10.1093/bioinformatics/btad095](https://doi.org/10.1093/bioinformatics/btad095.
+`mplrs`-improved version - [https://doi.org/10.1093/bioinformatics/btad095](https://doi.org/10.1093/bioinformatics/btad095).
 
 ## Acknowledgements
 The original source code with indirect enumeration was written by [Tom Clement](https://scholar.google.com/citations?user=kUD5y04AAAAJ). [Erik Baalhuis](https://github.com/EBaalhuis) later expanded the code with a direct enumeration method that improved parallellisation. [Daan de Groot](https://scholar.google.com/citations?user=xY_GjWkAAAAJ) helped with many new features, bug fixes, and code reviews. [Bianca Buchner](https://github.com/BeeAnka) added support for `mplrs`, which raises the maximal size of networks you can enumerate with ecmtool. 
