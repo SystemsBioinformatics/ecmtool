@@ -1,0 +1,36 @@
+Bootstrap: docker
+From: python:3.10-slim
+Stage: spython-base
+
+%files
+ecmtool /ecmtool/ecmtool/
+models /ecmtool/models/
+main.py /ecmtool/
+setup.py /ecmtool/
+cython_setup.py /ecmtool/
+requirements.txt /ecmtool/
+%post
+
+apt update && apt install -y git openssh-client build-essential bash openjdk-17-jre libopenmpi-dev libgmp-dev wget
+
+wget http://cgm.cs.mcgill.ca/~avis/C/lrslib/archive/lrslib-071a.tar.gz && tar -xzf lrslib-071a.tar.gz
+cd lrslib-071a && make && make mplrs && make install && mv `pwd`/mplrs /usr/local/bin/mplrs && mv `pwd`/redund /usr/local/bin/redund
+
+mkdir -p /ecmtool
+cd /ecmtool
+
+pip3 install -r requirements.txt
+python3 cython_setup.py build_ext --inplace && mv *.so ecmtool
+python3 setup.py install
+
+# Make sure we don't have to run as root
+useradd -ms /bin/bash user
+chown -R user:user /ecmtool
+su -  user # USER user
+
+%runscript
+cd /ecmtool
+exec /bin/bash /bin/bash "$@"
+%startscript
+cd /ecmtool
+exec /bin/bash /bin/bash "$@"
