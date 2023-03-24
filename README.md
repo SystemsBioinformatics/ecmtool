@@ -18,6 +18,7 @@ path should be replaced with the path ecmtool was downloaded to).
 * Install the dependencies in requirements.txt inside the ecmtool directory (e.g. by running `pip install -r requirements.txt`).
 * Linux only: install _redund_ of package _lrslib_ (e.g. by running `apt install lrslib`).
 
+#### Installing ecmtool using Docker 
 For convenience, there's a Docker script you can use that has all dependencies already installed, and allows you to directly run ecmtool.
 Open a terminal with the ecmtool project as its working directory, and run:
 
@@ -25,6 +26,9 @@ Open a terminal with the ecmtool project as its working directory, and run:
 docker build -t ecmtool -f docker/Dockerfile .
 docker run -ti ecmtool bash
 ```
+
+#### Installing ecmtool using Singularity
+To be continued.
 
 ### Running
 Ecmtool can be run by executing `python main.py –-model_path <path/to/model.xml> [arguments]` from the command line, after navigating to the ecmtool directory as described above. The possible arguments and their default values are printed when you run `python main.py --help`.
