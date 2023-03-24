@@ -1,4 +1,5 @@
 import os
+import pickle
 import sys
 from argparse import ArgumentParser, ArgumentTypeError
 from time import time
@@ -9,10 +10,12 @@ from scipy.optimize import linprog
 from subprocess import run
 
 from ecmtool import mpi_wrapper
-from ecmtool.conversion_cone import get_conversion_cone, iterative_conversion_cone
+from ecmtool.conversion_cone import get_conversion_cone, calculate_linearities, calc_C0_dual_extreme_rays, calc_H, \
+    calc_C_extreme_rays, post_process_rays
 from ecmtool.helpers import get_metabolite_adjacency, redund, to_fractions
 from ecmtool.helpers import mp_print, unsplit_metabolites, print_ecms_direct, normalize_columns
-from ecmtool.network import extract_sbml_stoichiometry, add_reaction_tags
+from ecmtool.intersect_directly_mpi import intersect_directly
+from ecmtool.network import extract_sbml_stoichiometry, add_reaction_tags, Network
 
 
 class HiddenPrints:
@@ -148,115 +151,7 @@ def set_inoutputs(inputs, outputs, network):
     return
 
 
-if __name__ == '__main__':
-    start = time()
-
-    parser = ArgumentParser(
-        description='Calculate Elementary Conversion Modes from an SBML model. For medium-to large networks, be sure to define --inputs and --outputs. This reduces the enumeration problem complexity considerably.')
-    parser.add_argument('--model_path', type=str, default='models/active_subnetwork_KO_5.xml',
-                        help='Relative or absolute path to an SBML model .xml file')
-    parser.add_argument('--direct', type=str2bool, default=False,
-                        help='Enable to intersect with equalities directly. Direct intersection works better than indirect when many metabolites are hidden, and on large networks (default: False)')
-    parser.add_argument('--compress', type=str2bool, default=True,
-                        help='Perform compression to which the conversions are invariant, and reduce the network size considerably (default: True)')
-    parser.add_argument('--remove_infeasible', type=str2bool, default=True,
-                        help='Remove reactions that cannot carry flux dsquring compression. Switch off when this gives rise to numerical linear algebra problems. (default: True)')
-    parser.add_argument('--out_path', default='conversion_cone.csv',
-                        help='Relative or absolute path to the .csv file you want to save the calculated conversions to (default: conversion_cone.csv)')
-    parser.add_argument('--add_objective_metabolite', type=str2bool, default=True,
-                        help='Add a virtual metabolite containing the stoichiometry of the objective function of the model (default: true)')
-    parser.add_argument('--print_metabolites', type=str2bool, default=True,
-                        help='Print the names and IDs of metabolites in the (compressed) metabolic network (default: true)')
-    parser.add_argument('--print_reactions', type=str2bool, default=False,
-                        help='Print the names and IDs of reactions in the (compressed) metabolic network (default: true)')
-    parser.add_argument('--print_conversions', type=str2bool, default=False,
-                        help='Print the calculated conversion modes (default: false)')
-    parser.add_argument('--use_external_compartment', type=str, default=None,
-                        help='If a string is given, this string indicates how the external compartment in metabolite_ids of SBML-file is marked. By default, dead-end reaction-detection is used to find external metabolites, and no compartment-information. Please check if external compartment detection works by checking metabolite information before compression and with --primt metabolites true')
-    parser.add_argument('--auto_direction', type=str2bool, default=True,
-                        help='Automatically determine external metabolites that can only be consumed or produced (default: true)')
-    parser.add_argument('--inputs', type=str, default='',
-                        help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be consumed')
-    parser.add_argument('--outputs', type=str, default='',
-                        help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be produced. '
-                             'If inputs are given, but no outputs, then everything not marked as input is marked as output.'
-                             'If inputs and outputs are given, the possible remainder of external metabolites is marked as both')
-    parser.add_argument('--hide', type=str, default='',
-                        help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that are transformed into internal metabolites by adding bidirectional exchange reactions')
-    parser.add_argument('--prohibit', type=str, default='',
-                        help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that are transformed into internal metabolites without adding bidirectional exchange reactions.'
-                             'This metabolite can therefore not be used as input nor output.')
-    parser.add_argument('--tag', type=str, default='',
-                        help='Comma-separated list of reaction indices, as given by --print_reactions true (before compression), that will be tagged with new virtual metabolites, such that the reaction flux appears in ECMs.')
-    parser.add_argument('--hide_all_in_or_outputs', type=str, default='',
-                        help='String that is either empty, input, or output. If it is inputs or outputs, after splitting metabolites, all inputs or outputs are hidden (objective is always excluded)')
-    parser.add_argument('--iterative', type=str2bool, default=False,
-                        help='Enable iterative conversion mode enumeration (helps on large, dense networks) (default: false)')
-    parser.add_argument('--only_rays', type=str2bool, default=False,
-                        help='Enable to only return extreme rays, and not elementary modes. This describes the full conversion space, but not all biologically relevant minimal conversions. See (Urbanczik, 2005) (default: false)')
-    parser.add_argument('--verbose', type=str2bool, default=True,
-                        help='Enable to show detailed console output (default: true)')
-    parser.add_argument('--splitting_before_polco', type=str2bool, default=True,
-                        help='Enables splitting external metabolites by making virtual input and output metabolites before starting the computation. Setting to false would do the splitting after first computation step. Which method is faster is complicated and model-dependent. (default: true)')
-    parser.add_argument('--redund_after_polco', type=str2bool, default=True,
-                        help='(Indirect intersection only) Enables redundant row removal from inequality description of dual cone. Works well with models with relatively many internal metabolites, and when running parrallelized computation using MPI (default: true)')
-    parser.add_argument('--scei', type=str2bool, default=True, help='Enable to use SCEI compression (default: true)')
-    parser.add_argument('--sort_order', type=str, default='min_adj',
-                        help='Order in which internal metabolites should be set to zero. Default is to minimize the added adjacencies, other options are: min_lp, max_lp_per_adj, min_connections')
-    parser.add_argument('--intermediate_cone_path', type=str, default='',
-                        help='Filename where intermediate cone result can be found. If an empty string is given (default), then no intermediate result is picked up and the calculation is done in full')
-    parser.add_argument('--manual_override', type=str, default='',
-                        help='Index indicating which metabolite should be intersected in first step. Advanced option, can be used in combination with --intermediate_cone_path, to pick a specific intersection at a specific time.')
-
-    parser.add_argument('--polco', type=str2bool, default=False,
-                        help='Uses polco instead of mplrs for extreme ray enumeration (default: false)')
-    parser.add_argument('--processes', type=int, default=3,
-                        help='Numer of processes for calculations (default: 3 - minimum required for mplrs)')
-    parser.add_argument('--jvm_mem', type=int, default=None, nargs='*', action='store',
-                        help='Two values given the minimum and maximum memeory for java machine in GB e.g. 50 300 (default: maximum memory available)')
-    parser.add_argument('--path2mplrs', type=str, default=None,
-                        help='if mplrs binary is not accessable via PATH variable "mplrs", the absolute path to the binary can be provided with "--path2mplrs" e.g. "--path2mplrs /home/user/mplrs/lrslib-071b/mplrs" ')
-
-    args = parser.parse_args()
-
-    if args.jvm_mem is not None and len(args.jvm_mem) not in (0, 2):
-        parser.error(
-            'Either give no values for jvm_mem, or two - "minGB maxGB" e.g. 50 200, not {}.'.format(len(args.jvm_mem)))
-
-    if args.polco is False:
-        path2mplrs = args.path2mplrs if args.path2mplrs is not None else 'mplrs'
-        try:
-            mplrs_check = run([path2mplrs], capture_output=True)
-            if args.verbose is True:
-                print('Found mplrs')
-        except:
-            print('\x1b[0;31;40m' + 'WARNING1: mplrs NOT found' + '\x1b[0m')
-            print(
-                '\x1b[0;31;40m' + 'Make sure mplrs is installed properly, see http://cgm.cs.mcgill.ca/~avis/C/lrslib/USERGUIDE.html' + '\x1b[0m')
-            print(
-                '\x1b[0;31;40m' + 'Make sure mplrs is added to the PATH variable or provide absolute path to mplrs binary via command line argument --path2mplrs' + '\x1b[0m')
-            print('\x1b[0;31;40m' + 'Switching to POLCO' + '\x1b[0m')
-            args.polco = True
-
-    if args.model_path == '':
-        mp_print('No model given, please specify --model_path')
-        exit()
-
-    if len(args.inputs) or len(args.outputs):
-        # Disable automatic determination of external metabolite direction if lists are given manually
-        args.auto_direction = False
-
-    if args.iterative:
-        # Only compress when flag is enabled, and when not performing iterative enumeration.
-        # Iterative enumeration performs compression after the iteration steps.
-        args.compress = False
-
-    if sys.platform.startswith('win32'):
-        mp_print('!!\n'
-                 'Running ecmtool on Linux might be faster than on Windows, because of external dependencies.\n'
-                 'To reap the benefits of parallelization and the use of cython, please use a virtual Linux machine'
-                 'or a Linux computing cluster.\n')
-
+def preprocess_sbml(args):
     model_path = args.model_path
 
     network = extract_sbml_stoichiometry(model_path, add_objective=args.add_objective_metabolite,
@@ -265,6 +160,7 @@ if __name__ == '__main__':
                                          use_external_compartment=args.use_external_compartment)
 
     tagged_reaction_indices = []
+    external_cycles = None
 
     adj = get_metabolite_adjacency(network.N)
 
@@ -350,50 +246,245 @@ if __name__ == '__main__':
         for index, item in enumerate(network.metabolites):
             mp_print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
 
+    return network, external_cycles
+
+
+if __name__ == '__main__':
+    start = time()
+
+    parser = ArgumentParser(
+        description='Calculate Elementary Conversion Modes from an SBML model. For medium-to large networks, be sure to define --inputs and --outputs. This reduces the enumeration problem complexity considerably.')
+    parser.add_argument('command', nargs='?', default='all')
+    parser.add_argument('--model_path', type=str, default='models/active_subnetwork_KO_5.xml',
+                        help='Relative or absolute path to an SBML model .xml file')
+    parser.add_argument('--direct', type=str2bool, default=False,
+                        help='Enable to intersect with equalities directly. Direct intersection works better than indirect when many metabolites are hidden, and on large networks (default: False)')
+    parser.add_argument('--compress', type=str2bool, default=True,
+                        help='Perform compression to which the conversions are invariant, and reduce the network size considerably (default: True)')
+    parser.add_argument('--remove_infeasible', type=str2bool, default=True,
+                        help='Remove reactions that cannot carry flux dsquring compression. Switch off when this gives rise to numerical linear algebra problems. (default: True)')
+    parser.add_argument('--out_path', default='conversion_cone.csv',
+                        help='Relative or absolute path to the .csv file you want to save the calculated conversions to (default: conversion_cone.csv)')
+    parser.add_argument('--add_objective_metabolite', type=str2bool, default=True,
+                        help='Add a virtual metabolite containing the stoichiometry of the objective function of the model (default: true)')
+    parser.add_argument('--print_metabolites', type=str2bool, default=True,
+                        help='Print the names and IDs of metabolites in the (compressed) metabolic network (default: true)')
+    parser.add_argument('--print_reactions', type=str2bool, default=False,
+                        help='Print the names and IDs of reactions in the (compressed) metabolic network (default: true)')
+    parser.add_argument('--print_conversions', type=str2bool, default=False,
+                        help='Print the calculated conversion modes (default: false)')
+    parser.add_argument('--use_external_compartment', type=str, default=None,
+                        help='If a string is given, this string indicates how the external compartment in metabolite_ids of SBML-file is marked. By default, dead-end reaction-detection is used to find external metabolites, and no compartment-information. Please check if external compartment detection works by checking metabolite information before compression and with --primt metabolites true')
+    parser.add_argument('--auto_direction', type=str2bool, default=True,
+                        help='Automatically determine external metabolites that can only be consumed or produced (default: true)')
+    parser.add_argument('--inputs', type=str, default='',
+                        help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be consumed')
+    parser.add_argument('--outputs', type=str, default='',
+                        help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that can only be produced. '
+                             'If inputs are given, but no outputs, then everything not marked as input is marked as output.'
+                             'If inputs and outputs are given, the possible remainder of external metabolites is marked as both')
+    parser.add_argument('--hide', type=str, default='',
+                        help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that are transformed into internal metabolites by adding bidirectional exchange reactions')
+    parser.add_argument('--prohibit', type=str, default='',
+                        help='Comma-separated list of external metabolite indices, as given by --print_metabolites true (before compression), that are transformed into internal metabolites without adding bidirectional exchange reactions.'
+                             'This metabolite can therefore not be used as input nor output.')
+    parser.add_argument('--tag', type=str, default='',
+                        help='Comma-separated list of reaction indices, as given by --print_reactions true (before compression), that will be tagged with new virtual metabolites, such that the reaction flux appears in ECMs.')
+    parser.add_argument('--hide_all_in_or_outputs', type=str, default='',
+                        help='String that is either empty, input, or output. If it is inputs or outputs, after splitting metabolites, all inputs or outputs are hidden (objective is always excluded)')
+    parser.add_argument('--only_rays', type=str2bool, default=False,
+                        help='Enable to only return extreme rays, and not elementary modes. This describes the full conversion space, but not all biologically relevant minimal conversions. See (Urbanczik, 2005) (default: false)')
+    parser.add_argument('--verbose', type=str2bool, default=True,
+                        help='Enable to show detailed console output (default: true)')
+    parser.add_argument('--splitting_before_polco', type=str2bool, default=True,
+                        help='Enables splitting external metabolites by making virtual input and output metabolites before starting the computation. Setting to false would do the splitting after first computation step. Which method is faster is complicated and model-dependent. (default: true)')
+    parser.add_argument('--redund_after_polco', type=str2bool, default=True,
+                        help='(Indirect intersection only) Enables redundant row removal from inequality description of dual cone. Works well with models with relatively many internal metabolites, and when running parrallelized computation using MPI (default: true)')
+    parser.add_argument('--scei', type=str2bool, default=True, help='Enable to use SCEI compression (default: true)')
+    parser.add_argument('--sort_order', type=str, default='min_adj',
+                        help='Order in which internal metabolites should be set to zero. Default is to minimize the added adjacencies, other options are: min_lp, max_lp_per_adj, min_connections')
+    parser.add_argument('--intermediate_cone_path', type=str, default='',
+                        help='Filename where intermediate cone result can be found. If an empty string is given (default), then no intermediate result is picked up and the calculation is done in full')
+    parser.add_argument('--manual_override', type=str, default='',
+                        help='Index indicating which metabolite should be intersected in first step. Advanced option, can be used in combination with --intermediate_cone_path, to pick a specific intersection at a specific time.')
+
+    parser.add_argument('--polco', type=str2bool, default=False,
+                        help='Uses polco instead of mplrs for extreme ray enumeration (default: false)')
+    parser.add_argument('--processes', type=int, default=3,
+                        help='Numer of processes for calculations (default: 3 - minimum required for mplrs)')
+    parser.add_argument('--jvm_mem', type=int, default=None, nargs='*', action='store',
+                        help='Two values given the minimum and maximum memeory for java machine in GB e.g. 50 300 (default: maximum memory available)')
+    parser.add_argument('--path2mplrs', type=str, default=None,
+                        help='if mplrs binary is not accessable via PATH variable "mplrs", the absolute path to the binary can be provided with "--path2mplrs" e.g. "--path2mplrs /home/user/mplrs/lrslib-071b/mplrs" ')
+
+    args = parser.parse_args()
+
+    if args.polco and args.jvm_mem is not None and len(args.jvm_mem) not in (0, 2):
+        parser.error(
+            'Either give no values for jvm_mem, or two - "minGB maxGB" e.g. 50 200, not {}.'.format(len(args.jvm_mem)))
+
+    if args.polco is False:
+        path2mplrs = args.path2mplrs if args.path2mplrs is not None else 'mplrs'
+        try:
+            mplrs_check = run([path2mplrs], capture_output=True)
+            if args.verbose is True:
+                mp_print('Found mplrs')
+        except:
+            mp_print('\x1b[0;31;40m' + 'WARNING1: mplrs NOT found' + '\x1b[0m')
+            mp_print(
+                '\x1b[0;31;40m' + 'Make sure mplrs is installed properly, see http://cgm.cs.mcgill.ca/~avis/C/lrslib/USERGUIDE.html' + '\x1b[0m')
+            mp_print(
+                '\x1b[0;31;40m' + 'Make sure mplrs is added to the PATH variable or provide absolute path to mplrs binary via command line argument --path2mplrs' + '\x1b[0m')
+            mp_print('\x1b[0;31;40m' + 'Switching to POLCO' + '\x1b[0m')
+            args.polco = True
+
+    if args.model_path == '':
+        mp_print('No model given, please specify --model_path')
+        exit()
+
+    if len(args.inputs) or len(args.outputs):
+        # Disable automatic determination of external metabolite direction if lists are given manually
+        args.auto_direction = False
+
+    if sys.platform.startswith('win32'):
+        mp_print('!!\n'
+                 'Running ecmtool on Linux might be faster than on Windows, because of external dependencies.\n'
+                 'To reap the benefits of parallelization and the use of cython, please use a virtual Linux machine'
+                 'or a Linux computing cluster.\n')
+
+    if args.command in ['preprocess', 'all']:
+        network, external_cycles = preprocess_sbml(args)
+        with open(os.path.join('tmp', 'network.dat'), 'wb') as file:
+            pickle.dump(network, file)
+        with open(os.path.join('tmp', 'external_cycles.dat'), 'wb') as file:
+            pickle.dump(external_cycles, file)
+
     if args.direct:
-        # Direct intersection method
-        R = network.N
-        external = np.asarray(network.external_metabolite_indices())
-        internal = np.setdiff1d(range(R.shape[0]), external)
-        T_intersected, ids = intersect_directly(R, internal, network, verbose=args.verbose,
-                                                sort_order=args.sort_order, manual_override=args.manual_override,
-                                                intermediate_cone_path=args.intermediate_cone_path)
-        if external_cycles:
-            external_cycles_array = to_fractions(np.zeros((T_intersected.shape[0], len(external_cycles))))
-            for ind, cycle in enumerate(external_cycles):
-                for cycle_metab in cycle:
-                    metab_ind = [ind for ind, metab in enumerate(ids) if metab == cycle_metab][0]
-                    external_cycles_array[metab_ind, ind] = cycle[cycle_metab]
+        if args.command in ['direct_intersect', 'all']:
+            if 'network' not in locals():
+                with open(os.path.join('tmp', 'network.dat'), 'rb') as file:
+                    network = pickle.load(file)
+            if 'external_cycles' not in locals():
+                with open(os.path.join('tmp', 'external_cycles.dat'), 'rb') as file:
+                    external_cycles = pickle.load(file)
 
-            T_intersected = np.concatenate((T_intersected, external_cycles_array, -external_cycles_array), axis=1)
+            # Direct intersection method
+            R = network.N
+            external = np.asarray(network.external_metabolite_indices())
+            internal = np.setdiff1d(range(R.shape[0]), external)
+            T_intersected, ids = intersect_directly(R, internal, network, verbose=args.verbose,
+                                                    sort_order=args.sort_order, manual_override=args.manual_override,
+                                                    intermediate_cone_path=args.intermediate_cone_path)
+            if external_cycles:
+                external_cycles_array = to_fractions(np.zeros((T_intersected.shape[0], len(external_cycles))))
+                for ind, cycle in enumerate(external_cycles):
+                    for cycle_metab in cycle:
+                        metab_ind = [ind for ind, metab in enumerate(ids) if metab == cycle_metab][0]
+                        external_cycles_array[metab_ind, ind] = cycle[cycle_metab]
 
-        cone = np.transpose(T_intersected)
+                T_intersected = np.concatenate((T_intersected, external_cycles_array, -external_cycles_array), axis=1)
+
+            cone = np.transpose(T_intersected)
+            with open(os.path.join('tmp', 'cone.dat'), 'wb') as file:
+                pickle.dump(cone, file)
     else:
-        if args.iterative:
-            # Indirect iterative enumeration
-            cone = network.uncompress(
-                iterative_conversion_cone(network, only_rays=args.only_rays, verbose=args.verbose))
-        else:
-            # Indirect enumeration
-            cone = get_conversion_cone(network.N, network.external_metabolite_indices(),
-                                       network.reversible_reaction_indices(),
-                                       input_metabolites=network.input_metabolite_indices(),
-                                       output_metabolites=network.output_metabolite_indices(),
-                                       verbose=args.verbose, only_rays=args.only_rays,
-                                       redund_after_polco=args.redund_after_polco,
-                                       polco=args.polco, processes=args.processes, jvm_mem=args.jvm_mem,
-                                       path2mplrs=args.path2mplrs)
+        # Indirect enumeration
+        if args.command in ['calc_linearities', 'all']:
+            if 'network' not in locals():
+                with open(os.path.join('tmp', 'network.dat'), 'rb') as file:
+                    network = pickle.load(file)
 
-            # if external_cycles:
-            #     T_intersected = np.transpose(cone)
-            #     external_cycles_array = to_fractions(np.zeros((T_intersected.shape[0], len(external_cycles))))
-            #     for ind, cycle in enumerate(external_cycles):
-            #         for cycle_metab in cycle:
-            #             metab_ind = [ind for ind, metab in enumerate(ids) if metab == cycle_metab][0]
-            #             external_cycles_array[metab_ind, ind] = cycle[cycle_metab]
-            #
-            #     T_intersected = np.concatenate((T_intersected, external_cycles_array, -external_cycles_array), axis=1)
-            #     cone = np.transpose(T_intersected)
+            linearity_data = calculate_linearities(network.N, network.reversible_reaction_indices(),
+                                                   network.external_metabolite_indices(),
+                                                   network.input_metabolite_indices(),
+                                                   network.output_metabolite_indices(), args.verbose)
+            with open(os.path.join('tmp', 'linearity_data.dat'), 'wb') as file:
+                pickle.dump(linearity_data, file)
+
+        if args.command in ['calc_C0_rays', 'all']:
+            if 'linearity_data' not in locals():
+                with open(os.path.join('tmp', 'linearity_data.dat'), 'rb') as file:
+                    linearity_data = pickle.load(file)
+            linearities, linearities_deflated, G_rev, G_irrev, amount_metabolites, \
+            extended_external_metabolites, in_out_indices = linearity_data
+
+            C0_dual_rays = calc_C0_dual_extreme_rays(linearities, G_rev, G_irrev,
+                                                     polco=args.polco, processes=args.processes, jvm_mem=args.jvm_mem,
+                                                     path2mplrs=args.path2mplrs)
+            with open(os.path.join('tmp', 'C0_dual_rays.dat'), 'wb') as file:
+                pickle.dump(C0_dual_rays, file)
+
+        if args.command in ['calc_H', 'all']:
+            if 'C0_dual_rays' not in locals():
+                with open(os.path.join('tmp', 'C0_dual_rays.dat'), 'rb') as file:
+                    C0_dual_rays = pickle.load(file)
+
+            if 'linearity_data' not in locals():
+                with open(os.path.join('tmp', 'linearity_data.dat'), 'rb') as file:
+                    linearity_data = pickle.load(file)
+            linearities, linearities_deflated, G_rev, G_irrev, amount_metabolites, \
+            extended_external_metabolites, in_out_indices = linearity_data
+
+            if 'network' not in locals():
+                with open(os.path.join('tmp', 'network.dat'), 'rb') as file:
+                    network = pickle.load(file)
+
+            H = calc_H(C0_dual_rays, linearities_deflated, network.external_metabolite_indices(),
+                       network.input_metabolite_indices(),
+                       network.output_metabolite_indices(), in_out_indices, redund_after_polco=args.redund_after_polco,
+                       only_rays=args.only_rays, verbose=args.verbose)
+
+            with open(os.path.join('tmp', 'H.dat'), 'wb') as file:
+                pickle.dump(H, file)
+
+        if args.command in ['calc_C_rays', 'all']:
+            if 'H' not in locals():
+                with open(os.path.join('tmp', 'H.dat'), 'rb') as file:
+                    H = pickle.load(file)
+            H_eq, H_ineq, linearity_rays = H
+            C_rays = calc_C_extreme_rays(H_eq, H_ineq,
+                                         polco=args.polco, processes=args.processes, jvm_mem=args.jvm_mem,
+                                         path2mplrs=args.path2mplrs)
+
+            with open(os.path.join('tmp', 'C_rays.dat'), 'wb') as file:
+                pickle.dump(C_rays, file)
+
+        if args.command in ['post_process', 'all']:
+            if 'C_rays' not in locals():
+                with open(os.path.join('tmp', 'C_rays.dat'), 'rb') as file:
+                    C_rays = pickle.load(file)
+
+            if 'H' not in locals():
+                with open(os.path.join('tmp', 'H.dat'), 'rb') as file:
+                    H = pickle.load(file)
+            H_eq, H_ineq, linearity_rays = H
+
+            if 'linearity_data' not in locals():
+                with open(os.path.join('tmp', 'linearity_data.dat'), 'rb') as file:
+                    linearity_data = pickle.load(file)
+            linearities, linearities_deflated, G_rev, G_irrev, amount_metabolites, \
+            extended_external_metabolites, in_out_indices = linearity_data
+
+            if 'network' not in locals():
+                with open(os.path.join('tmp', 'network.dat'), 'rb') as file:
+                    network = pickle.load(file)
+
+            G = np.transpose(network.N)
+            cone = post_process_rays(G, C_rays, linearity_rays, network.external_metabolite_indices(),
+                                     extended_external_metabolites,
+                                     in_out_indices, amount_metabolites, only_rays=args.only_rays, verbose=args.verbose)
+
+            with open(os.path.join('tmp', 'cone.dat'), 'wb') as file:
+                pickle.dump(C_rays, file)
+
+    if args.command in ['save_ecms', 'all']:
+        if 'cone' not in locals():
+            with open(os.path.join('tmp', 'cone.dat'), 'rb') as file:
+                cone = pickle.load(file)
+
+        if 'network' not in locals():
+            with open(os.path.join('tmp', 'network.dat'), 'rb') as file:
+                network = pickle.load(file)
 
         cone_transpose, ids = unsplit_metabolites(np.transpose(cone), network)
         cone = np.transpose(cone_transpose)
@@ -408,18 +499,18 @@ if __name__ == '__main__':
         ids = list(np.delete(ids, internal_ids))
         cone = np.delete(cone, internal_ids, axis=1)
 
-    if mpi_wrapper.is_first_process():
-        try:
-            np.savetxt(args.out_path, cone, delimiter=',', header=','.join(ids), comments='')
-        except OverflowError:
-            normalised = np.transpose(normalize_columns(np.transpose(cone)))
-            np.savetxt(args.out_path, normalised, delimiter=',', header=','.join(ids), comments='')
+        if mpi_wrapper.is_first_process():
+            try:
+                np.savetxt(args.out_path, cone, delimiter=',', header=','.join(ids), comments='')
+            except OverflowError:
+                normalised = np.transpose(normalize_columns(np.transpose(cone)))
+                np.savetxt(args.out_path, normalised, delimiter=',', header=','.join(ids), comments='')
 
-    if args.verbose is True:
-        print('Found %s ECMs' % cone.shape[0])
+        if args.verbose is True:
+            mp_print('Found %s ECMs' % cone.shape[0])
 
-    if args.print_conversions is True:
-        print_ecms_direct(np.transpose(cone), ids)
+        if args.print_conversions is True:
+            print_ecms_direct(np.transpose(cone), ids)
 
     end = time()
     mp_print('Ran in %f seconds' % (end - start))
