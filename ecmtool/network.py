@@ -1,6 +1,5 @@
 from gmpy2 import mpq as Fraction
 
-import cbmpy
 import libsbml as sbml
 import numpy as np
 from scipy.linalg import null_space
@@ -177,6 +176,7 @@ def extract_sbml_stoichiometry(path, add_objective=True, skip_external_reactions
             conversions. By default, ecmtool does not use this but does print a warning.
     :return: Network
     """
+    import cbmpy
     cbmpy_model = cbmpy.readSBML3FBC(path)
 
     species = list(cbmpy_model.species)
