@@ -196,8 +196,8 @@ def calc_H(rays=None, linearities_deflated=None, external_metabolites=None, inpu
             # unique_inds = find_remaining_rows(H_ineq_float, H_ineq_normalized, verbose=verbose)
             # H_ineq_original = H_ineq_original[unique_inds, :]
 
-            if verbose:
-                mp_print("Size of H_eq after communication step:", H_eq.shape[0], H_eq.shape[1])
+            # if verbose:
+            #     mp_print("Size of H_eq after communication step:", H_eq.shape[0], H_eq.shape[1])
 
         use_custom_redund = True  # If set to false, redundancy removal with redund from lrslib is used
         if use_custom_redund:
