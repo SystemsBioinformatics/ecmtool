@@ -177,16 +177,16 @@ def write_mplrs_input(equality_matrix, inequality_matrix, mplrs_path, verbose=Fa
     :param verbose: print status messages during enumeration
     :return: d dimensional parameter for ine file giving the width of the matrix
     """
-    if inequality_matrix is not None:
+    if (inequality_matrix is not None) and (inequality_matrix.shape[0]>0):
         inequality_matrix = inequality_matrix.tolist()
 
-    if equality_matrix is not None:
+    if (equality_matrix is not None) and (equality_matrix.shape[0]>0):
         equality_matrix = equality_matrix.tolist()
 
     textfile = open(mplrs_path, "w")
 
     if equality_matrix is None:
-        d = len(inequality_matrix[0] ) + 1
+        d = len(inequality_matrix[0]) + 1
         write_header_no_linearity(textfile, inequality_matrix, d, m=None)
         if verbose:
             print('Writing inequalities to file')
@@ -194,7 +194,7 @@ def write_mplrs_input(equality_matrix, inequality_matrix, mplrs_path, verbose=Fa
 
     elif inequality_matrix is None:
         linearity = len(equality_matrix)
-        d = len(equality_matrix[0] ) + 1
+        d = len(equality_matrix[0]) + 1
         write_header_with_linearity(textfile, linearity, d, m=None)
         if verbose:
             print('Writing equalities to file')
@@ -202,7 +202,7 @@ def write_mplrs_input(equality_matrix, inequality_matrix, mplrs_path, verbose=Fa
 
     else:
         linearity = len(equality_matrix)
-        d = len(equality_matrix[0] ) + 1
+        d = len(equality_matrix[0]) + 1
         m = linearity + len(inequality_matrix)
         write_header_with_linearity(textfile, linearity, d, m)
         if verbose:
