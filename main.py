@@ -197,7 +197,7 @@ def preprocess_sbml(args):
     if args.direct:
         # Initialise mpi4py only here, because it can not be started when using mplrs due to
         # only being able to run one instance at a time, and mpi4py creates an instance on import.
-        mpi_wrapper.mpi_init()
+        mpi_wrapper.mpi_init(mplrs_present=mplrs_present)
 
         from ecmtool.intersect_directly_mpi import intersect_directly, remove_cycles, \
             compress_after_cycle_removing, check_if_intermediate_cone_exists
@@ -339,10 +339,12 @@ if __name__ == '__main__':
         parser.error(
             'Either give no values for jvm_mem, or two - "minGB maxGB" e.g. 50 200, not {}.'.format(len(args.jvm_mem)))
 
-    if args.polco is False:
+    mplrs_present = False
+    if (args.polco is False) and (args.command in ['calc_C0_rays', 'calc_C_rays', 'all']):
         path2mplrs = args.path2mplrs if args.path2mplrs is not None else 'mplrs'
         try:
             mplrs_check = run([path2mplrs], capture_output=True)
+            mplrs_present = True
             if args.verbose is True:
                 mp_print('Found mplrs')
         except:
@@ -418,7 +420,8 @@ if __name__ == '__main__':
                 extended_external_metabolites, in_out_indices = linearity_data
 
                 C0_dual_rays = calc_C0_dual_extreme_rays(linearities, G_rev, G_irrev,
-                                                         polco=args.polco, processes=args.processes, jvm_mem=args.jvm_mem,
+                                                         polco=args.polco, processes=args.processes,
+                                                         jvm_mem=args.jvm_mem,
                                                          path2mplrs=args.path2mplrs)
                 save_data(C0_dual_rays, 'C0_dual_rays.dat')
         else:
@@ -442,22 +445,29 @@ if __name__ == '__main__':
                 save_data(C0_dual_rays, 'C0_dual_rays.dat')
 
         if args.command in ['calc_H', 'all']:
-            if 'C0_dual_rays' not in locals():
-                C0_dual_rays = restore_data('C0_dual_rays.dat')
+            # Initialise mpi4py only here, because it can not be started when using mplrs due to
+            # only being able to run one instance at a time, and mpi4py creates an instance on import.
+            mpi_wrapper.mpi_init(mplrs_present=mplrs_present)
+            if mpi_wrapper.is_first_process():
+                if 'C0_dual_rays' not in locals():
+                    C0_dual_rays = restore_data('C0_dual_rays.dat')
 
-            if 'linearity_data' not in locals():
-                linearity_data = restore_data('linearity_data.dat')
-            linearities, linearities_deflated, G_rev, G_irrev, amount_metabolites, \
-            extended_external_metabolites, in_out_indices = linearity_data
+                if 'linearity_data' not in locals():
+                    linearity_data = restore_data('linearity_data.dat')
+                linearities, linearities_deflated, G_rev, G_irrev, amount_metabolites, \
+                extended_external_metabolites, in_out_indices = linearity_data
 
-            if 'network' not in locals():
-                network = restore_data('network.dat')
-
-            H = calc_H(C0_dual_rays, linearities_deflated, network.external_metabolite_indices(),
-                       network.input_metabolite_indices(),
-                       network.output_metabolite_indices(), in_out_indices, redund_after_polco=args.redund_after_polco,
-                       only_rays=args.only_rays, verbose=args.verbose)
-            save_data(H, 'H.dat')
+                if 'network' not in locals():
+                    network = restore_data('network.dat')
+                H = calc_H(rays=C0_dual_rays, linearities_deflated=linearities_deflated,
+                           external_metabolites=network.external_metabolite_indices(),
+                           input_metabolites=network.input_metabolite_indices(),
+                           output_metabolites=network.output_metabolite_indices(), in_out_indices=in_out_indices,
+                           redund_after_polco=args.redund_after_polco, only_rays=args.only_rays, verbose=args.verbose)
+                save_data(H, 'H.dat')
+            else:
+                H = calc_H()
+                exit()
 
         if args.polco:
             if args.command in ['calc_C_rays', 'all']:
@@ -512,10 +522,10 @@ if __name__ == '__main__':
 
     if args.command in ['save_ecms', 'all'] and mpi_wrapper.is_first_process():
         if 'cone' not in locals():
-                cone = restore_data('cone.dat')
+            cone = restore_data('cone.dat')
 
         if 'network' not in locals():
-                network = restore_data('network.dat')
+            network = restore_data('network.dat')
 
         cone_transpose, ids = unsplit_metabolites(np.transpose(cone), network)
         cone = np.transpose(cone_transpose)

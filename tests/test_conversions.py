@@ -225,8 +225,8 @@ class TestKO2Direct:
     @pytest.fixture(scope='class', autouse=True)
     def runEcmtool(self):
         # global metabIds, conversions, ecoliCoreReturnCode, outputfile, ecoliCoreOutput
-        commandList = ['python', 'main.py', '--model_path', 'models/active_subnetwork_KO_2.xml', '--auto_direction', 'true',
-                       '--out_path', outputfile, '--direct', 'True']
+        commandList = ['python', 'main.py', '--model_path', 'models/active_subnetwork_KO_2.xml', '--auto_direction',
+                       'true', '--out_path', outputfile, '--direct', 'true']
         ecoliOutput = ConversionsOutput(commandList)
         return ecoliOutput
 

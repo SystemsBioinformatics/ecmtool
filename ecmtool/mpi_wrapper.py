@@ -3,11 +3,13 @@ import sys, os
 comm = None
 
 
-def mpi_init():
+def mpi_init(mplrs_present=False):
     if sys.platform.startswith('win32'):
         print("mpi4py does not work properly on Windows, so its use will be skipped.")
         return
-
+    if mplrs_present:
+        print("Not using mpi4py for removing redundant rays, since mplrs is required for another step. "
+              "If mpi4py is required, try separating the mplrs- and mpi4py-step.")
     try:
         from mpi4py import MPI
     except ImportError:

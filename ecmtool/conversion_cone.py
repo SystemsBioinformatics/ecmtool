@@ -101,8 +101,8 @@ def calc_C0_dual_extreme_rays(linearities, G_rev, G_irrev, polco, processes, jvm
     return rays
 
 
-def calc_H(rays, linearities_deflated, external_metabolites, input_metabolites,
-           output_metabolites, in_out_indices, redund_after_polco=True, only_rays=False, verbose=False):
+def calc_H(rays=None, linearities_deflated=None, external_metabolites=None, input_metabolites=None,
+           output_metabolites=None, in_out_indices=None, redund_after_polco=True, only_rays=False, verbose=False):
     """
     :param rays:
     :param linearities_deflated:
@@ -115,108 +115,115 @@ def calc_H(rays, linearities_deflated, external_metabolites, input_metabolites,
     :param verbose:
     :return:
     """
-    if verbose:
-        print('Deflating H')
-    if rays.shape[0] == 0:
-        mp_print('Warning: first polco-application did not give any rays. Check if this is expected behaviour.')
-        rays_deflated = rays
-    else:
-        rays_deflated = deflate_matrix(rays, external_metabolites)
+    if mpi_wrapper.is_first_process():
+        if verbose:
+            print('Deflating H')
+        if rays.shape[0] == 0:
+            mp_print('Warning: first polco-application did not give any rays. Check if this is expected behaviour.')
+            rays_deflated = rays
+        else:
+            rays_deflated = deflate_matrix(rays, external_metabolites)
 
-    if verbose:
-        print('Expanding H with metabolite direction constraints')
-    # Add bidirectional (in- and output) metabolites in reverse direction
-    if rays_deflated.shape[0] == 0:
-        rays_split = rays_deflated
-    else:
-        rays_split = split_columns(rays_deflated, in_out_indices) if not only_rays else rays_deflated
-    linearities_split = split_columns(linearities_deflated, in_out_indices) if not only_rays else linearities_deflated
+        if verbose:
+            print('Expanding H with metabolite direction constraints')
+        # Add bidirectional (in- and output) metabolites in reverse direction
+        if rays_deflated.shape[0] == 0:
+            rays_split = rays_deflated
+        else:
+            rays_split = split_columns(rays_deflated, in_out_indices) if not only_rays else rays_deflated
+        linearities_split = split_columns(linearities_deflated, in_out_indices) if not only_rays else linearities_deflated
 
-    H_ineq = rays_split
-    H_eq = linearities_split
+        H_ineq = rays_split
+        H_eq = linearities_split
 
-    # Add input/output constraints to H_ineq
-    if not H_ineq.shape[0]:
-        H_ineq = np.zeros(shape=(1, H_ineq.shape[1]))
+        # Add input/output constraints to H_ineq
+        if not H_ineq.shape[0]:
+            H_ineq = np.zeros(shape=(1, H_ineq.shape[1]))
 
-    identity = to_fractions(np.identity(H_ineq.shape[1]))
+        identity = to_fractions(np.identity(H_ineq.shape[1]))
 
-    # Bidirectional (in- and output) metabolites.
-    # When enumerating only extreme rays, no splitting is done, and
-    # thus no other dimensions need to have directionality specified.
-    if not only_rays:
-        for list_index, inout_metabolite_index in enumerate(in_out_indices):
-            index = inout_metabolite_index
+        # Bidirectional (in- and output) metabolites.
+        # When enumerating only extreme rays, no splitting is done, and
+        # thus no other dimensions need to have directionality specified.
+        if not only_rays:
+            for list_index, inout_metabolite_index in enumerate(in_out_indices):
+                index = inout_metabolite_index
+                H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
+
+                index = len(external_metabolites) + list_index
+                H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
+
+        # Inputs
+        for input_metabolite in input_metabolites:
+            index = external_metabolites.index(input_metabolite)
+            H_ineq = np.append(H_ineq, [-identity[index, :]], axis=0)
+
+        # Outputs
+        for output_metabolite in output_metabolites:
+            index = external_metabolites.index(output_metabolite)
             H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
 
-            index = len(external_metabolites) + list_index
-            H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
+        if verbose:
+            print('Reducing rows in H by removing redundant rows')
 
-    # Inputs
-    for input_metabolite in input_metabolites:
-        index = external_metabolites.index(input_metabolite)
-        H_ineq = np.append(H_ineq, [-identity[index, :]], axis=0)
+        # Use redundancy-removal to make H_ineq and H_eq smaller
+        print("Size of H_ineq before redund:", H_ineq.shape[0], H_ineq.shape[1])
+        print("Size of H_eq before redund:", H_eq.shape[0], H_eq.shape[1])
+        count_before_ineq = len(H_ineq)
+        count_before_eq = len(H_eq)
 
-    # Outputs
-    for output_metabolite in output_metabolites:
-        index = external_metabolites.index(output_metabolite)
-        H_ineq = np.append(H_ineq, [identity[index, :]], axis=0)
+        if verbose:
+            mp_print('Detecting linearities in H_ineq.')
+        H_ineq_transpose, cycle_rays = remove_cycles_redund(np.transpose(H_ineq))
+        H_ineq = np.transpose(H_ineq_transpose)
 
-    if verbose:
-        print('Reducing rows in H by removing redundant rows')
-
-    # Use redundancy-removal to make H_ineq and H_eq smaller
-    print("Size of H_ineq before redund:", H_ineq.shape[0], H_ineq.shape[1])
-    print("Size of H_eq before redund:", H_eq.shape[0], H_eq.shape[1])
-    count_before_ineq = len(H_ineq)
-    count_before_eq = len(H_eq)
-
-    if verbose:
-        mp_print('Detecting linearities in H_ineq.')
-    H_ineq_transpose, cycle_rays = remove_cycles_redund(np.transpose(H_ineq))
-    H_ineq = np.transpose(H_ineq_transpose)
-
-    H_eq = np.concatenate((H_eq, np.transpose(cycle_rays)), axis=0)  # Add found linearities from H_ineq to H_eq
+        H_eq = np.concatenate((H_eq, np.transpose(cycle_rays)), axis=0)  # Add found linearities from H_ineq to H_eq
 
     # Remove duplicates from H_ineq and H_eq
     if redund_after_polco:
-        H_ineq_original = H_ineq
-        H_ineq_normalized = np.transpose(normalize_columns(np.transpose(H_ineq.astype(dtype='float')), verbose=verbose))
-        # unique_inds = find_unique_inds(H_ineq_normalized, verbose=verbose, tol=1e-9)
-        # H_ineq_float = H_ineq_normalized[unique_inds, :]
-        # H_ineq_original = H_ineq_original[unique_inds, :]
-        H_ineq_float, unique_inds = np.unique(H_ineq_normalized, axis=0, return_index=True)
-        H_ineq_original = H_ineq_original[unique_inds, :]
+        if mpi_wrapper.is_first_process():
+            H_ineq_original = H_ineq
+            H_ineq_normalized = np.transpose(normalize_columns(np.transpose(H_ineq.astype(dtype='float')), verbose=verbose))
+            # unique_inds = find_unique_inds(H_ineq_normalized, verbose=verbose, tol=1e-9)
+            # H_ineq_float = H_ineq_normalized[unique_inds, :]
+            # H_ineq_original = H_ineq_original[unique_inds, :]
+            H_ineq_float, unique_inds = np.unique(H_ineq_normalized, axis=0, return_index=True)
+            H_ineq_original = H_ineq_original[unique_inds, :]
 
-        # H_ineq_float = unique(H_ineq_normalized)
+            # H_ineq_float = unique(H_ineq_normalized)
 
-        # Find out if rows have been thrown away, and if so, do that as well
-        # unique_inds = find_remaining_rows(H_ineq_float, H_ineq_normalized, verbose=verbose)
-        # H_ineq_original = H_ineq_original[unique_inds, :]
+            # Find out if rows have been thrown away, and if so, do that as well
+            # unique_inds = find_remaining_rows(H_ineq_float, H_ineq_normalized, verbose=verbose)
+            # H_ineq_original = H_ineq_original[unique_inds, :]
 
-        if verbose:
-            mp_print("Size of H_eq after communication step:", H_eq.shape[0], H_eq.shape[1])
+            if verbose:
+                mp_print("Size of H_eq after communication step:", H_eq.shape[0], H_eq.shape[1])
 
         use_custom_redund = True  # If set to false, redundancy removal with redund from lrslib is used
         if use_custom_redund:
             mp_print('Using custom redundancy removal')
+            if not mpi_wrapper.is_first_process():
+                H_ineq_float = None
+            H_ineq_float = mpi_wrapper.bcast(H_ineq_float, root=0)
             t1 = time()
             nonred_inds_ineq, cycle_rays = drop_redundant_rays(np.transpose(H_ineq_float), rays_are_unique=True, linearities=False, normalised=True)
+            if not mpi_wrapper.is_first_process():
+                return None
             mp_print("Custom redund took %f sec" % (time()-t1))
-
             H_ineq = H_ineq_original[nonred_inds_ineq, :]
 
             # t1 = time()
             # H_eq = independent_rows(H_eq)
             # mp_print("Removing dependent rows in H_eq took %f sec" % (time() - t1))
         else:
-            mp_print('Using classical redundancy removal')
-            t2 = time()
-            H_ineq = redund(H_ineq)
-            mp_print("Redund took %f sec" % (time() - t2))
-            t2 = time()
-            H_eq = redund(H_eq)
-            mp_print("Redund took %f sec" % (time() - t2))
+            if mpi_wrapper.is_first_process():
+                mp_print('Using classical redundancy removal')
+                t2 = time()
+                H_ineq = redund(H_ineq)
+                mp_print("Redund took %f sec" % (time() - t2))
+                t2 = time()
+                H_eq = redund(H_eq)
+                mp_print("Redund took %f sec" % (time() - t2))
 
     print("Size of H_ineq after redund:", H_ineq.shape[0], H_ineq.shape[1])
     print("Size of H_eq after redund:", H_eq.shape[0], H_eq.shape[1])
