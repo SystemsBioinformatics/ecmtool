@@ -130,7 +130,7 @@ def write_mplrs_matrix(textfile, matrix):
         for val in line:
             textfile.write(str(val) + ' ')
         textfile.write('\n')
-    
+
 
 def write_header_no_linearity(textfile, inequality_matrix, d):
     """
@@ -142,9 +142,9 @@ def write_header_no_linearity(textfile, inequality_matrix, d):
     """
     textfile.write('H-representation' + ' \n')
     textfile.write('begin' + ' \n')
-    textfile.write(str(len(inequality_matrix)) + ' ' + str(d) +  ' ' + 'rational' + ' \n')
-    
-    
+    textfile.write(str(len(inequality_matrix)) + ' ' + str(d) + ' ' + 'rational' + ' \n')
+
+
 def write_header_with_linearity(textfile, linearity, d, m=None):
     """
     Writes header of ine file for calculations with mplrs.
@@ -154,7 +154,7 @@ def write_header_with_linearity(textfile, linearity, d, m=None):
     :param m: dimensional parameter for ine file giving the number of rows (mplrs parameter)
     :return: None
     """
-    linearity_list = [*range(1,linearity+1,1)]
+    linearity_list = [*range(1, linearity + 1, 1)]
     textfile.write('H-representation' + ' \n')
     textfile.write('linearity' + ' ' + str(linearity) + ' ')
     for i in linearity_list:
@@ -163,11 +163,11 @@ def write_header_with_linearity(textfile, linearity, d, m=None):
     textfile.write('begin' + ' \n')
 
     if m is None:
-        textfile.write(str(linearity) + ' ' + str(d) +  ' ' + 'rational' + ' \n')
+        textfile.write(str(linearity) + ' ' + str(d) + ' ' + 'rational' + ' \n')
     else:
-        textfile.write(str(m) + ' ' + str(d) +  ' ' + 'rational' + ' \n')
-          
-    
+        textfile.write(str(m) + ' ' + str(d) + ' ' + 'rational' + ' \n')
+
+
 def write_mplrs_input(equality_matrix, inequality_matrix, mplrs_path, verbose=False):
     """
 
@@ -177,22 +177,28 @@ def write_mplrs_input(equality_matrix, inequality_matrix, mplrs_path, verbose=Fa
     :param verbose: print status messages during enumeration
     :return: d dimensional parameter for ine file giving the width of the matrix
     """
-    if (inequality_matrix is not None) and (inequality_matrix.shape[0]>0):
+    if (inequality_matrix is not None) and (inequality_matrix.shape[0] > 0):
         inequality_matrix = inequality_matrix.tolist()
+        noInequalities=False
+    else:
+        noInequalities=True
 
-    if (equality_matrix is not None) and (equality_matrix.shape[0]>0):
+    if (equality_matrix is not None) and (equality_matrix.shape[0] > 0):
         equality_matrix = equality_matrix.tolist()
+        noEqualities=False
+    else:
+        noEqualities=True
 
     textfile = open(mplrs_path, "w")
 
-    if equality_matrix is None:
+    if noEqualities:
         d = len(inequality_matrix[0]) + 1
-        write_header_no_linearity(textfile, inequality_matrix, d, m=None)
+        write_header_no_linearity(textfile, inequality_matrix, d)
         if verbose:
             print('Writing inequalities to file')
         write_mplrs_matrix(textfile, inequality_matrix)
 
-    elif inequality_matrix is None:
+    elif noInequalities:
         linearity = len(equality_matrix)
         d = len(equality_matrix[0]) + 1
         write_header_with_linearity(textfile, linearity, d, m=None)
@@ -227,7 +233,7 @@ def parse_mplrs_output(mplrs_output_path, d, verbose=False):
     """
     if verbose:
         print('Parsing computed rays')
-        
+
     with open(mplrs_output_path, 'r') as file:
         lines = file.readlines()
         rays_vertices = np.ndarray(shape=(0, d))
@@ -239,7 +245,7 @@ def parse_mplrs_output(mplrs_output_path, d, verbose=False):
             end = len(lines) - stop
             del lines[-end:]
             del lines[:start]
-            
+
             number_lines = len(lines)
             rays_vertices = np.repeat(np.repeat(to_fractions(np.zeros(shape=(1, 1))), d, axis=1), number_lines, axis=0)
 
@@ -247,9 +253,9 @@ def parse_mplrs_output(mplrs_output_path, d, verbose=False):
                 for column, value in enumerate(line.replace('\n', '').split()):
                     if value != '0':
                         rays_vertices[row, column] = Fraction(str(value))
-                        
-    rays = rays_vertices[:,1:]
-    
+
+    rays = rays_vertices[:, 1:]
+
     return rays
 
 
@@ -307,7 +313,7 @@ def process_mplrs_ouput(width_matrix, verbose=True):
 
     return rays
 
-    
+
 def get_extreme_rays_polco(equality_matrix, inequality_matrix, rand, jvm_mem, processes, symbolic=True, verbose=False):
     """
     Calculates extreme rays using polco. Includes generation of input file, calculations and parsing of output file.
@@ -339,8 +345,8 @@ def get_extreme_rays_polco(equality_matrix, inequality_matrix, rand, jvm_mem, pr
     if jvm_mem == None:
         min_mem, max_mem = get_min_max_java_memory()
     else:
-        min_mem, max_mem = jvm_mem   
-    
+        min_mem, max_mem = jvm_mem
+
     if verbose:
         print('Running polco (%d-%d GiB java VM memory)' % (min_mem, max_mem), 'with "-maxthreads" %s' % processes)
 
@@ -390,7 +396,8 @@ def get_extreme_rays_polco(equality_matrix, inequality_matrix, rand, jvm_mem, pr
     return rays
 
 
-def get_extreme_rays(equality_matrix=None, inequality_matrix=None, verbose=False, polco=False, processes=None, jvm_mem=None, path2mplrs=None):
+def get_extreme_rays(equality_matrix=None, inequality_matrix=None, verbose=False, polco=False, processes=None,
+                     jvm_mem=None, path2mplrs=None):
     """
     Calculates extreme rays using either mplrs or polco.
     :param equality_matrix: equality_matrix: ndarray containing all equalities
@@ -422,12 +429,12 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, verbose=False
     if polco is True:
         if verbose:
             print('Starting enumeration with polco')
-        rays = get_extreme_rays_polco(equality_matrix, inequality_matrix, rand, jvm_mem, processes, symbolic=True, verbose=verbose)
+        rays = get_extreme_rays_polco(equality_matrix, inequality_matrix, rand, jvm_mem, processes, symbolic=True,
+                                      verbose=verbose)
     else:
         if verbose:
             print('Starting enumeration with mplrs')
         rays = get_extreme_rays_mplrs(equality_matrix, inequality_matrix, processes, rand, path2mplrs, verbose=verbose)
-        
 
     return rays
 
@@ -613,7 +620,8 @@ def print_ecms_direct(R, metabolite_ids):
         mp_print("")
 
 
-def normalize_columns_slower(R, verbose=False):  # This was the original function, but seems slower and further equivalent to new function below
+def normalize_columns_slower(R,
+                             verbose=False):  # This was the original function, but seems slower and further equivalent to new function below
     result = np.zeros(R.shape)
     number_rays = R.shape[1]
     for i in range(result.shape[1]):
@@ -621,7 +629,7 @@ def normalize_columns_slower(R, verbose=False):  # This was the original functio
             if i % 10000 == 0:
                 mp_print("Normalize columns is on ray %d of %d (%f %%)" %
                          (i, number_rays, i / number_rays * 100), PRINT_IF_RANK_NONZERO=True)
-        largest_number = np.max(np.abs(R[:,i]))
+        largest_number = np.max(np.abs(R[:, i]))
         if largest_number > 1e100:  # If numbers are very large, converting to float might give issues, therefore we first divide by another int
             part_normalized_column = np.array(R[:, i] / largest_number, dtype='float')
             result[:, i] = part_normalized_column / np.linalg.norm(part_normalized_column, ord=1)
@@ -636,7 +644,7 @@ def normalize_columns(R, verbose=False):
     result = R
     largest_number = np.max(np.abs(R))
     if largest_number > 1e100:
-        result = result / largest_number # If numbers are very large, converting to float might give issues, therefore we first divide by another int
+        result = result / largest_number  # If numbers are very large, converting to float might give issues, therefore we first divide by another int
     result = result.astype(dtype='float')
     norms = np.linalg.norm(result, axis=0, ord=1)
     norms[np.where(norms == 0)[0]] = 1
@@ -675,7 +683,7 @@ def normalize_columns_fraction(R, vectorized=False, verbose=True):
                     mp_print("Normalize columns is on ray %d of %d (%f %%)" %
                              (i, number_rays, i / number_rays * 100), PRINT_IF_RANK_NONZERO=True)
             norm_column = np.sum(np.abs(np.array(R[:, i])))
-            if norm_column!=0:
+            if norm_column != 0:
                 R[:, i] = np.array(R[:, i]) / norm_column
     else:
         R = R / np.sum(np.abs(R), axis=0)
