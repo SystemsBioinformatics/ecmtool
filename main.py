@@ -14,7 +14,7 @@ from ecmtool.conversion_cone import calculate_linearities, calc_C0_dual_extreme_
     calc_C_extreme_rays, post_process_rays
 from ecmtool.helpers import get_metabolite_adjacency, redund, to_fractions, prep_mplrs_input, execute_mplrs, \
     process_mplrs_ouput
-from ecmtool.helpers import mp_print, unsplit_metabolites, print_ecms_direct, normalize_columns
+from ecmtool.helpers import mp_print, unsplit_metabolites, print_ecms_direct, normalize_columns, uniqueReadWrite
 from ecmtool.intersect_directly_mpi import intersect_directly
 from ecmtool.network import extract_sbml_stoichiometry, add_reaction_tags, Network
 
@@ -289,6 +289,8 @@ if __name__ == '__main__':
                         help='Print the names and IDs of reactions in the (compressed) metabolic network (default: true)')
     parser.add_argument('--print_conversions', type=str2bool, default=False,
                         help='Print the calculated conversion modes (default: false)')
+    parser.add_argument('--make_unique', type=str2bool, default=True,
+                        help='Make sure set of ECMs is unique at the end  (default: True)')
     parser.add_argument('--use_external_compartment', type=str, default=None,
                         help='If a string is given, this string indicates how the external compartment in metabolite_ids of SBML-file is marked. By default, dead-end reaction-detection is used to find external metabolites, and no compartment-information. Please check if external compartment detection works by checking metabolite information before compression and with --primt metabolites true')
     parser.add_argument('--auto_direction', type=str2bool, default=True,
@@ -371,6 +373,7 @@ if __name__ == '__main__':
                  'or a Linux computing cluster.\n')
 
     if args.command in ['preprocess', 'all']:
+        mp_print("\nPreprocessing model.")
         network, external_cycles = preprocess_sbml(args)
         save_data(network, 'network.dat')
         save_data(external_cycles, 'external_cycles.dat')
@@ -403,6 +406,7 @@ if __name__ == '__main__':
     else:
         # Indirect enumeration
         if args.command in ['calc_linearities', 'all']:
+            mp_print("\nCalculating linearities in original network.")
             if 'network' not in locals():
                 network = restore_data('network.dat')
 
@@ -427,6 +431,7 @@ if __name__ == '__main__':
         else:
             # Using mplrs for enumeration
             if args.command in ['prep_C0_rays', 'all']:
+                mp_print("\nPreparing for first vertex enumeration step.")
                 if 'linearity_data' not in locals():
                     linearity_data = restore_data('linearity_data.dat')
                 linearities, linearities_deflated, G_rev, G_irrev, amount_metabolites, \
@@ -435,16 +440,20 @@ if __name__ == '__main__':
                 width_matrix = prep_mplrs_input(np.append(linearities, G_rev, axis=0), G_irrev)
                 save_data(width_matrix, 'width_matrix.dat')
             if args.command in ['calc_C0_rays', 'all']:
+                mp_print("\nFirst vertex enumeration step.")
                 # This step gets skipped when running on a computing cluster,
                 # in order to run mplrs directly with mpirun.
                 execute_mplrs(processes=args.processes, path2mplrs=args.path2mplrs, verbose=args.verbose)
             if args.command in ['process_C0_rays', 'all']:
+                mp_print("\nProcessing results from first vertex enumeration step.")
                 if 'width_matrix' not in locals():
                     width_matrix = restore_data('width_matrix.dat')
                 C0_dual_rays = process_mplrs_ouput(width_matrix, verbose=args.verbose)
                 save_data(C0_dual_rays, 'C0_dual_rays.dat')
 
         if args.command in ['calc_H', 'all']:
+            mp_print("\nCalculating H. Adding steady-state, irreversibility constraints, "
+                     "then discarding redundant inequalities.")
             # Initialise mpi4py only here, because it can not be started when using mplrs due to
             # only being able to run one instance at a time, and mpi4py creates an instance on import.
             mpi_wrapper.mpi_init(mplrs_present=mplrs_present)
@@ -482,6 +491,7 @@ if __name__ == '__main__':
         else:
             # Using mplrs for enumeration
             if args.command in ['prep_C_rays', 'all']:
+                mp_print("\nPreparing for second vertex enumeration step.")
                 if 'H' not in locals():
                     H = restore_data('H.dat')
                 H_eq, H_ineq, linearity_rays = H
@@ -489,10 +499,12 @@ if __name__ == '__main__':
                 width_matrix = prep_mplrs_input(H_eq, H_ineq)
                 save_data(width_matrix, 'width_matrix.dat')
             if args.command in ['calc_C_rays', 'all']:
+                mp_print("\nPerforming second vertex enumeration step.")
                 # This step gets skipped when running on a computing cluster,
                 # in order to run mplrs directly with mpirun.
                 execute_mplrs(processes=args.processes, path2mplrs=args.path2mplrs, verbose=args.verbose)
             if args.command in ['process_C_rays', 'all']:
+                mp_print("\nProcessing results from second vertex enumeration step.")
                 if 'width_matrix' not in locals():
                     width_matrix = restore_data('width_matrix.dat')
                 C_rays = process_mplrs_ouput(width_matrix, verbose=args.verbose)
@@ -551,6 +563,9 @@ if __name__ == '__main__':
 
         if args.print_conversions is True:
             print_ecms_direct(np.transpose(cone), ids)
+
+        if args.make_unique is True:
+            uniqueReadWrite(args.out_path)
 
     end = time()
     mp_print('Ran in %f seconds' % (end - start))

@@ -308,10 +308,10 @@ def post_process_rays(G, rays, linearity_rays, external_metabolites, extended_ex
         rays_inflated[:, in_out_metabolites] = np.subtract(rays_inflated[:, in_out_metabolites],
                                                            rays_inflated[:, G.shape[1]:])
     rays_merged = np.asarray(rays_inflated[:, :G.shape[1]], dtype='object')
-    rays_unique = unique(rays_merged)
+    # rays_unique = unique(rays_merged)
     # rays_unique = redund(rays_merged)
 
     if verbose:
-        print('Enumerated %d rays' % len(rays_unique))
+        print('Enumerated %d rays' % len(rays_merged))
 
-    return rays_unique
+    return rays_merged

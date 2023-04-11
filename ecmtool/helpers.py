@@ -13,6 +13,25 @@ from sympy import Matrix
 from ecmtool.mpi_wrapper import get_process_rank
 
 
+def uniqueReadWrite(filename):
+    fileNonUnique = open(filename, 'r')
+    splitFilename = filename.split('.')
+    if len(splitFilename) == 2:
+        uniqueFilename = splitFilename[0] + "_unique" + '.' + splitFilename[1]
+    else:
+        uniqueFilename = splitFilename[0] + "_unique"
+    fileUnique = open(uniqueFilename, 'w')
+    ecmsSet = set()
+    # uniqueInds = []
+    alot = 10 ** 5
+    for ind, line in enumerate(fileNonUnique):
+        if (ind % alot) == 0:
+            print("I'm at line " + str(ind))
+        if line not in ecmsSet:
+            ecmsSet.add(line)
+            fileUnique.write(line)
+
+
 def unique(matrix):
     unique_set = list({tuple(row) for row in matrix if np.count_nonzero(row) > 0})
     return np.vstack(unique_set) if len(unique_set) else to_fractions(np.ndarray(shape=(0, matrix.shape[1])))
