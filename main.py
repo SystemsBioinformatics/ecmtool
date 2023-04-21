@@ -452,11 +452,11 @@ if __name__ == '__main__':
                 save_data(C0_dual_rays, 'C0_dual_rays.dat')
 
         if args.command in ['calc_H', 'all']:
-            mp_print("\nCalculating H. Adding steady-state, irreversibility constraints, "
-                     "then discarding redundant inequalities.")
             # Initialise mpi4py only here, because it can not be started when using mplrs due to
             # only being able to run one instance at a time, and mpi4py creates an instance on import.
             mpi_wrapper.mpi_init(mplrs_present=mplrs_present)
+            mp_print("\nCalculating H. Adding steady-state, irreversibility constraints, "
+                     "then discarding redundant inequalities.")
             if mpi_wrapper.is_first_process():
                 if 'C0_dual_rays' not in locals():
                     C0_dual_rays = restore_data('C0_dual_rays.dat')
