@@ -5,8 +5,8 @@ With this tool you can calculate _Elementary Conversion Modes_ (ECMs) from metab
 ecmtool can be used in two different modes: either as a standalone command line tool, or as a Python library for your own scripts. We will describe how to install and use both modes.
 
 ### Prerequisites
-* Download and install Python. Ecmtool is compatible with python 3.x. Ensure both python and its package manager _pip_ are added to your PATH environment variable. If this last step is omitted, an error like the following will be thrown when you try to run python: `’python’ is not recognized as an internal or external command [..]`.
-* Download and install Java. Make sure you have a 64bit version; you can check this with `java -version`. Otherwise, you might get an error `Invalid maximum heap size`.
+* Download and install Python. Ecmtool is compatible with python 3.x, and tested on 3.10. Ensure both python and its package manager _pip_ are added to your PATH environment variable. If this last step is omitted, an error like the following will be thrown when you try to run python: `’python’ is not recognized as an internal or external command [..]`.
+* Download and install Java. ecmtool is tested with OpenJDK 17. Make sure you have a 64bit version; you can check this with `java -version`. Otherwise, you might get an error `Invalid maximum heap size`.
 
 ## Mode 1: standalone command line tool
 In this mode, you can call ecmtool like a normal program from your command line. It reads metabolic networks in the SBML format, and writes resulting ECMs into a CSV file for later analysis. Most researchers will use this method. For running ecmtool on computing clusters efficiently, see the Advanced Usage section in this readme.
@@ -17,6 +17,18 @@ In this mode, you can call ecmtool like a normal program from your command line.
 path should be replaced with the path ecmtool was downloaded to).
 * Install the dependencies in requirements.txt inside the ecmtool directory (e.g. by running `pip install -r requirements.txt`).
 * Linux only: install _redund_ of package _lrslib_ (e.g. by running `apt install lrslib`).
+
+#### Installing ecmtool using Docker 
+For convenience, there's a Docker script you can use that has all dependencies already installed, and allows you to directly run ecmtool.
+Open a terminal with the ecmtool project as its working directory, and run:
+
+```bash
+docker build -t ecmtool -f docker/Dockerfile .
+docker run -ti ecmtool bash
+```
+
+#### Installing ecmtool using Singularity
+To be continued.
 
 ### Running
 Ecmtool can be run by executing `python main.py –-model_path <path/to/model.xml> [arguments]` from the command line, after navigating to the ecmtool directory as described above. The possible arguments and their default values are printed when you run `python main.py --help`.
@@ -93,13 +105,36 @@ See the script examples_and_results/minimal_run_wo_sbml.py for an example on how
 ## Advanced usage
 After testing how the tool works, most users will want to run their workloads on computing clusters instead of on single machines. This section describes some of the steps that are useful for running on clusers
 
-### Parallel computing with mpi4py
-On Linux or Mac, ecmtool can make use of mpi4py for parallel computing. To make use of this feature, an implementation of MPI (e.g. OpenMPI) and mpi4py are required. They can be installed, for example, with
+### Parallel computing with OpenMPI
+On Linux or Mac, ecmtool can make use of OpenMPI for running on parallel in a computing cluster. To make use of this feature, OpenMPI, mpi4py, and mplrs are required. They can be installed, for example, with
 
+```bash
+apt install libopenmpi-dev
+wget http://cgm.cs.mcgill.ca/~avis/C/lrslib/archive/lrslib-071a.tar.gz
+tar -xzf lrslib-071a.tar.gz
+cd lrslib-071a
+make && make mplrs && make install
+ln -s `pwd`/mplrs /usr/local/bin/mplrs
+ln -s `pwd`/redund /usr/local/bin/redund
+cd ..
 ```
-apt install openmpi-bin
+
+Optional, only needed for "direct" enumeration:
+```bash
 pip3 install mpi4py
 ```
+
+Running ecmtool on a cluster using the indirect enumeration method is now as simple as running:
+```bash
+python3 main.py --processes <number of processes for enumeration> --model_path models/e_coli_core.xml
+```
+Note that this performs preprocessing steps like network compression on the node you run this command on, and not on the compute cluster.
+
+For direct enumeration, the number of processes for enumeration is passed to mpiexec instead:
+```bash
+mpiexec -n <number of processes for enumeration> python3 main.py --direct true --model_path models/e_coli_core.xml
+```
+In this mode, preprocessing steps are run on the compute cluster too.
 
 ### Doubling direct enumeration method speed
 The direct enumeration method can be sped up by compiling our LU decomposition code with Cython. The following describes the steps needed on Linux, but the same concept also applies to Mac OS and Windows. First make sure all dependencies are satisfied. Then execute:
@@ -110,21 +145,18 @@ python3 cython_setup.py build_ext --inplace
 mv _bglu* ecmtool/
 ```
 
-
-### Running on a computing cluster with mpiexec
-For example: mpiexec -n 4 python3 main.py --model_path models/e_coli_core.xml
-
+ℹ️ Note that in the Docker script, this optimisation has already been done. You don't need to compile anything there.
 
 ## Citing ecmtool
 Please refer to the following papers when using ecmtool:
 
 Initial version - [https://www.cell.com/patterns/fulltext/S2666-3899(20)30241-5](https://www.cell.com/patterns/fulltext/S2666-3899(20)30241-5).
 
+`mplrs` improved version - [https://doi.org/10.1093/bioinformatics/btad095](https://doi.org/10.1093/bioinformatics/btad095).
 `mplrs`-improved version - [https://doi.org/10.1093/bioinformatics/btad095](https://doi.org/10.1093/bioinformatics/btad095).
 
 ## Acknowledgements
 The original source code with indirect enumeration was written by [Tom Clement](https://scholar.google.com/citations?user=kUD5y04AAAAJ). [Erik Baalhuis](https://github.com/EBaalhuis) later expanded the code with a direct enumeration method that improved parallellisation. [Daan de Groot](https://scholar.google.com/citations?user=xY_GjWkAAAAJ) helped with many new features, bug fixes, and code reviews. [Bianca Buchner](https://github.com/BeeAnka) added support for `mplrs`, which raises the maximal size of networks you can enumerate with ecmtool. 
 
 ## License
-
 ecmtool is released with the liberal MIT license. You are free to use it for any purpose. We hope others will contribute to the field by making derived work publicly available too.

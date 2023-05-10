@@ -1,11 +1,27 @@
-FROM alpine:3.11
+FROM python:3.10-slim
 
-RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories
-RUN apk update && apk add git openssh build-base bash openjdk14 openmpi-dev gmp-dev python3 python3-dev cython py3-numpy py3-numpy-dev py3-scipy py3-psutil py3-scikit-learn
-RUN git clone https://github.com/tjclement/ecmtool.git
-RUN cd ecmtool && pip3 install -r requirements.txt && python3 setup.py install && cp /usr/lib/python3.*/site-packages/ecmtool*.egg/_bglu_dense.cpython-38-x86_64-linux-gnu.so ecmtool/
-RUN cd .. && wget http://cgm.cs.mcgill.ca/~avis/C/lrslib/archive/lrslib-070a.tar.gz && tar -xzf lrslib-070a.tar.gz && cd lrslib-070 && make && make install && cd .. && rm -rf lrslib*
+RUN apt update && apt install -y git openssh-client build-essential bash openjdk-17-jre libopenmpi-dev libgmp-dev wget
 
+RUN wget http://cgm.cs.mcgill.ca/~avis/C/lrslib/archive/lrslib-071a.tar.gz && tar -xzf lrslib-071a.tar.gz
+RUN cd lrslib-071a && make && make mplrs && make install && \
+    mv `pwd`/mplrs /usr/local/bin/mplrs && mv `pwd`/redund /usr/local/bin/redund && \
+    mv `pwd`/*.so /usr/local/lib
+RUN ldconfig
+
+COPY ecmtool /ecmtool/ecmtool/
+COPY models /ecmtool/models/
+COPY tests /ecmtool/tests/
+COPY tmp/.gitignore /ecmtool/tmp/
+COPY main.py setup.py cython_setup.py requirements.txt /ecmtool/
 WORKDIR /ecmtool
 
-CMD ["/bin/ash"]
+RUN pip3 install -r requirements.txt
+RUN python3 cython_setup.py build_ext --inplace && mv *.so ecmtool
+RUN python3 setup.py install
+
+# Make sure we don't have to run as root
+RUN useradd -ms /bin/bash user
+RUN chown -R user:user /ecmtool /lrslib*
+USER user
+
+CMD ["/bin/bash"]
