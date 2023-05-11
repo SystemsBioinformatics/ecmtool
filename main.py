@@ -342,7 +342,7 @@ if __name__ == '__main__':
             'Either give no values for jvm_mem, or two - "minGB maxGB" e.g. 50 200, not {}.'.format(len(args.jvm_mem)))
 
     mplrs_present = False
-    if (args.polco is False) and (args.command in ['calc_C0_rays', 'calc_C_rays', 'all']):
+    if (args.polco is False) and (args.direct is False) and (args.command in ['calc_C0_rays', 'calc_C_rays', 'all']):
         path2mplrs = args.path2mplrs if args.path2mplrs is not None else 'mplrs'
         try:
             mplrs_check = run([path2mplrs], capture_output=True)
