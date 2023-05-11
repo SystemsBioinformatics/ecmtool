@@ -26,7 +26,7 @@ def uniqueReadWrite(filename):
     alot = 10 ** 5
     for ind, line in enumerate(fileNonUnique):
         if (ind % alot) == 0:
-            print("I'm at line " + str(ind))
+            print("Writing file is at line " + str(ind))
         if line not in ecmsSet:
             ecmsSet.add(line)
             fileUnique.write(line)
@@ -591,12 +591,18 @@ def unsplit_metabolites(R, network):
     res = []
     ids = []
 
+    if len(metabolite_ids) != R.shape[0]:
+        exit("Warning! Network object is not up-to-date, unsplitting metabolites may go wrong.")
+
+    newNetworkMetabs = []
     processed = {}
     for i in range(R.shape[0]):
         metabolite = metabolite_ids[i].replace("_virtin", "").replace("_virtout", "")
+        metabInfo = network.metabolites[i]
         if metabolite in processed:
             row = processed[metabolite]
             res[row] += R[i, :]
+            newNetworkMetabs[row].direction = 'both'
         else:
             if metabolite[-4:] == '_int':
                 if np.sum(np.abs(R[i, :])) == 0:
@@ -606,8 +612,12 @@ def unsplit_metabolites(R, network):
             res.append(R[i, :].tolist())
             processed[metabolite] = len(res) - 1
             ids.append(metabolite)
+            metabInfo.id = metabolite
+            metabInfo.name = metabInfo.name.replace("_virtin", "").replace("_virtout", "")
+            newNetworkMetabs.append(metabInfo)
 
     # remove all-zero rays
+    network.metabolites = newNetworkMetabs
     res = np.asarray(res)
     res = res[:, [sum(abs(res)) != 0][0]]
 
