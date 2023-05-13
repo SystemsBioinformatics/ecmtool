@@ -501,14 +501,15 @@ if __name__ == '__main__':
         else:
             # Using mplrs for enumeration
             if args.command in ['prep_C_rays', 'all_between_mplrs', 'all']:
-                mp_print("\nPreparing for second vertex enumeration step.")
-                if 'H' not in locals():
-                    H = restore_data('H.dat')
-                H_eq, H_ineq, linearity_rays = H
+                if mpi_wrapper.is_first_process():
+                    mp_print("\nPreparing for second vertex enumeration step.")
+                    if 'H' not in locals():
+                        H = restore_data('H.dat')
+                    H_eq, H_ineq, linearity_rays = H
 
-                width_matrix = prep_mplrs_input(H_eq, H_ineq)
-                if args.command not in ['all']:
-                    save_data(width_matrix, 'width_matrix.dat')
+                    width_matrix = prep_mplrs_input(H_eq, H_ineq)
+                    if args.command not in ['all']:
+                        save_data(width_matrix, 'width_matrix.dat')
             if args.command in ['calc_C_rays', 'all']:
                 mp_print("\nPerforming second vertex enumeration step.")
                 # This step gets skipped when running on a computing cluster,
