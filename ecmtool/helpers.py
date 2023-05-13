@@ -257,11 +257,15 @@ def parse_mplrs_output(mplrs_output_path, d, verbose=False):
     mpi_rank = mpi_wrapper.get_process_rank()
 
     if verbose:
-        print('Parsing computed rays')
+        mp_print('Parsing computed rays')
         start = time()
 
     with open(mplrs_output_path, 'r') as file:
-        lines = file.readlines()
+        if mpi_wrapper.is_first_process():
+            lines = file.readlines()
+        else:
+            lines = None
+        lines = mpi_wrapper.bcast(lines, root=0)
         rays_vertices = np.ndarray(shape=(0, d))
 
         if len(lines) > 0:
