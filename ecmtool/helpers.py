@@ -9,8 +9,9 @@ import numpy as np
 import psutil
 from numpy.linalg import svd
 from sympy import Matrix
-from time import time
-from ecmtool import mpi_wrapper
+
+from ecmtool.mpi_wrapper import get_process_rank
+
 
 def uniqueReadWrite(filename):
     fileNonUnique = open(filename, 'r')
@@ -201,15 +202,15 @@ def write_mplrs_input(equality_matrix, inequality_matrix, mplrs_path, verbose=Fa
     """
     if (inequality_matrix is not None) and (inequality_matrix.shape[0] > 0):
         inequality_matrix = inequality_matrix.tolist()
-        noInequalities = False
+        noInequalities=False
     else:
-        noInequalities = True
+        noInequalities=True
 
     if (equality_matrix is not None) and (equality_matrix.shape[0] > 0):
         equality_matrix = equality_matrix.tolist()
-        noEqualities = False
+        noEqualities=False
     else:
-        noEqualities = True
+        noEqualities=True
 
     textfile = open(mplrs_path, "w")
 
@@ -254,8 +255,7 @@ def parse_mplrs_output(mplrs_output_path, d, verbose=False):
     :return: computed rays as ndarray
     """
     if verbose:
-        mp_print('Parsing computed rays')
-        start = time()
+        print('Parsing computed rays')
 
     with open(mplrs_output_path, 'r') as file:
         lines = file.readlines()
@@ -273,12 +273,6 @@ def parse_mplrs_output(mplrs_output_path, d, verbose=False):
             rays_vertices = np.repeat(np.repeat(to_fractions(np.zeros(shape=(1, 1))), d, axis=1), number_lines, axis=0)
 
             for row, line in enumerate(lines):
-                if verbose:
-                    if row % 10000 == 0:
-                        mp_print("Process %d is parsing ray %d (%f %%)." %
-                                 (mpi_rank, lineNum, row / nLinesPerProcess[mpi_rank] * 100),
-                                 PRINT_IF_RANK_NONZERO=True)
-
                 for column, value in enumerate(line.replace('\n', '').split()):
                     if value != '0':
                         rays_vertices[row, column] = Fraction(str(value))
@@ -334,14 +328,13 @@ def process_mplrs_output(width_matrix, verbose=True):
 
     if verbose:
         print('Done parsing rays')
-        start = time()
 
     # Clean up the files created above
     remove(mplrs_input_path)
     remove(mplrs_redund_path)
     remove(mplrs_output_path)
     if verbose:
-        print("Done removing files. This took " + str(time() - start) + " seconds.")
+        print("Done removing files.")
 
     return rays
 
@@ -495,7 +488,7 @@ def get_redund_binary():
 def redund(matrix, verbose=False):
     if not os.path.isdir(relative_path('tmp')):
         os.makedirs(relative_path('tmp'))
-    rank = str(mpi_wrapper.get_process_rank())
+    rank = str(get_process_rank())
     matrix = to_fractions(matrix)
     binary = get_redund_binary()
     matrix_path = relative_path('tmp' + os.sep + 'matrix' + rank + '.ine')
@@ -593,7 +586,7 @@ def mp_print(*args, **kwargs):
     named argument PRINT_IF_RANK_NONZERO is set to true.
     :return:
     """
-    if mpi_wrapper.get_process_rank() == 0:
+    if get_process_rank() == 0:
         print(*args)
     elif 'PRINT_IF_RANK_NONZERO' in kwargs and kwargs['PRINT_IF_RANK_NONZERO']:
         print(*args)
