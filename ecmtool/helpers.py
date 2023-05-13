@@ -332,7 +332,7 @@ def execute_mplrs(processes=3, path2mplrs=None, verbose=True):
 
 def process_mplrs_output(width_matrix, verbose=True):
     # Parse resulting extreme rays
-    rays = parse_mplrs_output(mplrs_output_path, width_matrix, verbose=True)
+    rays = parse_mplrs_output(mplrs_output_path, width_matrix, verbose=verbose)
 
     if verbose:
         print('Done parsing rays')
