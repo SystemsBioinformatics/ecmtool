@@ -300,9 +300,6 @@ def post_process_rays(G, rays, linearity_rays, external_metabolites, extended_ex
         rays_inflated = inflate_matrix(rays, extended_external_metabolites,
                                        amount_metabolites + len(in_out_metabolites))
 
-    if verbose:
-        print('Removing non-unique rays')
-
     # Merge bidirectional metabolites again, and drop duplicate rows
     if not only_rays:
         rays_inflated[:, in_out_metabolites] = np.subtract(rays_inflated[:, in_out_metabolites],
