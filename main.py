@@ -452,12 +452,13 @@ if __name__ == '__main__':
                 # in order to run mplrs directly with mpirun.
                 execute_mplrs(processes=args.processes, path2mplrs=args.path2mplrs, verbose=args.verbose)
             if args.command in ['process_C0_rays', 'all_between_mplrs', 'all']:
-                mp_print("\nProcessing results from first vertex enumeration step.")
-                if 'width_matrix' not in locals():
-                    width_matrix = restore_data('width_matrix.dat')
-                C0_dual_rays = process_mplrs_output(width_matrix, verbose=args.verbose)
-                if args.command not in ['all_between_mplrs', 'all']:
-                    save_data(C0_dual_rays, 'C0_dual_rays.dat')
+                if mpi_wrapper.is_first_process():
+                    mp_print("\nProcessing results from first vertex enumeration step.")
+                    if 'width_matrix' not in locals():
+                        width_matrix = restore_data('width_matrix.dat')
+                    C0_dual_rays = process_mplrs_output(width_matrix, verbose=args.verbose)
+                    if args.command not in ['all_between_mplrs', 'all']:
+                        save_data(C0_dual_rays, 'C0_dual_rays.dat')
 
         if args.command in ['calc_H', 'all_between_mplrs', 'all']:
             # Initialise mpi4py only here, because it can not be started when using mplrs due to
