@@ -506,21 +506,11 @@ if __name__ == '__main__':
                 # in order to run mplrs directly with mpirun.
                 execute_mplrs(processes=args.processes, path2mplrs=args.path2mplrs, verbose=args.verbose)
             if args.command in ['process_C_rays', 'all']:
-                # Initialise mpi4py only here, because it can not be started when using mplrs due to
-                # only being able to run one instance at a time, and mpi4py creates an instance on import.
-                mpi_wrapper.mpi_init(mplrs_present=mplrs_present)
-
                 mp_print("\nProcessing results from second vertex enumeration step.")
                 if 'width_matrix' not in locals():
                     width_matrix = restore_data('width_matrix.dat')
                 C_rays = process_mplrs_output(width_matrix, verbose=args.verbose)
-                if mpi_wrapper.is_first_process():
-                    if args.verbose:
-                        mp_print("Saving C_rays to file.")
-                        startSaving = time()
-                    save_data(C_rays, 'C_rays.dat')
-                    if args.verbose:
-                        mp_print("Saving C_rays took " + str(time() - startSaving) + " seconds.")
+                save_data(C_rays, 'C_rays.dat')
 
         if args.command in ['postprocess', 'all']:
             if 'C_rays' not in locals():
