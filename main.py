@@ -510,7 +510,12 @@ if __name__ == '__main__':
                 if 'width_matrix' not in locals():
                     width_matrix = restore_data('width_matrix.dat')
                 C_rays = process_mplrs_output(width_matrix, verbose=args.verbose)
+                if args.verbose:
+                    mp_print("Saving C_rays to file.")
+                    startSaving = time()
                 save_data(C_rays, 'C_rays.dat')
+                if args.verbose:
+                    mp_print("Saving C_rays took " + str(time() - startSaving) + " seconds.")
 
         if args.command in ['postprocess', 'all']:
             if 'C_rays' not in locals():
