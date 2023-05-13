@@ -160,10 +160,10 @@ def preprocess_sbml(args):
                                          skip_external_reactions=True,
                                          use_external_compartment=args.use_external_compartment)
 
-    tagged_reaction_indices = []
+    # tagged_reaction_indices = []
     external_cycles = None
 
-    adj = get_metabolite_adjacency(network.N)
+    # adj = get_metabolite_adjacency(network.N)
 
     if not args.auto_direction:
         set_inoutputs(args.inputs, args.outputs, network)
