@@ -270,7 +270,7 @@ if __name__ == '__main__':
                         help='Optional: run only a single step of ecmtool, continuing from the state of the previous step. \n'
                              'Allowed values (in order of execution): preprocess, direct_intersect (only when --direct true),\n'
                              'calc_linearities, prep_C0_rays, calc_C0_rays, process_C0_rays, calc_H, prep_C_rays, calc_C_rays,\n'
-                             'process_C_rays, postprocess, save_ecms. Omit to run all steps.')
+                             'process_C_rays, all_from_mplrs, postprocess, save_ecms. Omit to run all steps.')
     parser.add_argument('--model_path', type=str, default='models/active_subnetwork_KO_5.xml',
                         help='Relative or absolute path to an SBML model .xml file')
     parser.add_argument('--direct', type=str2bool, default=False,
@@ -505,19 +505,20 @@ if __name__ == '__main__':
                 # This step gets skipped when running on a computing cluster,
                 # in order to run mplrs directly with mpirun.
                 execute_mplrs(processes=args.processes, path2mplrs=args.path2mplrs, verbose=args.verbose)
-            if args.command in ['process_C_rays', 'all']:
+            if args.command in ['process_C_rays', 'all_from_mplrs', 'all']:
                 mp_print("\nProcessing results from second vertex enumeration step.")
                 if 'width_matrix' not in locals():
                     width_matrix = restore_data('width_matrix.dat')
                 C_rays = process_mplrs_output(width_matrix, verbose=args.verbose)
-                if args.verbose:
-                    mp_print("Saving C_rays to file.")
-                    startSaving = time()
-                save_data(C_rays, 'C_rays.dat')
-                if args.verbose:
-                    mp_print("Saving C_rays took " + str(time() - startSaving) + " seconds.")
+                if args.command not in ['all_from_mplrs', 'all']:
+                    if args.verbose:
+                        mp_print("Saving C_rays to file.")
+                        startSaving = time()
+                    save_data(C_rays, 'C_rays.dat')
+                    if args.verbose:
+                        mp_print("Saving C_rays took " + str(time() - startSaving) + " seconds.")
 
-        if args.command in ['postprocess', 'all']:
+        if args.command in ['postprocess', 'all_from_mplrs', 'all']:
             if 'C_rays' not in locals():
                 C_rays = restore_data('C_rays.dat')
 
@@ -537,9 +538,10 @@ if __name__ == '__main__':
             cone = post_process_rays(G, C_rays, linearity_rays, network.external_metabolite_indices(),
                                      extended_external_metabolites,
                                      in_out_indices, amount_metabolites, only_rays=args.only_rays, verbose=args.verbose)
-            save_data(cone, 'cone.dat')
+            if args.command not in ['all_from_mplrs', 'all']:
+                save_data(cone, 'cone.dat')
 
-    if args.command in ['save_ecms', 'all'] and mpi_wrapper.is_first_process():
+    if args.command in ['save_ecms', 'all_from_mplrs', 'all'] and mpi_wrapper.is_first_process():
         if 'cone' not in locals():
             cone = restore_data('cone.dat')
 
