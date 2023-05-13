@@ -28,3 +28,5 @@ examples_and_results/ecms.csv
 iIT.csv
 test_conversions.csv
 test_conversions_unique.csv
+*conversions.csv
+*conversions_unique.csv
