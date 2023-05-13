@@ -602,7 +602,7 @@ def mp_print(*args, **kwargs):
 
 
 def unsplit_metabolites(R, network):
-    metabolite_ids = [metab.id for metab in network.metabolites]
+    metabolite_ids = [metab.id for metab in network.metabolites if metab.is_external]
     res = []
     ids = []
 

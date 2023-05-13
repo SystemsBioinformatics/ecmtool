@@ -206,16 +206,16 @@ def preprocess_sbml(args):
         if args.intermediate_cone_path:
             check_if_intermediate_cone_exists(args.intermediate_cone_path)
 
-    if args.direct or args.splitting_before_polco:
-        # Split metabolites in input and output
-        network.split_in_out(args.only_rays)
-        cycle_removal_boolean = True if not args.only_rays else False
-    else:
-        cycle_removal_boolean = False
+    # if args.direct or args.splitting_before_polco:
+    # Split metabolites in input and output
+    network.split_in_out(args.only_rays)
+    cycle_removal_boolean = True if not args.only_rays else False
+    # else:
+    #     cycle_removal_boolean = False
 
     if args.hide_all_in_or_outputs:
-        if not args.direct and not args.splitting_before_polco:
-            network.split_in_out(args.only_rays)
+        # if not args.direct and not args.splitting_before_polco:
+        #     network.split_in_out(args.only_rays)
 
         hide_indices = [ind for ind, metab in enumerate(network.metabolites) if
                         (metab.is_external) & (metab.direction == args.hide_all_in_or_outputs) & (
@@ -314,8 +314,8 @@ if __name__ == '__main__':
                         help='Enable to only return extreme rays, and not elementary modes. This describes the full conversion space, but not all biologically relevant minimal conversions. See (Urbanczik, 2005) (default: false)')
     parser.add_argument('--verbose', type=str2bool, default=True,
                         help='Enable to show detailed console output (default: true)')
-    parser.add_argument('--splitting_before_polco', type=str2bool, default=True,
-                        help='Enables splitting external metabolites by making virtual input and output metabolites before starting the computation. Setting to false would do the splitting after first computation step. Which method is faster is complicated and model-dependent. (default: true)')
+    # parser.add_argument('--splitting_before_polco', type=str2bool, default=True,
+    #                     help='Enables splitting external metabolites by making virtual input and output metabolites before starting the computation. Setting to false would do the splitting after first computation step. Which method is faster is complicated and model-dependent. (default: true)')
     parser.add_argument('--redund_after_polco', type=str2bool, default=True,
                         help='(Indirect intersection only) Enables redundant row removal from inequality description of dual cone. Works well with models with relatively many internal metabolites, and when running parrallelized computation using MPI (default: true)')
     parser.add_argument('--scei', type=str2bool, default=True, help='Enable to use SCEI compression (default: true)')
@@ -535,9 +535,21 @@ if __name__ == '__main__':
                 network = restore_data('network.dat')
 
             G = np.transpose(network.N)
-            cone = post_process_rays(G, C_rays, linearity_rays, network.external_metabolite_indices(),
-                                     extended_external_metabolites,
-                                     in_out_indices, amount_metabolites, only_rays=args.only_rays, verbose=args.verbose)
+            # cone = post_process_rays(G, C_rays, linearity_rays, network.external_metabolite_indices(),
+            #                          extended_external_metabolites,
+            #                          in_out_indices, amount_metabolites, only_rays=args.only_rays, verbose=args.verbose)
+            # When calculating only extreme rays, we need to add linealities in both directions
+            if args.only_rays and len(in_out_indices) > 0:
+                cone = np.append(C_rays, linearity_rays, axis=0)
+            else:
+                cone = C_rays
+
+            if args.verbose:
+                if cone.shape[0] == 0:
+                    print('Warning: no feasible Elementary Conversion Modes found')
+                else:
+                    print('Enumerated %d rays' % len(cone))
+
             if args.command not in ['all_from_mplrs', 'all']:
                 save_data(cone, 'cone.dat')
 
@@ -551,15 +563,15 @@ if __name__ == '__main__':
         cone_transpose, ids = unsplit_metabolites(np.transpose(cone), network)
         cone = np.transpose(cone_transpose)
 
-        internal_ids = []
-        for metab in network.metabolites:
-            if not metab.is_external:
-                id_ind = [ind for ind, id in enumerate(ids) if id == metab.id]
-                if len(id_ind):
-                    internal_ids.append(id_ind[0])
-
-        ids = list(np.delete(ids, internal_ids))
-        cone = np.delete(cone, internal_ids, axis=1)
+        # internal_ids = []
+        # for metab in network.metabolites:
+        #     if not metab.is_external:
+        #         id_ind = [ind for ind, id in enumerate(ids) if id == metab.id]
+        #         if len(id_ind):
+        #             internal_ids.append(id_ind[0])
+        #
+        # ids = list(np.delete(ids, internal_ids))
+        # cone = np.delete(cone, internal_ids, axis=1)
 
         try:
             np.savetxt(args.out_path, cone, delimiter=',', header=','.join(ids), comments='')
