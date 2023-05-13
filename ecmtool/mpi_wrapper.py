@@ -12,10 +12,8 @@ def mpi_init(mplrs_present=False):
               "If mpi4py is required, try separating the mplrs- and mpi4py-step.")
     try:
         from mpi4py import MPI
-    except ImportError as error:
-        print("Error occurred when import mpi4py: ", error)
-        print("Is mpi4py installed?")
-        print("Since the mpi4py-package is not imported, parallel computation is not possible for direct enumeration. "
+    except ImportError:
+        print("Since the mpi4py-package is not installed, parallel computation is not possible for direct enumeration. "
               "This package does not work properly on Windows, but can be installed on other operating systems.")
         return
 
