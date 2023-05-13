@@ -333,6 +333,8 @@ def process_mplrs_output(width_matrix, verbose=True):
     remove(mplrs_input_path)
     remove(mplrs_redund_path)
     remove(mplrs_output_path)
+    if verbose:
+        print("Done removing files.")
 
     return rays
 
