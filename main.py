@@ -269,7 +269,7 @@ if __name__ == '__main__':
     parser.add_argument('command', nargs='?', default='all',
                         help='Optional: run only a single step of ecmtool, continuing from the state of the previous step. \n'
                              'Allowed values (in order of execution): preprocess, direct_intersect (only when --direct true),\n'
-                             'calc_linearities, prep_C0_rays, calc_C0_rays, process_C0_rays, calc_H, prep_C_rays, calc_C_rays,\n'
+                             'calc_linearities, prep_C0_rays, all_until_mplrs, calc_C0_rays, all_between_mplrs, process_C0_rays, calc_H, prep_C_rays, calc_C_rays,\n'
                              'process_C_rays, all_from_mplrs, postprocess, save_ecms. Omit to run all steps.')
     parser.add_argument('--model_path', type=str, default='models/active_subnetwork_KO_5.xml',
                         help='Relative or absolute path to an SBML model .xml file')
@@ -374,11 +374,12 @@ if __name__ == '__main__':
                  'To reap the benefits of parallelization and the use of cython, please use a virtual Linux machine'
                  'or a Linux computing cluster.\n')
 
-    if args.command in ['preprocess', 'all']:
+    if args.command in ['preprocess', 'all_until_mplrs', 'all']:
         mp_print("\nPreprocessing model.")
         network, external_cycles = preprocess_sbml(args)
-        save_data(network, 'network.dat')
-        save_data(external_cycles, 'external_cycles.dat')
+        if args.command not in ['all_until_mplrs', 'all']:
+            save_data(network, 'network.dat')
+            save_data(external_cycles, 'external_cycles.dat')
 
     if args.direct:
         if args.command in ['direct_intersect', 'all']:
@@ -404,10 +405,11 @@ if __name__ == '__main__':
                 T_intersected = np.concatenate((T_intersected, external_cycles_array, -external_cycles_array), axis=1)
 
             cone = np.transpose(T_intersected)
-            save_data(cone, 'cone.dat')
+            if args.command not in ['all']:
+                save_data(cone, 'cone.dat')
     else:
         # Indirect enumeration
-        if args.command in ['calc_linearities', 'all']:
+        if args.command in ['calc_linearities', 'all_until_mplrs', 'all']:
             mp_print("\nCalculating linearities in original network.")
             if 'network' not in locals():
                 network = restore_data('network.dat')
@@ -416,7 +418,8 @@ if __name__ == '__main__':
                                                    network.external_metabolite_indices(),
                                                    network.input_metabolite_indices(),
                                                    network.output_metabolite_indices(), args.verbose)
-            save_data(linearity_data, 'linearity_data.dat')
+            if args.command not in ['all']:
+                save_data(linearity_data, 'linearity_data.dat')
 
         if args.polco:
             if args.command in ['calc_C0_rays', 'all']:
@@ -429,10 +432,11 @@ if __name__ == '__main__':
                                                          polco=args.polco, processes=args.processes,
                                                          jvm_mem=args.jvm_mem,
                                                          path2mplrs=args.path2mplrs)
-                save_data(C0_dual_rays, 'C0_dual_rays.dat')
+                if args.command not in ['all']:
+                    save_data(C0_dual_rays, 'C0_dual_rays.dat')
         else:
             # Using mplrs for enumeration
-            if args.command in ['prep_C0_rays', 'all']:
+            if args.command in ['prep_C0_rays', 'all_until_mplrs', 'all']:
                 mp_print("\nPreparing for first vertex enumeration step.")
                 if 'linearity_data' not in locals():
                     linearity_data = restore_data('linearity_data.dat')
@@ -440,20 +444,22 @@ if __name__ == '__main__':
                 extended_external_metabolites, in_out_indices = linearity_data
 
                 width_matrix = prep_mplrs_input(np.append(linearities, G_rev, axis=0), G_irrev)
-                save_data(width_matrix, 'width_matrix.dat')
+                if args.command not in ['all']:
+                    save_data(width_matrix, 'width_matrix.dat')
             if args.command in ['calc_C0_rays', 'all']:
                 mp_print("\nFirst vertex enumeration step.")
                 # This step gets skipped when running on a computing cluster,
                 # in order to run mplrs directly with mpirun.
                 execute_mplrs(processes=args.processes, path2mplrs=args.path2mplrs, verbose=args.verbose)
-            if args.command in ['process_C0_rays', 'all']:
+            if args.command in ['process_C0_rays', 'all_between_mplrs', 'all']:
                 mp_print("\nProcessing results from first vertex enumeration step.")
                 if 'width_matrix' not in locals():
                     width_matrix = restore_data('width_matrix.dat')
                 C0_dual_rays = process_mplrs_output(width_matrix, verbose=args.verbose)
-                save_data(C0_dual_rays, 'C0_dual_rays.dat')
+                if args.command not in ['all_between_mplrs', 'all']:
+                    save_data(C0_dual_rays, 'C0_dual_rays.dat')
 
-        if args.command in ['calc_H', 'all']:
+        if args.command in ['calc_H', 'all_between_mplrs', 'all']:
             # Initialise mpi4py only here, because it can not be started when using mplrs due to
             # only being able to run one instance at a time, and mpi4py creates an instance on import.
             mpi_wrapper.mpi_init(mplrs_present=mplrs_present)
@@ -475,7 +481,8 @@ if __name__ == '__main__':
                            input_metabolites=network.input_metabolite_indices(),
                            output_metabolites=network.output_metabolite_indices(), in_out_indices=in_out_indices,
                            redund_after_polco=args.redund_after_polco, only_rays=args.only_rays, verbose=args.verbose)
-                save_data(H, 'H.dat')
+                if args.command not in ['all_between_mplrs', 'all']:
+                    save_data(H, 'H.dat')
             else:
                 H = calc_H()
                 exit()
@@ -488,18 +495,19 @@ if __name__ == '__main__':
                 C_rays = calc_C_extreme_rays(H_eq, H_ineq,
                                              polco=args.polco, processes=args.processes, jvm_mem=args.jvm_mem,
                                              path2mplrs=args.path2mplrs)
-
-                save_data(C_rays, 'C_rays.dat')
+                if args.command not in ['all']:
+                    save_data(C_rays, 'C_rays.dat')
         else:
             # Using mplrs for enumeration
-            if args.command in ['prep_C_rays', 'all']:
+            if args.command in ['prep_C_rays', 'all_between_mplrs', 'all']:
                 mp_print("\nPreparing for second vertex enumeration step.")
                 if 'H' not in locals():
                     H = restore_data('H.dat')
                 H_eq, H_ineq, linearity_rays = H
 
                 width_matrix = prep_mplrs_input(H_eq, H_ineq)
-                save_data(width_matrix, 'width_matrix.dat')
+                if args.command not in ['all']:
+                    save_data(width_matrix, 'width_matrix.dat')
             if args.command in ['calc_C_rays', 'all']:
                 mp_print("\nPerforming second vertex enumeration step.")
                 # This step gets skipped when running on a computing cluster,
