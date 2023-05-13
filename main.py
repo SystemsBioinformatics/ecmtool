@@ -13,7 +13,7 @@ from ecmtool import mpi_wrapper
 from ecmtool.conversion_cone import calculate_linearities, calc_C0_dual_extreme_rays, calc_H, \
     calc_C_extreme_rays, post_process_rays
 from ecmtool.helpers import get_metabolite_adjacency, redund, to_fractions, prep_mplrs_input, execute_mplrs, \
-    process_mplrs_ouput
+    process_mplrs_output
 from ecmtool.helpers import mp_print, unsplit_metabolites, print_ecms_direct, normalize_columns, uniqueReadWrite
 from ecmtool.intersect_directly_mpi import intersect_directly
 from ecmtool.network import extract_sbml_stoichiometry, add_reaction_tags, Network
@@ -335,6 +335,8 @@ if __name__ == '__main__':
     parser.add_argument('--path2mplrs', type=str, default=None,
                         help='if mplrs binary is not accessable via PATH variable "mplrs", the absolute path to the binary can be provided with "--path2mplrs" e.g. "--path2mplrs /home/user/mplrs/lrslib-071b/mplrs" ')
 
+    parser.add_argument('--timestamp', type=str2bool, default=False,
+                        help='Determines whether we print timestamps for several steps in the program.')
     args = parser.parse_args()
 
     if args.polco and args.jvm_mem is not None and len(args.jvm_mem) not in (0, 2):
@@ -448,7 +450,7 @@ if __name__ == '__main__':
                 mp_print("\nProcessing results from first vertex enumeration step.")
                 if 'width_matrix' not in locals():
                     width_matrix = restore_data('width_matrix.dat')
-                C0_dual_rays = process_mplrs_ouput(width_matrix, verbose=args.verbose)
+                C0_dual_rays = process_mplrs_output(width_matrix, verbose=args.verbose)
                 save_data(C0_dual_rays, 'C0_dual_rays.dat')
 
         if args.command in ['calc_H', 'all']:
@@ -507,7 +509,7 @@ if __name__ == '__main__':
                 mp_print("\nProcessing results from second vertex enumeration step.")
                 if 'width_matrix' not in locals():
                     width_matrix = restore_data('width_matrix.dat')
-                C_rays = process_mplrs_ouput(width_matrix, verbose=args.verbose)
+                C_rays = process_mplrs_output(width_matrix, verbose=args.verbose)
                 save_data(C_rays, 'C_rays.dat')
 
         if args.command in ['postprocess', 'all']:

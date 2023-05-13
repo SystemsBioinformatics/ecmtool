@@ -24,12 +24,16 @@ def uniqueReadWrite(filename):
     ecmsSet = set()
     # uniqueInds = []
     alot = 10 ** 5
+    deletedCount = 0
     for ind, line in enumerate(fileNonUnique):
         if (ind % alot) == 0:
             print("Writing file is at line " + str(ind))
         if line not in ecmsSet:
             ecmsSet.add(line)
             fileUnique.write(line)
+        else:
+            deletedCount += 1
+    print("Removed " + str(deletedCount) + " non-unique rays.")
 
 
 def unique(matrix):
@@ -291,7 +295,7 @@ def get_extreme_rays_mplrs(equality_matrix, inequality_matrix, processes, rand, 
     """
     width_matrix = prep_mplrs_input(equality_matrix, inequality_matrix)
     execute_mplrs(processes=processes, path2mplrs=path2mplrs, verbose=verbose)
-    return process_mplrs_ouput(width_matrix=width_matrix, verbose=verbose)
+    return process_mplrs_output(width_matrix=width_matrix, verbose=verbose)
 
 
 mplrs_input_path = relative_path('tmp' + os.sep + 'mplrs.ine')
@@ -318,7 +322,7 @@ def execute_mplrs(processes=3, path2mplrs=None, verbose=True):
     check_call(f'mpirun -np {processes} {path2mplrs} {mplrs_redund_path} {mplrs_output_path}', shell=True)
 
 
-def process_mplrs_ouput(width_matrix, verbose=True):
+def process_mplrs_output(width_matrix, verbose=True):
     # Parse resulting extreme rays
     rays = parse_mplrs_output(mplrs_output_path, width_matrix, verbose=False)
 
