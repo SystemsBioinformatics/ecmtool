@@ -12,6 +12,7 @@ from sympy import Matrix
 from time import time
 from ecmtool import mpi_wrapper
 
+
 def uniqueReadWrite(filename):
     fileNonUnique = open(filename, 'r')
     splitFilename = filename.split('.')
@@ -255,7 +256,6 @@ def parse_mplrs_output(mplrs_output_path, d, verbose=False):
     """
     if verbose:
         mp_print('Parsing computed rays')
-        start = time()
 
     with open(mplrs_output_path, 'r') as file:
         lines = file.readlines()
@@ -272,19 +272,21 @@ def parse_mplrs_output(mplrs_output_path, d, verbose=False):
             number_lines = len(lines)
             rays_vertices = np.repeat(np.repeat(to_fractions(np.zeros(shape=(1, 1))), d, axis=1), number_lines, axis=0)
 
+            if verbose:
+                startTime = time()
+
             for row, line in enumerate(lines):
-                if verbose:
-                    if row % 10000 == 0:
-                        mp_print("Process %d is parsing ray %d (%f %%)." %
-                                 (mpi_rank, lineNum, row / nLinesPerProcess[mpi_rank] * 100),
-                                 PRINT_IF_RANK_NONZERO=True)
+                if (row == 10000) and verbose:
+                    mp_print("Parsed %d rays of mplrs output. Estimated total parsing time: %f seconds." % (
+                    row, (number_lines / row) * (time() - startTime)))
 
                 for column, value in enumerate(line.replace('\n', '').split()):
                     if value != '0':
                         rays_vertices[row, column] = Fraction(str(value))
 
     rays = rays_vertices[:, 1:]
-
+    if verbose:
+        print("Parsing rays took %f seconds." % (time() - startTime))
     return rays
 
 
@@ -330,7 +332,7 @@ def execute_mplrs(processes=3, path2mplrs=None, verbose=True):
 
 def process_mplrs_output(width_matrix, verbose=True):
     # Parse resulting extreme rays
-    rays = parse_mplrs_output(mplrs_output_path, width_matrix, verbose=False)
+    rays = parse_mplrs_output(mplrs_output_path, width_matrix, verbose=True)
 
     if verbose:
         print('Done parsing rays')
