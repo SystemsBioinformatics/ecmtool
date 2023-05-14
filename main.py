@@ -516,6 +516,7 @@ if __name__ == '__main__':
                 # in order to run mplrs directly with mpirun.
                 execute_mplrs(processes=args.processes, path2mplrs=args.path2mplrs, verbose=args.verbose)
             if args.command in ['process_C_rays', 'all_from_mplrs', 'all']:
+                startProcessingC = time()
                 mp_print("\nProcessing results from second vertex enumeration step.")
                 if 'width_matrix' not in locals():
                     width_matrix = restore_data('width_matrix.dat')
@@ -527,8 +528,11 @@ if __name__ == '__main__':
                     save_data(C_rays, 'C_rays.dat')
                     if args.verbose:
                         mp_print("Saving C_rays took " + str(time() - startSaving) + " seconds.")
+                if args.verbose:
+                    mp_print("Making unique took %f seconds." % (time() - startProcessingC))
 
         if args.command in ['postprocess', 'all_from_mplrs', 'all']:
+            startPostprocess = time()
             if 'C_rays' not in locals():
                 C_rays = restore_data('C_rays.dat')
 
@@ -544,7 +548,7 @@ if __name__ == '__main__':
             if 'network' not in locals():
                 network = restore_data('network.dat')
 
-            G = np.transpose(network.N)
+            # G = np.transpose(network.N)
             # cone = post_process_rays(G, C_rays, linearity_rays, network.external_metabolite_indices(),
             #                          extended_external_metabolites,
             #                          in_out_indices, amount_metabolites, only_rays=args.only_rays, verbose=args.verbose)
@@ -562,8 +566,10 @@ if __name__ == '__main__':
 
             if args.command not in ['all_from_mplrs', 'all']:
                 save_data(cone, 'cone.dat')
+            mp_print("Postprocessing took %f seconds." % (time()-startPostprocess))
 
     if args.command in ['save_ecms', 'all_from_mplrs', 'all'] and mpi_wrapper.is_first_process():
+        startUnsplitting = time()
         if 'cone' not in locals():
             cone = restore_data('cone.dat')
 
@@ -572,6 +578,8 @@ if __name__ == '__main__':
 
         cone_transpose, ids = unsplit_metabolites(np.transpose(cone), network)
         cone = np.transpose(cone_transpose)
+        if args.verbose:
+            mp_print("Unsplitting metabolites took %f seconds." % (time() - startUnsplitting))
 
         # internal_ids = []
         # for metab in network.metabolites:
@@ -582,7 +590,7 @@ if __name__ == '__main__':
         #
         # ids = list(np.delete(ids, internal_ids))
         # cone = np.delete(cone, internal_ids, axis=1)
-
+        startSaveEcms = time()
         try:
             np.savetxt(args.out_path, cone, delimiter=',', header=','.join(ids), comments='')
         except OverflowError:
@@ -595,8 +603,14 @@ if __name__ == '__main__':
         if args.print_conversions is True:
             print_ecms_direct(np.transpose(cone), ids)
 
+        if args.verbose:
+            mp_print("Saving ecms took %f seconds." % (time()-startSaveEcms))
+
         if args.make_unique is True:
+            startMakeUnique = time()
             uniqueReadWrite(args.out_path)
+            if args.verbose:
+                mp_print("Making unique took %f seconds." % (time() - startMakeUnique))
 
     end = time()
     mp_print('Ran in %f seconds' % (end - start))
