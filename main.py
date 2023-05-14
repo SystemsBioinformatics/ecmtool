@@ -335,7 +335,7 @@ if __name__ == '__main__':
     parser.add_argument('--path2mplrs', type=str, default=None,
                         help='if mplrs binary is not accessable via PATH variable "mplrs", the absolute path to the binary can be provided with "--path2mplrs" e.g. "--path2mplrs /home/user/mplrs/lrslib-071b/mplrs" ')
 
-    parser.add_argument('--timestamp', type=str2bool, default=False,
+    parser.add_argument('--timestamp', type=str2bool, default=True,
                         help='Determines whether we print timestamps for several steps in the program.')
     args = parser.parse_args()
 
@@ -526,9 +526,9 @@ if __name__ == '__main__':
                         mp_print("Saving C_rays to file.")
                         startSaving = time()
                     save_data(C_rays, 'C_rays.dat')
-                    if args.verbose:
+                    if args.timestamp:
                         mp_print("Saving C_rays took " + str(time() - startSaving) + " seconds.")
-                if args.verbose:
+                if args.timestamp:
                     mp_print("Procesing C_rays took %f seconds." % (time() - startProcessingC))
 
         if args.command in ['postprocess', 'all_from_mplrs', 'all']:
@@ -566,7 +566,8 @@ if __name__ == '__main__':
 
             if args.command not in ['all_from_mplrs', 'all']:
                 save_data(cone, 'cone.dat')
-            mp_print("Postprocessing took %f seconds." % (time()-startPostprocess))
+            if args.timestamp:
+                mp_print("Postprocessing took %f seconds." % (time()-startPostprocess))
 
     if args.command in ['save_ecms', 'all_from_mplrs', 'all'] and mpi_wrapper.is_first_process():
         startUnsplitting = time()
@@ -578,7 +579,7 @@ if __name__ == '__main__':
 
         cone_transpose, ids = unsplit_metabolites(np.transpose(cone), network)
         cone = np.transpose(cone_transpose)
-        if args.verbose:
+        if args.timestamp:
             mp_print("Unsplitting metabolites took %f seconds." % (time() - startUnsplitting))
 
         # internal_ids = []
@@ -603,13 +604,13 @@ if __name__ == '__main__':
         if args.print_conversions is True:
             print_ecms_direct(np.transpose(cone), ids)
 
-        if args.verbose:
+        if args.timestamp:
             mp_print("Saving ecms took %f seconds." % (time()-startSaveEcms))
 
         if args.make_unique is True:
             startMakeUnique = time()
             uniqueReadWrite(args.out_path)
-            if args.verbose:
+            if args.timestamp:
                 mp_print("Making unique took %f seconds." % (time() - startMakeUnique))
 
     end = time()
