@@ -529,7 +529,7 @@ if __name__ == '__main__':
                     if args.verbose:
                         mp_print("Saving C_rays took " + str(time() - startSaving) + " seconds.")
                 if args.verbose:
-                    mp_print("Making unique took %f seconds." % (time() - startProcessingC))
+                    mp_print("Procesing C_rays took %f seconds." % (time() - startProcessingC))
 
         if args.command in ['postprocess', 'all_from_mplrs', 'all']:
             startPostprocess = time()
