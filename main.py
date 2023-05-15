@@ -532,40 +532,24 @@ if __name__ == '__main__':
                     mp_print("Procesing C_rays took %f seconds." % (time() - startProcessingC))
 
         if args.command in ['postprocess', 'all_from_mplrs', 'all']:
+            # This postprocessing step only does something important when only_rays is True, see if this can be cleaned
+            # up further
             startPostprocess = time()
-            if 'C_rays' not in locals():
-                C_rays = restore_data('C_rays.dat')
-
-            if 'H' not in locals():
-                H = restore_data('H.dat')
-            H_eq, H_ineq, linearity_rays = H
-
-            if 'linearity_data' not in locals():
-                linearity_data = restore_data('linearity_data.dat')
-            linearities, linearities_deflated, G_rev, G_irrev, amount_metabolites, \
-            extended_external_metabolites, in_out_indices = linearity_data
-
-            if 'network' not in locals():
-                network = restore_data('network.dat')
-
-            # G = np.transpose(network.N)
-            # cone = post_process_rays(G, C_rays, linearity_rays, network.external_metabolite_indices(),
-            #                          extended_external_metabolites,
-            #                          in_out_indices, amount_metabolites, only_rays=args.only_rays, verbose=args.verbose)
-            # When calculating only extreme rays, we need to add linealities in both directions
-            if args.only_rays and len(in_out_indices) > 0:
-                cone = np.append(C_rays, linearity_rays, axis=0)
-            else:
-                cone = C_rays
-
-            if args.verbose:
-                if cone.shape[0] == 0:
-                    print('Warning: no feasible Elementary Conversion Modes found')
+            if args.only_rays:
+                if 'H' not in locals():
+                    H = restore_data('H.dat')
+                H_eq, H_ineq, linearity_rays = H
+                if linearity_rays.shape[0] > 0:
+                    if 'C_rays' not in locals():
+                        C_rays = restore_data('C_rays.dat')
+                    cone = np.append(C_rays, linearity_rays, axis=0)
+                    if args.command not in ['all_from_mplrs', 'all']:
+                        save_data(cone, 'cone.dat')
                 else:
-                    print('Enumerated %d rays' % len(cone))
+                    os.rename(os.path.join('ecmtool', 'tmp', 'C_rays.dat'), os.path.join('ecmtool', 'tmp', 'cone.dat'))
+            else:
+                os.rename(os.path.join('ecmtool', 'tmp', 'C_rays.dat'), os.path.join('ecmtool', 'tmp', 'cone.dat'))
 
-            if args.command not in ['all_from_mplrs', 'all']:
-                save_data(cone, 'cone.dat')
             if args.timestamp:
                 mp_print("Postprocessing took %f seconds." % (time()-startPostprocess))
 
@@ -582,15 +566,6 @@ if __name__ == '__main__':
         if args.timestamp:
             mp_print("Unsplitting metabolites took %f seconds." % (time() - startUnsplitting))
 
-        # internal_ids = []
-        # for metab in network.metabolites:
-        #     if not metab.is_external:
-        #         id_ind = [ind for ind, id in enumerate(ids) if id == metab.id]
-        #         if len(id_ind):
-        #             internal_ids.append(id_ind[0])
-        #
-        # ids = list(np.delete(ids, internal_ids))
-        # cone = np.delete(cone, internal_ids, axis=1)
         startSaveEcms = time()
         try:
             np.savetxt(args.out_path, cone, delimiter=',', header=','.join(ids), comments='')
