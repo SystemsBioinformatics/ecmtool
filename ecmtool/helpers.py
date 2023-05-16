@@ -9,7 +9,7 @@ import numpy as np
 import psutil
 from numpy.linalg import svd
 from sympy import Matrix
-from time import time
+from time import time, strftime, localtime
 from ecmtool import mpi_wrapper
 
 
@@ -599,35 +599,36 @@ def mp_print(*args, **kwargs):
         print(*args)
 
 
+# TODO: Remove this function eventually
 def unsplit_metabolites(R, network):
-    metabolite_ids = [metab.id for metab in network.metabolites if metab.is_external]
+    metabolites = [metab for metab in network.metabolites if metab.is_external]
     res = []
     ids = []
 
-    if len(metabolite_ids) != R.shape[0]:
+    if len(metabolites) != R.shape[0]:
         exit("Warning! Network object is not up-to-date, unsplitting metabolites may go wrong.")
 
     newNetworkMetabs = []
     processed = {}
     for i in range(R.shape[0]):
-        metabolite = metabolite_ids[i].replace("_virtin", "").replace("_virtout", "")
-        metabInfo = network.metabolites[i]
-        if metabolite in processed:
-            row = processed[metabolite]
+        metabRealId = metabolites[i].id.replace("_virtin", "").replace("_virtout", "")
+        metab = metabolites[i]
+        if metabRealId in processed:
+            row = processed[metabRealId]
             res[row] += R[i, :]
             newNetworkMetabs[row].direction = 'both'
         else:
-            if metabolite[-4:] == '_int':
+            if metabRealId[-4:] == '_int':
                 if np.sum(np.abs(R[i, :])) == 0:
                     continue
                 else:
-                    mp_print("Metabolite " + metabolite + " was made internal, but now is nonzero in ECMs.")
+                    mp_print("Metabolite " + metabRealId + " was made internal, but now is nonzero in ECMs.")
             res.append(R[i, :].tolist())
-            processed[metabolite] = len(res) - 1
-            ids.append(metabolite)
-            metabInfo.id = metabolite
-            metabInfo.name = metabInfo.name.replace("_virtin", "").replace("_virtout", "")
-            newNetworkMetabs.append(metabInfo)
+            processed[metabRealId] = len(res) - 1
+            ids.append(metabRealId)
+            metab.id = metabRealId
+            metab.name = metab.name.replace("_virtin", "").replace("_virtout", "")
+            newNetworkMetabs.append(metab)
 
     # remove all-zero rays
     network.metabolites = newNetworkMetabs
@@ -635,6 +636,171 @@ def unsplit_metabolites(R, network):
     res = res[:, [sum(abs(res)) != 0][0]]
 
     return res, ids
+
+
+def process_all_from_mplrs(network, linearities=None, output_fractions=False, out_path='conversion_cone.csv', verbose=True):
+    # Find out which metabolites should be unsplit: create a list of which entry i tells to which result-column
+    # metabolite i should go
+    metabIndToNewInd, ids = get_unsplit_metabolites_inds(network)
+    d = len(ids)
+
+    # Prepare some variables for parsing
+    parsedRayCount = 0
+    zeroRay = np.repeat(to_fractions(np.zeros(shape=(1, 1))), d)
+    zeroFrac = Fraction(0)
+    ecmsHashSet = set()
+    ecmsHashSet.add(hash(','.join([str(float(num)) for num in zeroRay]) + '\n'))
+    nonUniqueCount = 0
+    makeGuess = 10000
+
+    # Find out from mplrs output how many ecms there are
+    mplrsCountLine = read_n_to_last_line(mplrs_output_path, 2)
+    numRays = int(mplrsCountLine.split(' ')[2][5:])
+
+    # Open mplrs-output file
+    with open(mplrs_output_path) as fp:
+        # Skip first few lines that contain meta-information
+        reachedBegin = False
+        while not reachedBegin:
+            line = fp.readline()
+            if not line:
+                break
+            if line == "begin\n":
+                for ind in range(2):
+                    line = fp.readline()
+                    if not line:
+                        break
+                reachedBegin = True
+
+        # Open output file
+        outputfile = open(out_path, 'w')
+        outputfile.write(','.join(ids) + '\n')
+
+        startTime = time()
+        for ind in range(numRays):
+            # Here the reading of the first ECM line begins
+            line = fp.readline()
+
+            # Print some estimate on the remaining computation time once in a while
+            if (parsedRayCount == makeGuess) and verbose:
+                mp_print(strftime("%H:%M:%S", localtime()) + ": Parsed %d rays of mplrs output. "
+                                                                       "Estimated remaining time: %f seconds." % (
+                    parsedRayCount, ((numRays / parsedRayCount - 1) * (time() - startTime))))
+                makeGuess *= 2
+
+            # We intialize the ecms with all zeros
+            ecm = zeroRay.copy()
+            # For normalizing we keep track of the sum of absolute values
+            sumEcm = zeroFrac
+            # First column of mplrs-output is useless
+            croppedLine = line.replace('\n', '').split()[1:]
+
+            for column, value in enumerate(croppedLine):
+                if value != '0':
+                    fracVal = Fraction(value)
+                    ecm[metabIndToNewInd[column]] += fracVal
+                    sumEcm += abs(fracVal)
+
+            # Normalise row
+            ecm /= sumEcm
+
+            # Convert the ecm to a string to be able to store it
+            if output_fractions:
+                ecmString = ','.join([str(num) for num in ecm]) + '\n'
+            else:
+                ecmString = ','.join([str(float(num)) for num in ecm]) + '\n'
+            ecmHash = hash(ecmString)
+            if ecmHash not in ecmsHashSet:
+                ecmsHashSet.add(ecmHash)
+                # Print to file
+                outputfile.write(ecmString)
+            else:
+                nonUniqueCount += 1
+            parsedRayCount += 1
+
+        # If we run args.only_rays there can be linearities that we should add at the end
+        if linearities is not None:
+            for linearity in linearities:
+                linearity /= np.sum(np.abs(linearity))
+                if output_fractions:
+                    ecmString = ','.join([str(num) for num in ecm]) + '\n'
+                else:
+                    ecmString = ','.join([str(float(num)) for num in ecm]) + '\n'
+                ecmHash = hash(ecmString)
+                if ecmHash not in ecmsHashSet:
+                    ecmsHashSet.add(ecmHash)
+                    # Print to file
+                    outputfile.write(ecmString)
+        outputfile.close()
+
+    remove(mplrs_input_path)
+    remove(mplrs_redund_path)
+    remove(mplrs_output_path)
+
+    if verbose:
+        mp_print('Found %s ECMs' % (parsedRayCount - nonUniqueCount))
+    return ids
+
+
+def read_n_to_last_line(filename, n=1):
+    """Returns the nth before last line of a file (n=1 gives last line)"""
+    num_newlines = 0
+    with open(filename, 'rb') as f:
+        try:
+            f.seek(-2, os.SEEK_END)
+            while num_newlines < n:
+                f.seek(-2, os.SEEK_CUR)
+                if f.read(1) == b'\n':
+                    num_newlines += 1
+        except OSError:
+            f.seek(0)
+        last_line = f.readline().decode()
+    return last_line
+
+
+def get_unsplit_metabolites_inds(network):
+    metabolites = [metab for metab in network.metabolites if metab.is_external]
+    ids = []
+
+    metabIndToNewInd = []
+    newIndCounter = 0
+    newNetworkMetabs = []
+    processed = {}
+    for i, metab in enumerate(metabolites):
+        metabRealId = metab.id.replace("_virtin", "").replace("_virtout", "")
+        if metabRealId in processed:
+            metabRealInd = processed[metabRealId]
+            metabIndToNewInd.append(metabRealInd)
+            newNetworkMetabs[metabRealInd].direction = 'both'
+        else:
+            metabIndToNewInd.append(newIndCounter)
+            processed[metabRealId] = newIndCounter
+            newIndCounter += 1
+            ids.append(metabRealId)
+            metab.id = metabRealId
+            metab.name = metab.name.replace("_virtin", "").replace("_virtout", "")
+            newNetworkMetabs.append(metab)
+
+    network.metabolites = newNetworkMetabs
+    return metabIndToNewInd, ids
+
+
+def save_and_print_ecms(args, cone, ids):
+    startSaveEcms = time()
+    try:
+        np.savetxt(args.out_path, cone, delimiter=',', header=','.join(ids), comments='')
+    except OverflowError:
+        normalised = np.transpose(normalize_columns(np.transpose(cone)))
+        np.savetxt(args.out_path, normalised, delimiter=',', header=','.join(ids), comments='')
+
+    if args.verbose is True:
+        mp_print('Found %s ECMs' % cone.shape[0])
+
+    if args.print_conversions is True:
+        print_ecms_direct(np.transpose(cone), ids)
+
+    if args.timestamp:
+        mp_print("Saving ecms took %f seconds." % (time() - startSaveEcms))
 
 
 def print_ecms_direct(R, metabolite_ids):

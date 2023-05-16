@@ -12,9 +12,10 @@ from subprocess import run
 from ecmtool import mpi_wrapper
 from ecmtool.conversion_cone import calculate_linearities, calc_C0_dual_extreme_rays, calc_H, \
     calc_C_extreme_rays, post_process_rays
-from ecmtool.helpers import get_metabolite_adjacency, redund, to_fractions, prep_mplrs_input, execute_mplrs, \
+from ecmtool.helpers import redund, to_fractions, prep_mplrs_input, execute_mplrs, \
     process_mplrs_output
-from ecmtool.helpers import mp_print, unsplit_metabolites, print_ecms_direct, normalize_columns, uniqueReadWrite
+from ecmtool.helpers import mp_print, unsplit_metabolites, process_all_from_mplrs, print_ecms_direct, \
+    normalize_columns, uniqueReadWrite, save_and_print_ecms
 from ecmtool.intersect_directly_mpi import intersect_directly
 from ecmtool.network import extract_sbml_stoichiometry, add_reaction_tags, Network
 
@@ -271,8 +272,14 @@ if __name__ == '__main__':
                              'Allowed values (in order of execution): preprocess, direct_intersect (only when --direct true),\n'
                              'calc_linearities, prep_C0_rays, all_until_mplrs, calc_C0_rays, all_between_mplrs, process_C0_rays, calc_H, prep_C_rays, calc_C_rays,\n'
                              'process_C_rays, all_from_mplrs, postprocess, save_ecms. Omit to run all steps.')
+
+    # Choices for the input
     parser.add_argument('--model_path', type=str, default='models/active_subnetwork_KO_5.xml',
                         help='Relative or absolute path to an SBML model .xml file')
+
+    parser.add_argument('--output_fractions', type=str2bool, default=False,
+                        help='Determines whether fractions or their approximating floats are stored as outputs.')
+
     parser.add_argument('--direct', type=str2bool, default=False,
                         help='Enable to intersect with equalities directly. Direct intersection works better than indirect when many metabolites are hidden, and on large networks (default: False)')
     parser.add_argument('--compress', type=str2bool, default=True,
@@ -314,8 +321,7 @@ if __name__ == '__main__':
                         help='Enable to only return extreme rays, and not elementary modes. This describes the full conversion space, but not all biologically relevant minimal conversions. See (Urbanczik, 2005) (default: false)')
     parser.add_argument('--verbose', type=str2bool, default=True,
                         help='Enable to show detailed console output (default: true)')
-    # parser.add_argument('--splitting_before_polco', type=str2bool, default=True,
-    #                     help='Enables splitting external metabolites by making virtual input and output metabolites before starting the computation. Setting to false would do the splitting after first computation step. Which method is faster is complicated and model-dependent. (default: true)')
+
     parser.add_argument('--redund_after_polco', type=str2bool, default=True,
                         help='(Indirect intersection only) Enables redundant row removal from inequality description of dual cone. Works well with models with relatively many internal metabolites, and when running parrallelized computation using MPI (default: true)')
     parser.add_argument('--scei', type=str2bool, default=True, help='Enable to use SCEI compression (default: true)')
@@ -515,45 +521,68 @@ if __name__ == '__main__':
                 # This step gets skipped when running on a computing cluster,
                 # in order to run mplrs directly with mpirun.
                 execute_mplrs(processes=args.processes, path2mplrs=args.path2mplrs, verbose=args.verbose)
-            if args.command in ['process_C_rays', 'all_from_mplrs', 'all']:
+
+            if args.command in ['all_from_mplrs', 'all']:
+                # In this case we know that all postprocessing after mplrs must be run. We will optimise this
+                # preprocessing by only reading in mplrs output once and then do the unsplitting of metabolites, the
+                # making unique, and the saving at once.
+                args.command = 'all_from_mplrs'
+                if 'network' not in locals():
+                    network = restore_data('network.dat')
+                if args.only_rays:
+                    if 'H' not in locals():
+                        H = restore_data('H.dat')
+                    H_eq, H_ineq, linearity_rays = H
+                    linearity_rays = linearity_rays if linearity_rays.shape[0] > 0 else None
+                metabolite_ids = process_all_from_mplrs(network, linearities=linearity_rays,
+                                                        output_fractions=args.output_fractions, out_path=args.out_path,
+                                                        verbose=args.verbose)
+                if args.print_conversions:
+                    cone = np.loadtxt(args.out_path, delimiter=',', skiprows=1)
+                    print_ecms_direct(cone, metabolite_ids)
+
+            if args.command in ['process_C_rays']:
                 startProcessingC = time()
                 mp_print("\nProcessing results from second vertex enumeration step.")
                 if 'width_matrix' not in locals():
                     width_matrix = restore_data('width_matrix.dat')
                 C_rays = process_mplrs_output(width_matrix, verbose=args.verbose)
-                if args.command not in ['all_from_mplrs', 'all']:
-                    if args.verbose:
-                        mp_print("Saving C_rays to file.")
-                        startSaving = time()
-                    save_data(C_rays, 'C_rays.dat')
-                    if args.timestamp:
-                        mp_print("Saving C_rays took " + str(time() - startSaving) + " seconds.")
                 if args.timestamp:
-                    mp_print("Procesing C_rays took %f seconds." % (time() - startProcessingC))
+                    mp_print("Processing C_rays took %f seconds." % (time() - startProcessingC))
 
-        if args.command in ['postprocess', 'all_from_mplrs', 'all']:
-            # This postprocessing step only does something important when only_rays is True, see if this can be cleaned
-            # up further
-            startPostprocess = time()
-            if args.only_rays:
-                if 'H' not in locals():
-                    H = restore_data('H.dat')
-                H_eq, H_ineq, linearity_rays = H
-                if linearity_rays.shape[0] > 0:
-                    if 'C_rays' not in locals():
-                        C_rays = restore_data('C_rays.dat')
-                    cone = np.append(C_rays, linearity_rays, axis=0)
-                    if args.command not in ['all_from_mplrs', 'all']:
-                        save_data(cone, 'cone.dat')
-                else:
-                    os.rename(os.path.join('ecmtool', 'tmp', 'C_rays.dat'), os.path.join('ecmtool', 'tmp', 'cone.dat'))
-            else:
-                os.rename(os.path.join('ecmtool', 'tmp', 'C_rays.dat'), os.path.join('ecmtool', 'tmp', 'cone.dat'))
+                if args.verbose:
+                    mp_print("Saving cone to file.")
+                    startSaving = time()
+                save_data(C_rays, 'cone.dat')
+                if args.timestamp and args.verbose:
+                    mp_print("Saving cone took " + str(time() - startSaving) + " seconds.")
 
-            if args.timestamp:
-                mp_print("Postprocessing took %f seconds." % (time()-startPostprocess))
+        # if args.command in ['postprocess', 'all']:
+        #     # This postprocessing step only does something important when only_rays is True.
+        #     startPostprocess = time()
+        #     if args.only_rays:
+        #         if 'H' not in locals():
+        #             H = restore_data('H.dat')
+        #         H_eq, H_ineq, linearity_rays = H
+        #         if linearity_rays.shape[0] > 0:
+        #             if 'C_rays' not in locals():
+        #                 C_rays = restore_data('C_rays.dat')
+        #             cone = np.append(C_rays, linearity_rays, axis=0)
+        #             if args.command not in ['all']:
+        #                 save_data(cone, 'cone.dat')
+        #         elif args.command not in ['all']:
+        #             os.rename(os.path.join('ecmtool', 'tmp', 'C_rays.dat'), os.path.join('ecmtool', 'tmp', 'cone.dat'))
+        #         else:
+        #             cone = C_rays
+        #     elif args.command not in ['all']:
+        #         os.rename(os.path.join('ecmtool', 'tmp', 'C_rays.dat'), os.path.join('ecmtool', 'tmp', 'cone.dat'))
+        #     else:
+        #         cone = C_rays
+        #
+        #     if args.timestamp:
+        #         mp_print("Postprocessing took %f seconds." % (time() - startPostprocess))
 
-    if args.command in ['save_ecms', 'all_from_mplrs', 'all'] and mpi_wrapper.is_first_process():
+    if args.command in ['save_ecms', 'all'] and mpi_wrapper.is_first_process():
         startUnsplitting = time()
         if 'cone' not in locals():
             cone = restore_data('cone.dat')
@@ -561,26 +590,19 @@ if __name__ == '__main__':
         if 'network' not in locals():
             network = restore_data('network.dat')
 
+        if args.only_rays and (not args.direct):
+            if 'H' not in locals():
+                H = restore_data('H.dat')
+            H_eq, H_ineq, linearity_rays = H
+            if linearity_rays.shape[0] > 0:
+                cone = np.append(cone, linearity_rays, axis=0)
+
         cone_transpose, ids = unsplit_metabolites(np.transpose(cone), network)
         cone = np.transpose(cone_transpose)
         if args.timestamp:
             mp_print("Unsplitting metabolites took %f seconds." % (time() - startUnsplitting))
 
-        startSaveEcms = time()
-        try:
-            np.savetxt(args.out_path, cone, delimiter=',', header=','.join(ids), comments='')
-        except OverflowError:
-            normalised = np.transpose(normalize_columns(np.transpose(cone)))
-            np.savetxt(args.out_path, normalised, delimiter=',', header=','.join(ids), comments='')
-
-        if args.verbose is True:
-            mp_print('Found %s ECMs' % cone.shape[0])
-
-        if args.print_conversions is True:
-            print_ecms_direct(np.transpose(cone), ids)
-
-        if args.timestamp:
-            mp_print("Saving ecms took %f seconds." % (time()-startSaveEcms))
+        save_and_print_ecms(args, cone, ids)
 
         if args.make_unique is True:
             startMakeUnique = time()
@@ -590,4 +612,3 @@ if __name__ == '__main__':
 
     end = time()
     mp_print('Ran in %f seconds' % (end - start))
-    # os._exit(0)
