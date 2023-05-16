@@ -461,6 +461,8 @@ if __name__ == '__main__':
                 # in order to run mplrs directly with mpirun.
                 execute_mplrs(processes=args.processes, path2mplrs=args.path2mplrs, verbose=args.verbose)
             if args.command in ['process_C0_rays', 'all_between_mplrs', 'all']:
+                if args.command in ['all_between_mplrs']:
+                    mpi_wrapper.mpi_init(mplrs_present)
                 if mpi_wrapper.is_first_process():
                     mp_print("\nProcessing results from first vertex enumeration step.")
                     if 'width_matrix' not in locals():
@@ -537,6 +539,8 @@ if __name__ == '__main__':
                         H = restore_data('H.dat')
                     H_eq, H_ineq, linearity_rays = H
                     linearity_rays = linearity_rays if linearity_rays.shape[0] > 0 else None
+                else:
+                    linearity_rays = None
                 metabolite_ids = process_all_from_mplrs(network, linearities=linearity_rays,
                                                         output_fractions=args.output_fractions, out_path=args.out_path,
                                                         verbose=args.verbose)
