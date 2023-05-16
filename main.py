@@ -267,37 +267,18 @@ if __name__ == '__main__':
 
     parser = ArgumentParser(
         description='Calculate Elementary Conversion Modes from an SBML model. For medium-to large networks, be sure to define --inputs and --outputs. This reduces the enumeration problem complexity considerably.')
+    # Choosing what part to run. Not putting this first argument will just run the whole program.
     parser.add_argument('command', nargs='?', default='all',
                         help='Optional: run only a single step of ecmtool, continuing from the state of the previous step. \n'
                              'Allowed values (in order of execution): preprocess, direct_intersect (only when --direct true),\n'
                              'calc_linearities, prep_C0_rays, all_until_mplrs, calc_C0_rays, all_between_mplrs, process_C0_rays, calc_H, prep_C_rays, calc_C_rays,\n'
                              'process_C_rays, all_from_mplrs, postprocess, save_ecms. Omit to run all steps.')
 
-    # Choices for the input
+    # Choices for the model on which ECM-calculation is performed
     parser.add_argument('--model_path', type=str, default='models/active_subnetwork_KO_5.xml',
                         help='Relative or absolute path to an SBML model .xml file')
-
-    parser.add_argument('--output_fractions', type=str2bool, default=False,
-                        help='Determines whether fractions or their approximating floats are stored as outputs.')
-
-    parser.add_argument('--direct', type=str2bool, default=False,
-                        help='Enable to intersect with equalities directly. Direct intersection works better than indirect when many metabolites are hidden, and on large networks (default: False)')
-    parser.add_argument('--compress', type=str2bool, default=True,
-                        help='Perform compression to which the conversions are invariant, and reduce the network size considerably (default: True)')
-    parser.add_argument('--remove_infeasible', type=str2bool, default=True,
-                        help='Remove reactions that cannot carry flux dsquring compression. Switch off when this gives rise to numerical linear algebra problems. (default: True)')
-    parser.add_argument('--out_path', default='conversion_cone.csv',
-                        help='Relative or absolute path to the .csv file you want to save the calculated conversions to (default: conversion_cone.csv)')
     parser.add_argument('--add_objective_metabolite', type=str2bool, default=True,
                         help='Add a virtual metabolite containing the stoichiometry of the objective function of the model (default: true)')
-    parser.add_argument('--print_metabolites', type=str2bool, default=True,
-                        help='Print the names and IDs of metabolites in the (compressed) metabolic network (default: true)')
-    parser.add_argument('--print_reactions', type=str2bool, default=False,
-                        help='Print the names and IDs of reactions in the (compressed) metabolic network (default: true)')
-    parser.add_argument('--print_conversions', type=str2bool, default=False,
-                        help='Print the calculated conversion modes (default: false)')
-    parser.add_argument('--make_unique', type=str2bool, default=True,
-                        help='Make sure set of ECMs is unique at the end  (default: True)')
     parser.add_argument('--use_external_compartment', type=str, default=None,
                         help='If a string is given, this string indicates how the external compartment in metabolite_ids of SBML-file is marked. By default, dead-end reaction-detection is used to find external metabolites, and no compartment-information. Please check if external compartment detection works by checking metabolite information before compression and with --primt metabolites true')
     parser.add_argument('--auto_direction', type=str2bool, default=True,
@@ -319,19 +300,25 @@ if __name__ == '__main__':
                         help='String that is either empty, input, or output. If it is inputs or outputs, after splitting metabolites, all inputs or outputs are hidden (objective is always excluded)')
     parser.add_argument('--only_rays', type=str2bool, default=False,
                         help='Enable to only return extreme rays, and not elementary modes. This describes the full conversion space, but not all biologically relevant minimal conversions. See (Urbanczik, 2005) (default: false)')
-    parser.add_argument('--verbose', type=str2bool, default=True,
-                        help='Enable to show detailed console output (default: true)')
 
+    # Choices for the output
+    parser.add_argument('--output_fractions', type=str2bool, default=False,
+                        help='Determines whether fractions or their approximating floats are stored as outputs.')
+    parser.add_argument('--out_path', default='conversion_cone.csv',
+                        help='Relative or absolute path to the .csv file you want to save the calculated conversions to (default: conversion_cone.csv)')
+    parser.add_argument('--make_unique', type=str2bool, default=True,
+                        help='Make sure set of ECMs is unique at the end  (default: True)')
+
+    # Choices for the way in which ecm-calculation is performed. This can have large consequences for computational
+    # time. See publications for information.
+    parser.add_argument('--direct', type=str2bool, default=False,
+                        help='Enable to intersect with equalities directly. Direct intersection works better than indirect when many metabolites are hidden, and on large networks (default: False)')
+    parser.add_argument('--compress', type=str2bool, default=True,
+                        help='Perform compression to which the conversions are invariant, and reduce the network size considerably (default: True)')
+    parser.add_argument('--remove_infeasible', type=str2bool, default=True,
+                        help='Remove reactions that cannot carry flux during compression. Switch off when this gives rise to numerical linear algebra problems. (default: True)')
     parser.add_argument('--redund_after_polco', type=str2bool, default=True,
                         help='(Indirect intersection only) Enables redundant row removal from inequality description of dual cone. Works well with models with relatively many internal metabolites, and when running parrallelized computation using MPI (default: true)')
-    parser.add_argument('--scei', type=str2bool, default=True, help='Enable to use SCEI compression (default: true)')
-    parser.add_argument('--sort_order', type=str, default='min_adj',
-                        help='Order in which internal metabolites should be set to zero. Default is to minimize the added adjacencies, other options are: min_lp, max_lp_per_adj, min_connections')
-    parser.add_argument('--intermediate_cone_path', type=str, default='',
-                        help='Filename where intermediate cone result can be found. If an empty string is given (default), then no intermediate result is picked up and the calculation is done in full')
-    parser.add_argument('--manual_override', type=str, default='',
-                        help='Index indicating which metabolite should be intersected in first step. Advanced option, can be used in combination with --intermediate_cone_path, to pick a specific intersection at a specific time.')
-
     parser.add_argument('--polco', type=str2bool, default=False,
                         help='Uses polco instead of mplrs for extreme ray enumeration (default: false)')
     parser.add_argument('--processes', type=int, default=3,
@@ -340,7 +327,23 @@ if __name__ == '__main__':
                         help='Two values given the minimum and maximum memeory for java machine in GB e.g. 50 300 (default: maximum memory available)')
     parser.add_argument('--path2mplrs', type=str, default=None,
                         help='if mplrs binary is not accessable via PATH variable "mplrs", the absolute path to the binary can be provided with "--path2mplrs" e.g. "--path2mplrs /home/user/mplrs/lrslib-071b/mplrs" ')
+    parser.add_argument('--scei', type=str2bool, default=True, help='Enable to use SCEI compression (default: true)')
+    parser.add_argument('--sort_order', type=str, default='min_adj',
+                        help='Order in which internal metabolites should be set to zero (in direct enumeration). Default is to minimize the added adjacencies, other options are: min_lp, max_lp_per_adj, min_connections')
+    parser.add_argument('--intermediate_cone_path', type=str, default='',
+                        help='Filename where intermediate cone result can be found. If an empty string is given (default), then no intermediate result is picked up and the calculation is done in full')
+    parser.add_argument('--manual_override', type=str, default='',
+                        help='Index indicating which metabolite should be intersected in first step. Advanced option, can be used in combination with --intermediate_cone_path, to pick a specific intersection at a specific time.')
 
+    # Choices on what is printed in the console
+    parser.add_argument('--print_metabolites', type=str2bool, default=True,
+                        help='Print the names and IDs of metabolites in the (compressed) metabolic network (default: true)')
+    parser.add_argument('--print_reactions', type=str2bool, default=False,
+                        help='Print the names and IDs of reactions in the (compressed) metabolic network (default: true)')
+    parser.add_argument('--print_conversions', type=str2bool, default=False,
+                        help='Print the calculated conversion modes (default: false)')
+    parser.add_argument('--verbose', type=str2bool, default=True,
+                        help='Enable to show detailed console output (default: true)')
     parser.add_argument('--timestamp', type=str2bool, default=True,
                         help='Determines whether we print timestamps for several steps in the program.')
     args = parser.parse_args()
