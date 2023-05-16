@@ -549,41 +549,16 @@ if __name__ == '__main__':
                 mp_print("\nProcessing results from second vertex enumeration step.")
                 if 'width_matrix' not in locals():
                     width_matrix = restore_data('width_matrix.dat')
-                C_rays = process_mplrs_output(width_matrix, verbose=args.verbose)
+                cone = process_mplrs_output(width_matrix, verbose=args.verbose)
                 if args.timestamp:
                     mp_print("Processing C_rays took %f seconds." % (time() - startProcessingC))
 
                 if args.verbose:
                     mp_print("Saving cone to file.")
                     startSaving = time()
-                save_data(C_rays, 'cone.dat')
+                save_data(cone, 'cone.dat')
                 if args.timestamp and args.verbose:
                     mp_print("Saving cone took " + str(time() - startSaving) + " seconds.")
-
-        # if args.command in ['postprocess', 'all']:
-        #     # This postprocessing step only does something important when only_rays is True.
-        #     startPostprocess = time()
-        #     if args.only_rays:
-        #         if 'H' not in locals():
-        #             H = restore_data('H.dat')
-        #         H_eq, H_ineq, linearity_rays = H
-        #         if linearity_rays.shape[0] > 0:
-        #             if 'C_rays' not in locals():
-        #                 C_rays = restore_data('C_rays.dat')
-        #             cone = np.append(C_rays, linearity_rays, axis=0)
-        #             if args.command not in ['all']:
-        #                 save_data(cone, 'cone.dat')
-        #         elif args.command not in ['all']:
-        #             os.rename(os.path.join('ecmtool', 'tmp', 'C_rays.dat'), os.path.join('ecmtool', 'tmp', 'cone.dat'))
-        #         else:
-        #             cone = C_rays
-        #     elif args.command not in ['all']:
-        #         os.rename(os.path.join('ecmtool', 'tmp', 'C_rays.dat'), os.path.join('ecmtool', 'tmp', 'cone.dat'))
-        #     else:
-        #         cone = C_rays
-        #
-        #     if args.timestamp:
-        #         mp_print("Postprocessing took %f seconds." % (time() - startPostprocess))
 
     if args.command in ['save_ecms', 'all'] and mpi_wrapper.is_first_process():
         startUnsplitting = time()
