@@ -502,11 +502,11 @@ if __name__ == '__main__':
                 if 'H' not in locals():
                     H = restore_data('H.dat')
                 H_eq, H_ineq, linearity_rays = H
-                C_rays = calc_C_extreme_rays(H_eq, H_ineq,
+                cone = calc_C_extreme_rays(H_eq, H_ineq,
                                              polco=args.polco, processes=args.processes, jvm_mem=args.jvm_mem,
                                              path2mplrs=args.path2mplrs)
                 if args.command not in ['all']:
-                    save_data(C_rays, 'C_rays.dat')
+                    save_data(cone, 'cone.dat')
         else:
             # Using mplrs for enumeration
             if args.command in ['prep_C_rays', 'all_between_mplrs', 'all']:
