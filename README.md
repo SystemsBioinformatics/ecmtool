@@ -212,6 +212,13 @@ mv _bglu* ecmtool/
 
 ℹ️ Note that in the Docker script, this optimisation has already been done. You don't need to compile anything there.
 
+## Automatically testing ecmtool and contributing to ecmtool
+When ecmtool is installed properly its functioning with various parameter settings can be tested using some predefined tests using
+```bash
+python3 -m pytest tests/test_conversions.py
+```
+When contributing to ecmtool please make sure that these tests are passed before making a pull request. 
+
 ## Citing ecmtool
 Please refer to the following papers when using ecmtool:
 
