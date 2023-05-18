@@ -307,7 +307,9 @@ if __name__ == '__main__':
     parser.add_argument('--out_path', default='conversion_cone.csv',
                         help='Relative or absolute path to the .csv file you want to save the calculated conversions to (default: conversion_cone.csv)')
     parser.add_argument('--make_unique', type=str2bool, default=True,
-                        help='Make sure set of ECMs is unique at the end  (default: True)')
+                        help='Make sure set of ECMs is unique at the end  (default: True). Setting this to false speeds'
+                             'up the postprocessing. When running with direct-method or polco, uniqueness is already '
+                             'guaranteed, but mplrs is known to sometimes create duplicates.')
 
     # Choices for the way in which ecm-calculation is performed. This can have large consequences for computational
     # time. See publications for information.
@@ -368,6 +370,9 @@ if __name__ == '__main__':
                 '\x1b[0;31;40m' + 'Make sure mplrs is added to the PATH variable or provide absolute path to mplrs binary via command line argument --path2mplrs' + '\x1b[0m')
             mp_print('\x1b[0;31;40m' + 'Switching to POLCO' + '\x1b[0m')
             args.polco = True
+
+    if args.polco or args.direct:
+        args.make_unique = False
 
     if args.model_path == '':
         mp_print('No model given, please specify --model_path')
