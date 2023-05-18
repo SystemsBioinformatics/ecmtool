@@ -1,6 +1,6 @@
 # ecmtool - Uncover organisms' metabolic blueprints
 
-With this tool you can calculate _Elementary Conversion Modes_ (ECMs) from metabolic networks. Combinations of ECMs form all metabolic influence an organism can exert on its environment.
+With this tool you can calculate _Elementary Conversion Modes_ (ECMs) from metabolic networks. Combinations of ECMs comprise all metabolic influences an organism can exert on its environment.
 
 ecmtool can be used in two different modes: either as a standalone command line tool, or as a Python library for your own scripts. We will describe how to install and use both modes.
 
@@ -106,7 +106,7 @@ See the script examples_and_results/minimal_run_wo_sbml.py for an example on how
 After testing how the tool works, most users will want to run their workloads on computing clusters instead of on single machines. This section describes some of the steps that are useful for running on clusers
 
 ### Parallel computing with OpenMPI
-On Linux or Mac, ecmtool can make use of OpenMPI for running on parallel in a computing cluster. To make use of this feature, OpenMPI, mpi4py, and mplrs are required. They can be installed, for example, with
+On Linux or Mac, ecmtool can make use of OpenMPI for running on parallel in a computing cluster. To make use of this feature, in addition to the dependencies in requirements.txt, OpenMPI, mpi4py, and mplrs are required. The installation of OpenMPI and mplrs is done via:
 
 ```bash
 apt install libopenmpi-dev
@@ -119,9 +119,9 @@ ln -s `pwd`/redund /usr/local/bin/redund
 cd ..
 ```
 
-Optional, only needed for "direct" enumeration:
+The installation of mpi4py is done via:
 ```bash
-pip3 install mpi4py
+pip3 install mpi4py==3.1.4
 ```
 
 Running ecmtool on a cluster using the indirect enumeration method is now as simple as running:
@@ -135,6 +135,71 @@ For direct enumeration, the number of processes for enumeration is passed to mpi
 mpiexec -n <number of processes for enumeration> python3 main.py --direct true --model_path models/e_coli_core.xml
 ```
 In this mode, preprocessing steps are run on the compute cluster too.
+
+### Advanced ECM-computation on a computing cluster
+#### Installation of ecmtool when the user does not have root privileges on the cluster (a case report)
+On some computing clusters, it is not easy to install OpenMPI and mplrs. One method that was successful is outlined here. This cluster had an OpenMPI already available as a module that could be loaded. The available versions can be seen by 
+```bash
+module av OpenMPI
+```
+For the installation of mplrs, we will also need GMP, check this by
+```bash
+module av GMP
+```
+It is important that the versions of OpenMPI and GMP have to match. In this case, we used
+```bash
+module load OpenMPI/4.1.1-GCC-10.3.0
+module load GMP/6.2.1-GCCcore-10.3.0
+```
+where the last number indicates that they are using a compatible version of GCC. Now, we are ready to install mplrs. This can be done via:
+```bash
+apt install libopenmpi-dev
+wget http://cgm.cs.mcgill.ca/~avis/C/lrslib/archive/lrslib-071a.tar.gz
+tar -xzf lrslib-071a.tar.gz
+cd lrslib-071a
+make && make mplrs && make install
+```
+Now we need to tell the cluster where to find the installed mplrs. We can do this by adding the path to mplrs to the search path:
+```bash
+export LD_LIBRARY_PATH=/scicore/home/nimwegen/degroo0000/ecmtool/lrslib-071a:$LD_LIBRARY_PATH
+export PATH=/scicore/home/nimwegen/degroo0000/ecmtool/lrslib-071a:$PATH
+```
+Now using the command
+```bash
+mplrs
+```
+should give some output that indicates that mplrs is working and can be found.
+
+#### Running ecmtool using separate runs for non-parallel and parallel parts, with a .sh-script (on a slurm-cluster)
+To fully exploit parallel computation on a cluster, one would like to use ecmtool in separate steps, as outlined below. (In the ecmtool-folder one can also find an example-script that can be used on a computing cluster that is using slurm: ```examples_and_results/launch_separate_mmsyn_newest.sh```.)
+
+1. preprocessing and compression of the model on a compute node (instead of a login node). For this run 
+```bash
+srun --ntasks=1 --nodes=1 python3 main.py all_until_mplrs --model_path ${MODEL_PATH} --auto_direction ${AUTO_DIRECT} --hide "${HIDE}" --prohibit "${PROHIBIT}" --tag "${TAG}" --inputs "${INPUTS}" --outputs "${OUTPUTS}" --use_external_compartment "${EXT_COMP}" --add_objective_metabolite "${ADD_OBJ}" --compress "${COMPRESS}" --hide_all_in_or_outputs "${HIDE_ALL_IN_OR_OUTPUTS}
+```
+where the arguments in curly brackets should be replaced by your choices for these arguments.
+
+2. first vertex enumeration step with mplrs in parallel. For this run 
+```bash
+mpirun -np <number of processes> mplrs -redund ecmtool/tmp/mplrs.ine ecmtool/tmp/redund.ine
+mpirun -np <number of processes>  mplrs ecmtool/tmp/redund.ine ecmtool/tmp/mplrs.out
+```
+
+3. processing of results from first vertex enumeration step, adding steady-state constraints and removing redundant rays using a parallelized redundancy check.
+```bash
+mpirun -np <number of processes> python3 main.py all_between_mplrs
+```
+
+4. second vertex enumeration step with mplrs in parallel
+```bash
+mpirun -np <number of processes> mplrs -redund ecmtool/tmp/mplrs.ine ecmtool/tmp/redund.ine
+mpirun -np <number of processes>  mplrs ecmtool/tmp/redund.ine ecmtool/tmp/mplrs.out
+```
+
+5. processing of results from second vertex enumeration step, unsplitting of metabolites, ensuring that results are unique, and saving ecms to file
+```bash
+srun --ntasks=1 --nodes=1 python3 main.py all_from_mplrs --out_path ${OUT_PATH}
+```
 
 ### Doubling direct enumeration method speed
 The direct enumeration method can be sped up by compiling our LU decomposition code with Cython. The following describes the steps needed on Linux, but the same concept also applies to Mac OS and Windows. First make sure all dependencies are satisfied. Then execute:
