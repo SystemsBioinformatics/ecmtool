@@ -505,8 +505,8 @@ if __name__ == '__main__':
                     H = restore_data('H.dat')
                 H_eq, H_ineq, linearity_rays = H
                 cone = calc_C_extreme_rays(H_eq, H_ineq,
-                                             polco=args.polco, processes=args.processes, jvm_mem=args.jvm_mem,
-                                             path2mplrs=args.path2mplrs)
+                                           polco=args.polco, processes=args.processes, jvm_mem=args.jvm_mem,
+                                           path2mplrs=args.path2mplrs)
                 if args.command not in ['all']:
                     save_data(cone, 'cone.dat')
         else:
@@ -542,6 +542,7 @@ if __name__ == '__main__':
                 else:
                     linearity_rays = None
                 metabolite_ids = process_all_from_mplrs(network, linearities=linearity_rays,
+                                                        make_unique=args.make_unique,
                                                         output_fractions=args.output_fractions, out_path=args.out_path,
                                                         verbose=args.verbose)
                 if args.print_conversions:

@@ -638,7 +638,7 @@ def unsplit_metabolites(R, network):
     return res, ids
 
 
-def process_all_from_mplrs(network, linearities=None, output_fractions=False, out_path='conversion_cone.csv', verbose=True):
+def process_all_from_mplrs(network, linearities=None, make_unique=True, output_fractions=False, out_path='conversion_cone.csv', verbose=True):
     # Find out which metabolites should be unsplit: create a list of which entry i tells to which result-column
     # metabolite i should go
     metabIndToNewInd, ids = get_unsplit_metabolites_inds(network)
@@ -648,8 +648,9 @@ def process_all_from_mplrs(network, linearities=None, output_fractions=False, ou
     parsedRayCount = 0
     zeroRay = np.repeat(to_fractions(np.zeros(shape=(1, 1))), d)
     zeroFrac = Fraction(0)
-    ecmsHashSet = set()
-    ecmsHashSet.add(hash(','.join([str(float(num)) for num in zeroRay]) + '\n'))
+    if make_unique:
+        ecmsHashSet = set()
+        ecmsHashSet.add(hash(','.join([str(float(num)) for num in zeroRay]) + '\n'))
     nonUniqueCount = 0
     makeGuess = 10000
 
@@ -690,6 +691,7 @@ def process_all_from_mplrs(network, linearities=None, output_fractions=False, ou
 
             # We intialize the ecms with all zeros
             ecm = zeroRay.copy()
+            nonZero = False
             # For normalizing we keep track of the sum of absolute values
             sumEcm = zeroFrac
             # First column of mplrs-output is useless
@@ -697,6 +699,7 @@ def process_all_from_mplrs(network, linearities=None, output_fractions=False, ou
 
             for column, value in enumerate(croppedLine):
                 if value != '0':
+                    nonZero = True
                     fracVal = Fraction(value)
                     ecm[metabIndToNewInd[column]] += fracVal
                     sumEcm += abs(fracVal)
@@ -710,12 +713,16 @@ def process_all_from_mplrs(network, linearities=None, output_fractions=False, ou
             else:
                 ecmString = ','.join([str(float(num)) for num in ecm]) + '\n'
             ecmHash = hash(ecmString)
-            if ecmHash not in ecmsHashSet:
-                ecmsHashSet.add(ecmHash)
-                # Print to file
-                outputfile.write(ecmString)
+            if make_unique:
+                if ecmHash not in ecmsHashSet:
+                    ecmsHashSet.add(ecmHash)
+                    # Print to file
+                    outputfile.write(ecmString)
+                else:
+                    nonUniqueCount += 1
             else:
-                nonUniqueCount += 1
+                if nonZero:
+                    outputfile.write(ecmString)
             parsedRayCount += 1
 
         # If we run args.only_rays there can be linearities that we should add at the end
