@@ -724,6 +724,8 @@ def process_all_from_mplrs(network, linearities=None, make_unique=True, output_f
             else:
                 if nonZero:
                     outputfile.write(ecmString)
+                else:
+                    nonUniqueCount += 1
             parsedRayCount += 1
 
         # If we run args.only_rays there can be linearities that we should add at the end
