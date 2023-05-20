@@ -647,7 +647,6 @@ def process_all_from_mplrs(network, linearities=None, make_unique=True, output_f
     # Prepare some variables for parsing
     parsedRayCount = 0
     zeroRay = np.repeat(to_fractions(np.zeros(shape=(1, 1))), d)
-    zeroFrac = Fraction(0)
     if make_unique:
         ecmsHashSet = set()
         ecmsHashSet.add(hash(','.join([str(float(num)) for num in zeroRay]) + '\n'))
@@ -691,8 +690,6 @@ def process_all_from_mplrs(network, linearities=None, make_unique=True, output_f
 
             # We intialize the ecms with all zeros
             ecm = zeroRay.copy()
-            # For normalizing we keep track of the sum of absolute values
-            sumEcm = zeroFrac
             # First column of mplrs-output is useless
             croppedLine = line.replace('\n', '').split()[1:]
 
@@ -700,8 +697,7 @@ def process_all_from_mplrs(network, linearities=None, make_unique=True, output_f
                 if value != '0':
                     fracVal = Fraction(value)
                     ecm[metabIndToNewInd[column]] += fracVal
-            for value in ecm:
-                sumEcm += abs(value)
+            sumEcm = np.sum(np.abs(ecm))
 
             # Normalise row
             nonZero = sumEcm > 0
