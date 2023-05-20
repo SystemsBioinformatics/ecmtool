@@ -691,7 +691,6 @@ def process_all_from_mplrs(network, linearities=None, make_unique=True, output_f
 
             # We intialize the ecms with all zeros
             ecm = zeroRay.copy()
-            nonZero = False
             # For normalizing we keep track of the sum of absolute values
             sumEcm = zeroFrac
             # First column of mplrs-output is useless
@@ -699,13 +698,15 @@ def process_all_from_mplrs(network, linearities=None, make_unique=True, output_f
 
             for column, value in enumerate(croppedLine):
                 if value != '0':
-                    nonZero = True
                     fracVal = Fraction(value)
                     ecm[metabIndToNewInd[column]] += fracVal
-                    sumEcm += abs(fracVal)
+            for value in ecm:
+                sumEcm += abs(value)
 
             # Normalise row
-            ecm /= sumEcm
+            nonZero = sumEcm > 0
+            if nonZero:
+                ecm /= sumEcm
 
             # Convert the ecm to a string to be able to store it
             if output_fractions:
