@@ -1,0 +1,9 @@
+on:
+  push: ["*"]
+  workflow_dispatch:
+
+jobs:
+  test_indirect_e_coli_core:
+    uses: ./.github/actions/docker
+    with:
+      command: 'python3 main.py --model_path models/e_coli_core.xml --auto_direction true --direct false --polco true'

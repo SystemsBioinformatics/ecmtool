@@ -31,3 +31,4 @@ test_conversions_unique.csv
 *conversions.csv
 *conversions_unique.csv
 program.prof
+ecmtool_timestamps/*
