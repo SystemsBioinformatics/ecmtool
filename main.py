@@ -207,17 +207,11 @@ def preprocess_sbml(args):
         if args.intermediate_cone_path:
             check_if_intermediate_cone_exists(args.intermediate_cone_path)
 
-    # if args.direct or args.splitting_before_polco:
     # Split metabolites in input and output
     network.split_in_out(args.only_rays)
     cycle_removal_boolean = True if not args.only_rays else False
-    # else:
-    #     cycle_removal_boolean = False
 
     if args.hide_all_in_or_outputs:
-        # if not args.direct and not args.splitting_before_polco:
-        #     network.split_in_out(args.only_rays)
-
         hide_indices = [ind for ind, metab in enumerate(network.metabolites) if
                         (metab.is_external) & (metab.direction == args.hide_all_in_or_outputs) & (
                             not metab.id == 'objective_virtout') & (

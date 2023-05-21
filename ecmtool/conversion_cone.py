@@ -184,20 +184,8 @@ def calc_H(rays=None, linearities_deflated=None, external_metabolites=None, inpu
         if mpi_wrapper.is_first_process():
             H_ineq_original = H_ineq
             H_ineq_normalized = np.transpose(normalize_columns(np.transpose(H_ineq.astype(dtype='float')), verbose=verbose))
-            # unique_inds = find_unique_inds(H_ineq_normalized, verbose=verbose, tol=1e-9)
-            # H_ineq_float = H_ineq_normalized[unique_inds, :]
-            # H_ineq_original = H_ineq_original[unique_inds, :]
             H_ineq_float, unique_inds = np.unique(H_ineq_normalized, axis=0, return_index=True)
             H_ineq_original = H_ineq_original[unique_inds, :]
-
-            # H_ineq_float = unique(H_ineq_normalized)
-
-            # Find out if rows have been thrown away, and if so, do that as well
-            # unique_inds = find_remaining_rows(H_ineq_float, H_ineq_normalized, verbose=verbose)
-            # H_ineq_original = H_ineq_original[unique_inds, :]
-
-            # if verbose:
-            #     mp_print("Size of H_eq after communication step:", H_eq.shape[0], H_eq.shape[1])
 
         use_custom_redund = True  # If set to false, redundancy removal with redund from lrslib is used
         if use_custom_redund:
@@ -211,10 +199,6 @@ def calc_H(rays=None, linearities_deflated=None, external_metabolites=None, inpu
                 return None
             mp_print("Custom redund took %f sec" % (time()-t1))
             H_ineq = H_ineq_original[nonred_inds_ineq, :]
-
-            # t1 = time()
-            # H_eq = independent_rows(H_eq)
-            # mp_print("Removing dependent rows in H_eq took %f sec" % (time() - t1))
         else:
             if mpi_wrapper.is_first_process():
                 mp_print('Using classical redundancy removal')
@@ -305,8 +289,6 @@ def post_process_rays(G, rays, linearity_rays, external_metabolites, extended_ex
         rays_inflated[:, in_out_metabolites] = np.subtract(rays_inflated[:, in_out_metabolites],
                                                            rays_inflated[:, G.shape[1]:])
     rays_merged = np.asarray(rays_inflated[:, :G.shape[1]], dtype='object')
-    # rays_unique = unique(rays_merged)
-    # rays_unique = redund(rays_merged)
 
     if verbose:
         print('Enumerated %d rays' % len(rays_merged))
