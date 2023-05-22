@@ -300,9 +300,9 @@ if __name__ == '__main__':
                         help='Determines whether fractions or their approximating floats are stored as outputs.')
     parser.add_argument('--out_path', default='conversion_cone.csv',
                         help='Relative or absolute path to the .csv file you want to save the calculated conversions to (default: conversion_cone.csv)')
-    parser.add_argument('--make_unique', type=str2bool, default=True,
-                        help='Make sure set of ECMs is unique at the end  (default: True). Setting this to false speeds'
-                             'up the postprocessing. When running with direct-method or polco, uniqueness is already '
+    parser.add_argument('--make_unique', type=str2bool, default=False,
+                        help='Make sure set of ECMs is unique at the end  (default: False). Setting this to false drastically reduces memory requirements of '
+                             'the postprocessing. When running with direct-method or polco, uniqueness is already '
                              'guaranteed, but mplrs is known to sometimes create duplicates.')
 
     # Choices for the way in which ecm-calculation is performed. This can have large consequences for computational
