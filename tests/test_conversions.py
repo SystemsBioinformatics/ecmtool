@@ -68,12 +68,50 @@ def areConversionSetsEqual(conversions1, conversions2, atol=1e-8, rtol=1e-5):
     return True
 
 
-class TestEcolicore:
+class TestEcolicorePolco:
     @pytest.fixture(scope='class', autouse=True)
     def runEcmtool(self):
         # global metabIds, conversions, ecoliCoreReturnCode, outputfile, ecoliCoreOutput
         commandList = ['python', 'main.py', '--model_path', 'models/e_coli_core.xml', '--auto_direction', 'true',
-                       '--out_path', outputfile]
+                       '--out_path', outputfile, '--polco', 'true']
+        ecoliOutput = ConversionsOutput(commandList)
+        return ecoliOutput
+
+    def test_ecolicoreRunCompleted(self, runEcmtool):
+        assert (runEcmtool.ecoliCoreReturnCode == 0)
+
+    def test_numberECMs(self, runEcmtool):
+        assert (runEcmtool.conversions.shape[0] == 689)
+
+    def test_numberMetabs(self, runEcmtool):
+        assert (len(runEcmtool.metabIds) == 21)
+
+    def test_metabIds(self, runEcmtool):
+        trueFilename = os.path.join(truth_dir, 'true_ecolicore_conversions.csv')
+        true_metabIds = get_metabs(trueFilename)
+        assert (sorted(true_metabIds) == sorted(runEcmtool.metabIds))
+
+    def test_conversions(self, runEcmtool):
+        trueFilename = os.path.join(truth_dir, 'true_ecolicore_conversions.csv')
+        true_metabIds = get_metabs(trueFilename)
+
+        # These true conversions are normalised such that each row sums to 1.
+        true_conversions = np.loadtxt(trueFilename, delimiter=',', skiprows=1)
+        # Do the same for the current conversions
+        conversions_loc = runEcmtool.normalize_conversions(true_metabIds)
+
+        assert areConversionSetsEqual(conversions_loc, true_conversions)
+
+    def test_computeTime(self, runEcmtool):
+        assert runEcmtool.computeTime < 100
+
+
+class TestEcolicoreMplrs:
+    @pytest.fixture(scope='class', autouse=True)
+    def runEcmtool(self):
+        # global metabIds, conversions, ecoliCoreReturnCode, outputfile, ecoliCoreOutput
+        commandList = ['python', 'main.py', '--model_path', 'models/e_coli_core.xml', '--auto_direction', 'true',
+                       '--out_path', outputfile, '--path2mplrs', '/Users/Daan/Documents/GitHub/ecmtool/lrslib-071a/mplrs']
         ecoliOutput = ConversionsOutput(commandList)
         return ecoliOutput
 
@@ -225,8 +263,8 @@ class TestKO2Direct:
     @pytest.fixture(scope='class', autouse=True)
     def runEcmtool(self):
         # global metabIds, conversions, ecoliCoreReturnCode, outputfile, ecoliCoreOutput
-        commandList = ['python', 'main.py', '--model_path', 'models/active_subnetwork_KO_2.xml', '--auto_direction', 'true',
-                       '--out_path', outputfile, '--direct', 'True']
+        commandList = ['python', 'main.py', '--model_path', 'models/active_subnetwork_KO_2.xml', '--auto_direction',
+                       'true', '--out_path', outputfile, '--direct', 'true']
         ecoliOutput = ConversionsOutput(commandList)
         return ecoliOutput
 

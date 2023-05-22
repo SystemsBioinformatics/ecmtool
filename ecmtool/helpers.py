@@ -1,6 +1,6 @@
 import os
 import sys
-from fractions import Fraction
+from gmpy2 import mpq as Fraction
 from os import remove, devnull as os_devnull, system
 from random import randint
 from subprocess import check_call
@@ -9,8 +9,31 @@ import numpy as np
 import psutil
 from numpy.linalg import svd
 from sympy import Matrix
+from time import time, strftime, localtime
+from ecmtool import mpi_wrapper
 
-from ecmtool.mpi_wrapper import get_process_rank
+
+def uniqueReadWrite(filename):
+    fileNonUnique = open(filename, 'r')
+    splitFilename = filename.split('.')
+    if len(splitFilename) == 2:
+        uniqueFilename = splitFilename[0] + "_unique" + '.' + splitFilename[1]
+    else:
+        uniqueFilename = splitFilename[0] + "_unique"
+    fileUnique = open(uniqueFilename, 'w')
+    ecmsSet = set()
+    # uniqueInds = []
+    alot = 10 ** 5
+    deletedCount = 0
+    for ind, line in enumerate(fileNonUnique):
+        if (ind % alot) == 0:
+            print("Writing file is at line " + str(ind))
+        if line not in ecmsSet:
+            ecmsSet.add(line)
+            fileUnique.write(line)
+        else:
+            deletedCount += 1
+    print("Removed " + str(deletedCount) + " non-unique rays.")
 
 
 def unique(matrix):
@@ -130,7 +153,7 @@ def write_mplrs_matrix(textfile, matrix):
         for val in line:
             textfile.write(str(val) + ' ')
         textfile.write('\n')
-    
+
 
 def write_header_no_linearity(textfile, inequality_matrix, d):
     """
@@ -142,9 +165,9 @@ def write_header_no_linearity(textfile, inequality_matrix, d):
     """
     textfile.write('H-representation' + ' \n')
     textfile.write('begin' + ' \n')
-    textfile.write(str(len(inequality_matrix)) + ' ' + str(d) +  ' ' + 'rational' + ' \n')
-    
-    
+    textfile.write(str(len(inequality_matrix)) + ' ' + str(d) + ' ' + 'rational' + ' \n')
+
+
 def write_header_with_linearity(textfile, linearity, d, m=None):
     """
     Writes header of ine file for calculations with mplrs.
@@ -154,7 +177,7 @@ def write_header_with_linearity(textfile, linearity, d, m=None):
     :param m: dimensional parameter for ine file giving the number of rows (mplrs parameter)
     :return: None
     """
-    linearity_list = [*range(1,linearity+1,1)]
+    linearity_list = [*range(1, linearity + 1, 1)]
     textfile.write('H-representation' + ' \n')
     textfile.write('linearity' + ' ' + str(linearity) + ' ')
     for i in linearity_list:
@@ -163,11 +186,11 @@ def write_header_with_linearity(textfile, linearity, d, m=None):
     textfile.write('begin' + ' \n')
 
     if m is None:
-        textfile.write(str(linearity) + ' ' + str(d) +  ' ' + 'rational' + ' \n')
+        textfile.write(str(linearity) + ' ' + str(d) + ' ' + 'rational' + ' \n')
     else:
-        textfile.write(str(m) + ' ' + str(d) +  ' ' + 'rational' + ' \n')
-          
-    
+        textfile.write(str(m) + ' ' + str(d) + ' ' + 'rational' + ' \n')
+
+
 def write_mplrs_input(equality_matrix, inequality_matrix, mplrs_path, verbose=False):
     """
 
@@ -177,24 +200,30 @@ def write_mplrs_input(equality_matrix, inequality_matrix, mplrs_path, verbose=Fa
     :param verbose: print status messages during enumeration
     :return: d dimensional parameter for ine file giving the width of the matrix
     """
-    if inequality_matrix is not None:
+    if (inequality_matrix is not None) and (inequality_matrix.shape[0] > 0):
         inequality_matrix = inequality_matrix.tolist()
+        noInequalities = False
+    else:
+        noInequalities = True
 
-    if equality_matrix is not None:
+    if (equality_matrix is not None) and (equality_matrix.shape[0] > 0):
         equality_matrix = equality_matrix.tolist()
+        noEqualities = False
+    else:
+        noEqualities = True
 
     textfile = open(mplrs_path, "w")
 
-    if equality_matrix is None:
-        d = len(inequality_matrix[0] ) + 1
-        write_header_no_linearity(textfile, inequality_matrix, d, m=None)
+    if noEqualities:
+        d = len(inequality_matrix[0]) + 1
+        write_header_no_linearity(textfile, inequality_matrix, d)
         if verbose:
             print('Writing inequalities to file')
         write_mplrs_matrix(textfile, inequality_matrix)
 
-    elif inequality_matrix is None:
+    elif noInequalities:
         linearity = len(equality_matrix)
-        d = len(equality_matrix[0] ) + 1
+        d = len(equality_matrix[0]) + 1
         write_header_with_linearity(textfile, linearity, d, m=None)
         if verbose:
             print('Writing equalities to file')
@@ -202,7 +231,7 @@ def write_mplrs_input(equality_matrix, inequality_matrix, mplrs_path, verbose=Fa
 
     else:
         linearity = len(equality_matrix)
-        d = len(equality_matrix[0] ) + 1
+        d = len(equality_matrix[0]) + 1
         m = linearity + len(inequality_matrix)
         write_header_with_linearity(textfile, linearity, d, m)
         if verbose:
@@ -226,8 +255,8 @@ def parse_mplrs_output(mplrs_output_path, d, verbose=False):
     :return: computed rays as ndarray
     """
     if verbose:
-        print('Parsing computed rays')
-        
+        mp_print('Parsing computed rays')
+
     with open(mplrs_output_path, 'r') as file:
         lines = file.readlines()
         rays_vertices = np.ndarray(shape=(0, d))
@@ -239,17 +268,25 @@ def parse_mplrs_output(mplrs_output_path, d, verbose=False):
             end = len(lines) - stop
             del lines[-end:]
             del lines[:start]
-            
+
             number_lines = len(lines)
             rays_vertices = np.repeat(np.repeat(to_fractions(np.zeros(shape=(1, 1))), d, axis=1), number_lines, axis=0)
 
+            if verbose:
+                startTime = time()
+
             for row, line in enumerate(lines):
+                if (row == 10000) and verbose:
+                    mp_print("Parsed %d rays of mplrs output. Estimated total parsing time: %f seconds." % (
+                    row, (number_lines / row) * (time() - startTime)))
+
                 for column, value in enumerate(line.replace('\n', '').split()):
                     if value != '0':
                         rays_vertices[row, column] = Fraction(str(value))
-                        
-    rays = rays_vertices[:,1:]
-    
+
+    rays = rays_vertices[:, 1:]
+    if verbose:
+        print("Parsing rays took %f seconds." % (time() - startTime))
     return rays
 
 
@@ -264,14 +301,23 @@ def get_extreme_rays_mplrs(equality_matrix, inequality_matrix, processes, rand, 
     :param verbose: print status messages during enumeration
     :return: ndarray with computed rays
     """
+    width_matrix = prep_mplrs_input(equality_matrix, inequality_matrix)
+    execute_mplrs(processes=processes, path2mplrs=path2mplrs, verbose=verbose)
+    return process_mplrs_output(width_matrix=width_matrix, verbose=verbose)
 
-    mplrs_input_path = relative_path('tmp' + os.sep + 'mplrs_%d.ine' % rand)
-    mplrs_redund_path = relative_path('tmp' + os.sep + 'redund_%d.ine' % rand)
-    mplrs_output_path = relative_path('tmp' + os.sep + 'mplrs_%d.out' % rand)
 
+mplrs_input_path = relative_path('tmp' + os.sep + 'mplrs.ine')
+mplrs_redund_path = relative_path('tmp' + os.sep + 'redund.ine')
+mplrs_output_path = relative_path('tmp' + os.sep + 'mplrs.out')
+
+
+def prep_mplrs_input(equality_matrix, inequality_matrix):
     # Write mplrs input files to disk
     width_matrix = write_mplrs_input(equality_matrix, inequality_matrix, mplrs_input_path, verbose=False)
-    
+    return width_matrix
+
+
+def execute_mplrs(processes=3, path2mplrs=None, verbose=True):
     if path2mplrs is None:
         path2mplrs = 'mplrs'
 
@@ -283,11 +329,14 @@ def get_extreme_rays_mplrs(equality_matrix, inequality_matrix, processes, rand, 
         print(f'Running mplrs with {processes} processes')
     check_call(f'mpirun -np {processes} {path2mplrs} {mplrs_redund_path} {mplrs_output_path}', shell=True)
 
+
+def process_mplrs_output(width_matrix, verbose=True):
     # Parse resulting extreme rays
-    rays = parse_mplrs_output(mplrs_output_path, width_matrix, verbose=False)
+    rays = parse_mplrs_output(mplrs_output_path, width_matrix, verbose=verbose)
 
     if verbose:
         print('Done parsing rays')
+        start = time()
 
     # Clean up the files created above
     remove(mplrs_input_path)
@@ -296,7 +345,7 @@ def get_extreme_rays_mplrs(equality_matrix, inequality_matrix, processes, rand, 
 
     return rays
 
-    
+
 def get_extreme_rays_polco(equality_matrix, inequality_matrix, rand, jvm_mem, processes, symbolic=True, verbose=False):
     """
     Calculates extreme rays using polco. Includes generation of input file, calculations and parsing of output file.
@@ -328,8 +377,8 @@ def get_extreme_rays_polco(equality_matrix, inequality_matrix, rand, jvm_mem, pr
     if jvm_mem == None:
         min_mem, max_mem = get_min_max_java_memory()
     else:
-        min_mem, max_mem = jvm_mem   
-    
+        min_mem, max_mem = jvm_mem
+
     if verbose:
         print('Running polco (%d-%d GiB java VM memory)' % (min_mem, max_mem), 'with "-maxthreads" %s' % processes)
 
@@ -379,7 +428,8 @@ def get_extreme_rays_polco(equality_matrix, inequality_matrix, rand, jvm_mem, pr
     return rays
 
 
-def get_extreme_rays(equality_matrix=None, inequality_matrix=None, verbose=False, polco=False, processes=None, jvm_mem=None, path2mplrs=None):
+def get_extreme_rays(equality_matrix=None, inequality_matrix=None, verbose=False, polco=False, processes=None,
+                     jvm_mem=None, path2mplrs=None):
     """
     Calculates extreme rays using either mplrs or polco.
     :param equality_matrix: equality_matrix: ndarray containing all equalities
@@ -411,12 +461,12 @@ def get_extreme_rays(equality_matrix=None, inequality_matrix=None, verbose=False
     if polco is True:
         if verbose:
             print('Starting enumeration with polco')
-        rays = get_extreme_rays_polco(equality_matrix, inequality_matrix, rand, jvm_mem, processes, symbolic=True, verbose=verbose)
+        rays = get_extreme_rays_polco(equality_matrix, inequality_matrix, rand, jvm_mem, processes, symbolic=True,
+                                      verbose=verbose)
     else:
         if verbose:
             print('Starting enumeration with mplrs')
         rays = get_extreme_rays_mplrs(equality_matrix, inequality_matrix, processes, rand, path2mplrs, verbose=verbose)
-        
 
     return rays
 
@@ -445,7 +495,7 @@ def get_redund_binary():
 def redund(matrix, verbose=False):
     if not os.path.isdir(relative_path('tmp')):
         os.makedirs(relative_path('tmp'))
-    rank = str(get_process_rank())
+    rank = str(mpi_wrapper.get_process_rank())
     matrix = to_fractions(matrix)
     binary = get_redund_binary()
     matrix_path = relative_path('tmp' + os.sep + 'matrix' + rank + '.ine')
@@ -543,38 +593,220 @@ def mp_print(*args, **kwargs):
     named argument PRINT_IF_RANK_NONZERO is set to true.
     :return:
     """
-    if get_process_rank() == 0:
+    if mpi_wrapper.get_process_rank() == 0:
         print(*args)
     elif 'PRINT_IF_RANK_NONZERO' in kwargs and kwargs['PRINT_IF_RANK_NONZERO']:
         print(*args)
 
 
+# TODO: Remove this function eventually
 def unsplit_metabolites(R, network):
-    metabolite_ids = [metab.id for metab in network.metabolites]
+    metabolites = [metab for metab in network.metabolites if metab.is_external]
     res = []
     ids = []
 
+    if len(metabolites) != R.shape[0]:
+        exit("Warning! Network object is not up-to-date, unsplitting metabolites may go wrong.")
+
+    newNetworkMetabs = []
     processed = {}
     for i in range(R.shape[0]):
-        metabolite = metabolite_ids[i].replace("_virtin", "").replace("_virtout", "")
-        if metabolite in processed:
-            row = processed[metabolite]
+        metabRealId = metabolites[i].id.replace("_virtin", "").replace("_virtout", "")
+        metab = metabolites[i]
+        if metabRealId in processed:
+            row = processed[metabRealId]
             res[row] += R[i, :]
+            newNetworkMetabs[row].direction = 'both'
         else:
-            if metabolite[-4:] == '_int':
+            if metabRealId[-4:] == '_int':
                 if np.sum(np.abs(R[i, :])) == 0:
                     continue
                 else:
-                    mp_print("Metabolite " + metabolite + " was made internal, but now is nonzero in ECMs.")
+                    mp_print("Metabolite " + metabRealId + " was made internal, but now is nonzero in ECMs.")
             res.append(R[i, :].tolist())
-            processed[metabolite] = len(res) - 1
-            ids.append(metabolite)
+            processed[metabRealId] = len(res) - 1
+            ids.append(metabRealId)
+            metab.id = metabRealId
+            metab.name = metab.name.replace("_virtin", "").replace("_virtout", "")
+            newNetworkMetabs.append(metab)
 
     # remove all-zero rays
+    network.metabolites = newNetworkMetabs
     res = np.asarray(res)
     res = res[:, [sum(abs(res)) != 0][0]]
 
     return res, ids
+
+
+def process_all_from_mplrs(network, linearities=None, make_unique=True, output_fractions=False, out_path='conversion_cone.csv', verbose=True):
+    # Find out which metabolites should be unsplit: create a list of which entry i tells to which result-column
+    # metabolite i should go
+    metabIndToNewInd, ids = get_unsplit_metabolites_inds(network)
+    d = len(ids)
+
+    # Prepare some variables for parsing
+    parsedRayCount = 0
+    zeroRay = np.repeat(to_fractions(np.zeros(shape=(1, 1))), d)
+    if make_unique:
+        ecmsHashSet = set()
+        ecmsHashSet.add(hash(','.join([str(float(num)) for num in zeroRay]) + '\n'))
+    nonUniqueCount = 0
+    makeGuess = 10000
+
+    # Find out from mplrs output how many ecms there are
+    mplrsCountLine = read_n_to_last_line(mplrs_output_path, 2)
+    numRays = int(mplrsCountLine.split(' ')[2][5:])
+
+    # Open mplrs-output file
+    with open(mplrs_output_path) as fp:
+        # Skip first few lines that contain meta-information
+        reachedBegin = False
+        while not reachedBegin:
+            line = fp.readline()
+            if not line:
+                break
+            if line == "begin\n":
+                for ind in range(2):
+                    line = fp.readline()
+                    if not line:
+                        break
+                reachedBegin = True
+
+        # Open output file
+        outputfile = open(out_path, 'w')
+        outputfile.write(','.join(ids) + '\n')
+
+        startTime = time()
+        for ind in range(numRays):
+            # Here the reading of the first ECM line begins
+            line = fp.readline()
+
+            # Print some estimate on the remaining computation time once in a while
+            if (parsedRayCount == makeGuess) and verbose:
+                mp_print(strftime("%H:%M:%S", localtime()) + ": Parsed %d rays of mplrs output. "
+                                                                       "Estimated remaining time: %f seconds." % (
+                    parsedRayCount, ((numRays / parsedRayCount - 1) * (time() - startTime))))
+                makeGuess *= 2
+
+            # We intialize the ecms with all zeros
+            ecm = zeroRay.copy()
+            # First column of mplrs-output is useless
+            croppedLine = line.replace('\n', '').split()[1:]
+
+            for column, value in enumerate(croppedLine):
+                if value != '0':
+                    fracVal = Fraction(value)
+                    ecm[metabIndToNewInd[column]] += fracVal
+            sumEcm = np.sum(np.abs(ecm))
+
+            # Normalise row
+            nonZero = sumEcm > 0
+            if nonZero:
+                ecm /= sumEcm
+
+            # Convert the ecm to a string to be able to store it
+            if output_fractions:
+                ecmString = ','.join([str(num) for num in ecm]) + '\n'
+            else:
+                ecmString = ','.join([str(float(num)) for num in ecm]) + '\n'
+            ecmHash = hash(ecmString)
+            if make_unique:
+                if ecmHash not in ecmsHashSet:
+                    ecmsHashSet.add(ecmHash)
+                    # Print to file
+                    outputfile.write(ecmString)
+                else:
+                    nonUniqueCount += 1
+            else:
+                if nonZero:
+                    outputfile.write(ecmString)
+                else:
+                    nonUniqueCount += 1
+            parsedRayCount += 1
+
+        # If we run args.only_rays there can be linearities that we should add at the end
+        if linearities is not None:
+            for linearity in linearities:
+                linearity /= np.sum(np.abs(linearity))
+                if output_fractions:
+                    ecmString = ','.join([str(num) for num in ecm]) + '\n'
+                else:
+                    ecmString = ','.join([str(float(num)) for num in ecm]) + '\n'
+                ecmHash = hash(ecmString)
+                if ecmHash not in ecmsHashSet:
+                    ecmsHashSet.add(ecmHash)
+                    # Print to file
+                    outputfile.write(ecmString)
+        outputfile.close()
+
+    remove(mplrs_input_path)
+    remove(mplrs_redund_path)
+    remove(mplrs_output_path)
+
+    if verbose:
+        mp_print('Found %s ECMs' % (parsedRayCount - nonUniqueCount))
+    return ids
+
+
+def read_n_to_last_line(filename, n=1):
+    """Returns the nth before last line of a file (n=1 gives last line)"""
+    num_newlines = 0
+    with open(filename, 'rb') as f:
+        try:
+            f.seek(-2, os.SEEK_END)
+            while num_newlines < n:
+                f.seek(-2, os.SEEK_CUR)
+                if f.read(1) == b'\n':
+                    num_newlines += 1
+        except OSError:
+            f.seek(0)
+        last_line = f.readline().decode()
+    return last_line
+
+
+def get_unsplit_metabolites_inds(network):
+    metabolites = [metab for metab in network.metabolites if metab.is_external]
+    ids = []
+
+    metabIndToNewInd = []
+    newIndCounter = 0
+    newNetworkMetabs = []
+    processed = {}
+    for i, metab in enumerate(metabolites):
+        metabRealId = metab.id.replace("_virtin", "").replace("_virtout", "")
+        if metabRealId in processed:
+            metabRealInd = processed[metabRealId]
+            metabIndToNewInd.append(metabRealInd)
+            newNetworkMetabs[metabRealInd].direction = 'both'
+        else:
+            metabIndToNewInd.append(newIndCounter)
+            processed[metabRealId] = newIndCounter
+            newIndCounter += 1
+            ids.append(metabRealId)
+            metab.id = metabRealId
+            metab.name = metab.name.replace("_virtin", "").replace("_virtout", "")
+            newNetworkMetabs.append(metab)
+
+    network.metabolites = newNetworkMetabs
+    return metabIndToNewInd, ids
+
+
+def save_and_print_ecms(args, cone, ids):
+    startSaveEcms = time()
+    try:
+        np.savetxt(args.out_path, cone, delimiter=',', header=','.join(ids), comments='')
+    except OverflowError:
+        normalised = np.transpose(normalize_columns(np.transpose(cone)))
+        np.savetxt(args.out_path, normalised, delimiter=',', header=','.join(ids), comments='')
+
+    if args.verbose is True:
+        mp_print('Found %s ECMs' % cone.shape[0])
+
+    if args.print_conversions is True:
+        print_ecms_direct(np.transpose(cone), ids)
+
+    if args.timestamp:
+        mp_print("Saving ecms took %f seconds." % (time() - startSaveEcms))
 
 
 def print_ecms_direct(R, metabolite_ids):
@@ -602,7 +834,8 @@ def print_ecms_direct(R, metabolite_ids):
         mp_print("")
 
 
-def normalize_columns_slower(R, verbose=False):  # This was the original function, but seems slower and further equivalent to new function below
+def normalize_columns_slower(R,
+                             verbose=False):  # This was the original function, but seems slower and further equivalent to new function below
     result = np.zeros(R.shape)
     number_rays = R.shape[1]
     for i in range(result.shape[1]):
@@ -610,7 +843,7 @@ def normalize_columns_slower(R, verbose=False):  # This was the original functio
             if i % 10000 == 0:
                 mp_print("Normalize columns is on ray %d of %d (%f %%)" %
                          (i, number_rays, i / number_rays * 100), PRINT_IF_RANK_NONZERO=True)
-        largest_number = np.max(np.abs(R[:,i]))
+        largest_number = np.max(np.abs(R[:, i]))
         if largest_number > 1e100:  # If numbers are very large, converting to float might give issues, therefore we first divide by another int
             part_normalized_column = np.array(R[:, i] / largest_number, dtype='float')
             result[:, i] = part_normalized_column / np.linalg.norm(part_normalized_column, ord=1)
@@ -625,7 +858,7 @@ def normalize_columns(R, verbose=False):
     result = R
     largest_number = np.max(np.abs(R))
     if largest_number > 1e100:
-        result = result / largest_number # If numbers are very large, converting to float might give issues, therefore we first divide by another int
+        result = result / largest_number  # If numbers are very large, converting to float might give issues, therefore we first divide by another int
     result = result.astype(dtype='float')
     norms = np.linalg.norm(result, axis=0, ord=1)
     norms[np.where(norms == 0)[0]] = 1
@@ -664,7 +897,7 @@ def normalize_columns_fraction(R, vectorized=False, verbose=True):
                     mp_print("Normalize columns is on ray %d of %d (%f %%)" %
                              (i, number_rays, i / number_rays * 100), PRINT_IF_RANK_NONZERO=True)
             norm_column = np.sum(np.abs(np.array(R[:, i])))
-            if norm_column!=0:
+            if norm_column != 0:
                 R[:, i] = np.array(R[:, i]) / norm_column
     else:
         R = R / np.sum(np.abs(R), axis=0)

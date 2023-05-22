@@ -15,7 +15,7 @@ COPY tmp/.gitignore /ecmtool/tmp/
 COPY main.py setup.py cython_setup.py requirements.txt /ecmtool/
 WORKDIR /ecmtool
 
-RUN pip3 install -r requirements.txt
+RUN pip3 install -r requirements.txt && pip3 install mpi4py==3.1.4
 RUN python3 cython_setup.py build_ext --inplace && mv *.so ecmtool
 RUN python3 setup.py install
 

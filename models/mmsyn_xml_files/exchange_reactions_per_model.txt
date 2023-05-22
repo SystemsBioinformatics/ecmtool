@@ -1,0 +1,24 @@
+model	exchange reactions (all ex reactions above + new ex rea)
+mmsyn_sm00	-
+mmsyn_sm01	EX_duri_e
+mmsyn_sm02	EX_gua_e
+mmsyn_sm03	EX_met4_e
+mmsyn_sm04	EX_ser4_e
+mmsyn_sm05	EX_val4_e
+mmsyn_sm06	EX_tyr4_e
+mmsyn_sm07	EX_trp4_e
+mmsyn_sm08	EX_thr4_e
+mmsyn_sm09	EX_phe4_e
+mmsyn_sm10	EX_pro4_e
+mmsyn_sm11	EX_lys4_e
+mmsyn_sm12	EX_his4_e
+mmsyn_sm13	EX_gln4_e
+mmsyn_sm14	EX_leu4_e
+mmsyn_sm15	EX_asn4_e
+mmsyn_sm16	EX_ala4_e
+mmsyn_sm17	EX_ile4_e
+mmsyn_sm18	EX_gly4_e
+mmsyn_sm19	EX_glu4_e
+mmsyn_sm20	EX_asp4_e
+mmsyn_sm21	EX_asp4_e
+mmsyn_sm22	EX_duri_e
