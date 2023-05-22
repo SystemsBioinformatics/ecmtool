@@ -266,7 +266,7 @@ if __name__ == '__main__':
                         help='Optional: run only a single step of ecmtool, continuing from the state of the previous step. \n'
                              'Allowed values (in order of execution): preprocess, direct_intersect (only when --direct true),\n'
                              'calc_linearities, prep_C0_rays, all_until_mplrs, calc_C0_rays, all_between_mplrs, process_C0_rays, calc_H, prep_C_rays, calc_C_rays,\n'
-                             'process_C_rays, all_from_mplrs, postprocess, save_ecms. Omit to run all steps.')
+                             'process_C_rays, all_from_mplrs, postprocess, save_ecms, make_unique. Omit to run all steps.')
 
     # Choices for the model on which ECM-calculation is performed
     parser.add_argument('--model_path', type=str, default='models/active_subnetwork_KO_5.xml',
@@ -301,9 +301,11 @@ if __name__ == '__main__':
     parser.add_argument('--out_path', default='conversion_cone.csv',
                         help='Relative or absolute path to the .csv file you want to save the calculated conversions to (default: conversion_cone.csv)')
     parser.add_argument('--make_unique', type=str2bool, default=False,
-                        help='Make sure set of ECMs is unique at the end  (default: False). Setting this to false drastically reduces memory requirements of '
+                        help='Make sure set of ECMs is unique at the end  (default: False). Setting this to false '
+                             'drastically reduces memory requirements of '
                              'the postprocessing. When running with direct-method or polco, uniqueness is already '
-                             'guaranteed, but mplrs is known to sometimes create duplicates.')
+                             'guaranteed, but mplrs is known to sometimes create duplicates. One can always make a'
+                             'result unique by running main.py make_unique --out_path <path to calculated conversions>')
 
     # Choices for the way in which ecm-calculation is performed. This can have large consequences for computational
     # time. See publications for information.
@@ -591,6 +593,12 @@ if __name__ == '__main__':
             uniqueReadWrite(args.out_path)
             if args.timestamp:
                 mp_print("Making unique took %f seconds." % (time() - startMakeUnique))
+
+    if args.command in ['make_unique']:
+        startMakeUnique = time()
+        uniqueReadWrite(args.out_path)
+        if args.timestamp:
+            mp_print("Making unique took %f seconds." % (time() - startMakeUnique))
 
     end = time()
     mp_print('Ran in %f seconds' % (end - start))
