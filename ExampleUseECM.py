@@ -2,12 +2,12 @@ import os
 import cbmpy as cbm
 import copy
 import pandas as pd
-from ecmtool import extract_sbml_stoichiometry, get_conversion_cone
+from ecmtool import extract_sbml_stoichiometry, normalize_columns_fraction, get_conversion_cone
 from ecmtool.helpers import unsplit_metabolites, print_ecms_direct, unique
 import numpy as np
 
 
-def calc_ECMs(file_path, print_results=False, input_file_path='', print_metabolites_info=True):
+def calc_ECMs(file_path, print_results=True, input_file_path='', print_metabolites_info=True):
     """
     Calculates ECMs using ECMtool
     :return ecms: np.array
@@ -19,22 +19,22 @@ def calc_ECMs(file_path, print_results=False, input_file_path='', print_metaboli
     :param print_results: Boolean
     :param hide_metabs: indices of metabolites that should be ignored
     """
-    # Stap 1: netwerk bouwen
-    network = extract_sbml_stoichiometry(file_path, determine_inputs_outputs=True)
 
+    """Step 1: build network and perform some preprocessing steps"""
+    network = extract_sbml_stoichiometry(file_path, determine_inputs_outputs=True)
     external_inds = [ind for ind, metab in enumerate(network.metabolites) if metab.is_external]
 
-    """The following are just for checking the inputs to this program."""
+    # The following are just for checking the inputs to this program.
     metab_info_ext = [(ind, metab.id, metab.name, metab.direction) for ind, metab in
                       enumerate(network.metabolites) if metab.is_external]
 
-    """I extract some information about the external metabolites for checking"""
+    # I extract some information about the external metabolites for checking
     metab_info_ext_df = pd.DataFrame(metab_info_ext, columns=['metab_ind', 'metab_id', 'metab_name', 'Direction'])
 
-    """You can choose to save this information, by uncommenting this line"""
-    #    metab_info_ext_df.to_csv(path_or_buf='external_info_iJR904.csv', index=False)
+    # You can choose to save this information, by uncommenting this line
+    #    metab_info_ext_df.to_csv(path_or_buf='external_info_exampleUseECM.csv', index=False)
 
-    """If an input file is supplied, we set in input, output, and hide metabolites from this"""
+    """If an input file is supplied, we set input, output, and hide metabolites from this"""
     if input_file_path:  # If no input file is supplied, standard detection of ecmtool is used
         info_metabs_df = pd.read_csv(input_file_path)
         info_metabs_input = info_metabs_df[info_metabs_df.Input == 1]
@@ -69,23 +69,54 @@ def calc_ECMs(file_path, print_results=False, input_file_path='', print_metaboli
         for index, item in enumerate(network.metabolites):
             print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
 
-    """Keep a copy of the full network before compression. This can be nice for later."""
+    # Keep a copy of the full network before compression. This can be nice for later.
     full_network = copy.deepcopy(network)
+    orig_ids = [m.id for m in network.metabolites]
     orig_N = network.N
 
-    """"Split in and out metabolites, to facilitate ECM computation"""
+    # Putting external_cyles = None is necessary to make the indirect method and direct method compatible
+    external_cycles = None
+
+    # You can choose to print reactions of metabolites by re-setting this boolean.
+    print_before_compression = False
+    compress = True
+    if print_before_compression:
+        print('\nReactions%s:' % (' before compression' if compress else ''))
+        for index, item in enumerate(network.reactions):
+            print(index, item.id, item.name, 'reversible' if item.reversible else 'irreversible')
+
+        print('\nMetabolites%s:' % (' before compression' if compress else ''))
+        for index, item in enumerate(network.metabolites):
+            print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
+
+    # Split in and out metabolites, to facilitate ECM computation.
     network.split_in_out(only_rays=False)
 
-    """Stap 2: compress network"""
-    network.compress(verbose=True)
+    """Step 2: Compression of the network will speed ecmtool up."""
+    if compress:
+        network.compress(verbose=True, SCEI=True, cycle_removal=True, remove_infeasible=True)
 
-    """Stap 3: Ecms enumereren"""
-    #  In this script, indirect intersection is used. Use command line options to use direct intersection
+    # You can choose to print reactions of metabolites by re-setting this boolean.
+    print_after_compression = False
+    if print_after_compression and compress:
+        print('Reactions (after compression):')
+        for index, item in enumerate(network.reactions):
+            print(index, item.id, item.name, 'reversible' if item.reversible else 'irreversible')
+
+        print('Metabolites (after compression):')
+        for index, item in enumerate(network.metabolites):
+            print(index, item.id, item.name, 'external' if item.is_external else 'internal', item.direction)
+
+    """Step 3: Enumerate ECMs"""
+    #  In this script, indirect intersection with polco is used. Use command line options to use direct intersection
     cone = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
-                            network.input_metabolite_indices(), network.output_metabolite_indices(), only_rays=False,
-                            verbose=True)
+                               network.input_metabolite_indices(), network.output_metabolite_indices(),
+                               verbose=True)
+    # Unsplit metabolites that were inputs and outputs, and were therefore split before the computation.
     cone_transpose, ids = unsplit_metabolites(np.transpose(cone), network)
-    cone = np.transpose(cone_transpose)
+    cone = unique(np.transpose(normalize_columns_fraction(cone_transpose)))
+
+    print('Found %s ECMs' % cone.shape[0])
 
     if print_results:
         print_ecms_direct(np.transpose(cone), ids)
@@ -93,23 +124,6 @@ def calc_ECMs(file_path, print_results=False, input_file_path='', print_metaboli
     cone = cone.transpose()  # columns will be the different ECMs, rows are metabolites
 
     return cone, ids, full_network
-
-
-def print_ECMs(cone, debug_tags, network, orig_N, add_objective_metabolite):
-    for index, ecm in enumerate(cone):
-        # Normalise by objective metabolite, if applicable
-        objective_index = -1 - len(debug_tags)
-        objective = ecm[objective_index]
-        if add_objective_metabolite and objective > 0:
-            ecm /= objective
-
-        metabolite_ids = [met.id for met in
-                          network.metabolites] if not network.compressed else network.uncompressed_metabolite_ids
-
-        print('\nECM #%d:' % index)
-        for metabolite_index, stoichiometry_val in enumerate(ecm):
-            if stoichiometry_val != 0.0:
-                print('%s\t\t->\t%.4f' % (metabolite_ids[metabolite_index], stoichiometry_val))
 
 
 def get_efms(N, reversibility, verbose=True, efmtool_path=os.getcwd()):
@@ -128,7 +142,7 @@ def get_efms(N, reversibility, verbose=True, efmtool_path=os.getcwd()):
     if verbose:
         print('Fetching calculated EFMs')
     size = result['efms'].size
-    shape = size[1], size[0] # _data is in transposed form w.r.t. the result matrix
+    shape = size[1], size[0]  # _data is in transposed form w.r.t. the result matrix
     efms = np.reshape(np.array(result['efms']._data), shape)
     if verbose:
         print('Finishing fetching calculated EFMs')
@@ -162,7 +176,7 @@ def check_bijection_csvs(ecms_first_df, ecms_second_df):
     n_ecms_second = ecms_second.shape[1]
 
     # Find matching of metab_ids
-    matching_inds =np.zeros(len(metab_ids_first))
+    matching_inds = np.zeros(len(metab_ids_first))
     for id_ind, id in enumerate(metab_ids_first):
         matching_inds[id_ind] = [id_ind_sec for id_ind_sec, id_sec in enumerate(metab_ids_second) if id_sec == id][0]
 
@@ -177,11 +191,11 @@ def check_bijection_csvs(ecms_first_df, ecms_second_df):
 
     # Normalize both sets of ECMs
     sum_columns_first = np.sum(np.abs(ecms_first), axis=0)
-    sum_columns_first = sum_columns_first[np.newaxis,:]
+    sum_columns_first = sum_columns_first[np.newaxis, :]
     ecms_first = ecms_first / np.repeat(sum_columns_first, ecms_first.shape[0], axis=0)
 
     sum_columns_second = np.sum(np.abs(ecms_second), axis=0)
-    sum_columns_second = sum_columns_second[np.newaxis,:]
+    sum_columns_second = sum_columns_second[np.newaxis, :]
     ecms_second = ecms_second / np.repeat(sum_columns_second, ecms_second.shape[0], axis=0)
 
     found_match_ecms_first = [False] * n_ecms_first
@@ -211,9 +225,10 @@ def check_bijection_csvs(ecms_first_df, ecms_second_df):
 
     return bijection_YN, ecms_first_min_ecms_second, ecms_second_min_ecms_first
 
+
 """CONSTANTS"""
 model_name = "e_coli_core"
-#input_file_name = "bacteroid_ECMinputSmaller.csv"
+# input_file_name = "bacteroid_ECMinputSmaller.csv"
 # For a bigger computation, try:
 # input_file_name = "bacteroid_ECMinputAll.csv"
 
@@ -222,10 +237,10 @@ model_dir = os.path.join(os.getcwd(), "examples_and_results/models")
 
 model_path = os.path.join(model_dir, model_name + ".xml")
 mod = cbm.readSBML3FBC(model_path)
-#input_file_path = os.path.join(os.getcwd(), "examples_and_results\input_files", input_file_name)
+# input_file_path = os.path.join(os.getcwd(), "examples_and_results\input_files", input_file_name)
 
-#ecms_matrix, metab_ids, full_network = calc_ECMs(model_path, print_results=True, input_file_path=input_file_path)
-ecms_matrix, metab_ids, full_network = calc_ECMs(model_path, print_results=True,)
+# ecms_matrix, metab_ids, full_network = calc_ECMs(model_path, print_results=True, input_file_path=input_file_path)
+ecms_matrix, metab_ids, full_network = calc_ECMs(model_path, print_results=True, )
 
 # Create dataframe with the ecms as columns and the metabolites as index
 ecms_df = pd.DataFrame(np.transpose(ecms_matrix), columns=metab_ids)
@@ -234,14 +249,12 @@ ext_metab_inds = []
 ext_metab_ids = []
 for ind_id, metab_id in enumerate(metab_ids):
     ext_metab_bool = [metab.is_external for ind, metab in enumerate(full_network.metabolites) if metab.id == metab_id]
-    if len(ext_metab_bool)>0 and ext_metab_bool[0]:
+    if len(ext_metab_bool) > 0 and ext_metab_bool[0]:
         ext_metab_inds.append(ind_id)
         ext_metab_ids.append(metab_id)
 
 ecms_matrix_ext = ecms_matrix[ext_metab_inds, :]
 ecms_df_ext = pd.DataFrame(np.transpose(ecms_matrix_ext), columns=ext_metab_ids)
 
-#ecms_df_ext.to_csv(path_or_buf=os.path.join(os.getcwd(), "result_files", 'ecms_bacteroid_ext.csv'), index=True)
-#ecms_df.to_csv(path_or_buf=os.path.join(os.getcwd(), "result_files", 'ecms_bacteroid.csv'), index=True)
-ecms_df_ext.to_csv(path_or_buf=os.path.join(os.getcwd(), "result_files", 'ecms_ecolicore_ext.csv'), index=True)
-ecms_df.to_csv(path_or_buf=os.path.join(os.getcwd(), "result_files", 'ecms_ecolicore.csv'), index=True)
+ecms_df_ext.to_csv(
+    path_or_buf=os.path.join(os.getcwd(), "examples_and_results", "result_files", 'ecms_ExampleUseECM.csv'), index=True)

@@ -81,7 +81,7 @@ def calc_ECMs(file_path, print_results=False, input_file_path='', print_metaboli
     """Stap 3: Ecms enumereren"""
     #  In this script, indirect intersection is used. Use command line options to use direct intersection
     cone = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
-                            network.input_metabolite_indices(), network.output_metabolite_indices(), only_rays=False,
+                            network.input_metabolite_indices(), network.output_metabolite_indices(),
                             verbose=True)
     cone_transpose, ids = unsplit_metabolites(np.transpose(cone), network)
     cone = np.transpose(cone_transpose)

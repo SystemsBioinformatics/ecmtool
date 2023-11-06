@@ -31,7 +31,51 @@ def split_columns(matrix, columns):
     return matrix
 
 
-def calculate_linearities(N, reversible_reactions, external_metabolites, input_metabolites, output_metabolites, verbose=False):
+def get_conversion_cone(N, external_metabolites, reversible_reactions, input_metabolites, output_metabolites,
+                        verbose=True):
+    """
+    Main function to calculate ecms in one go, i.e. without using the modular steps as used in main.py. Currently,
+    this function does not allow certain options such as only_rays, hiding-metabolites, etc. Please look at the
+    work flow in main.py to see how you can use these options.
+    Parameters
+    ----------
+    N: stoichiometric matrix (rows are metabolites, columns are reactions)
+    external_metabolites: index list of metabolites that are external
+    reversible_reactions: index list of reactions that are reversible.
+    input_metabolites: index list of external metabolites that can only be used as an input
+    output_metabolites: index list of external metabolites that can only be used as an output
+    verbose
+
+    Returns
+    -------
+    cone: Conversion cone. Matrix with ECMs as columns, external metabolites as rows.
+    """
+    print("Calculating linearities in original network.")
+    linearity_data = calculate_linearities(N, reversible_reactions, external_metabolites, input_metabolites,
+                                           output_metabolites, verbose)
+
+    linearities, linearities_deflated, G_rev, G_irrev, amount_metabolites, \
+    extended_external_metabolites, in_out_indices = linearity_data
+
+    C0_dual_rays = calc_C0_dual_extreme_rays(linearities, G_rev, G_irrev, polco=True, processes=1, jvm_mem=None,
+                                             path2mplrs=None)
+
+    print("Calculating H. Adding steady-state, irreversibility constraints, then discarding redundant inequalities.")
+    H_eq, H_ineq, linearity_rays = calc_H(rays=C0_dual_rays, linearities_deflated=linearities_deflated,
+                                          external_metabolites=external_metabolites,
+                                          input_metabolites=input_metabolites,
+                                          output_metabolites=output_metabolites,
+                                          in_out_indices=in_out_indices,
+                                          redund_after_polco=True, only_rays=False, verbose=True)
+
+    """Calculate extreme rays of conversion cone."""
+    print("Calculating extreme rays of final cone.")
+    cone = calc_C_extreme_rays(H_eq, H_ineq, polco=True, processes=1, jvm_mem=None, path2mplrs=None)
+    return cone
+
+
+def calculate_linearities(N, reversible_reactions, external_metabolites, input_metabolites, output_metabolites,
+                          verbose=False):
     """
     :param N: stoichiometry matrix
     :param reversible_reactions: list of booleans stating whether the reaction at this column is reversible
@@ -131,7 +175,8 @@ def calc_H(rays=None, linearities_deflated=None, external_metabolites=None, inpu
             rays_split = rays_deflated
         else:
             rays_split = split_columns(rays_deflated, in_out_indices) if not only_rays else rays_deflated
-        linearities_split = split_columns(linearities_deflated, in_out_indices) if not only_rays else linearities_deflated
+        linearities_split = split_columns(linearities_deflated,
+                                          in_out_indices) if not only_rays else linearities_deflated
 
         H_ineq = rays_split
         H_eq = linearities_split
@@ -183,7 +228,8 @@ def calc_H(rays=None, linearities_deflated=None, external_metabolites=None, inpu
     if redund_after_polco:
         if mpi_wrapper.is_first_process():
             H_ineq_original = H_ineq
-            H_ineq_normalized = np.transpose(normalize_columns(np.transpose(H_ineq.astype(dtype='float')), verbose=verbose))
+            H_ineq_normalized = np.transpose(
+                normalize_columns(np.transpose(H_ineq.astype(dtype='float')), verbose=verbose))
             H_ineq_float, unique_inds = np.unique(H_ineq_normalized, axis=0, return_index=True)
             H_ineq_original = H_ineq_original[unique_inds, :]
 
@@ -194,10 +240,11 @@ def calc_H(rays=None, linearities_deflated=None, external_metabolites=None, inpu
                 H_ineq_float = None
             H_ineq_float = mpi_wrapper.bcast(H_ineq_float, root=0)
             t1 = time()
-            nonred_inds_ineq, cycle_rays = drop_redundant_rays(np.transpose(H_ineq_float), rays_are_unique=True, linearities=False, normalised=True)
+            nonred_inds_ineq, cycle_rays = drop_redundant_rays(np.transpose(H_ineq_float), rays_are_unique=True,
+                                                               linearities=False, normalised=True)
             if not mpi_wrapper.is_first_process():
                 return None
-            mp_print("Custom redund took %f sec" % (time()-t1))
+            mp_print("Custom redund took %f sec" % (time() - t1))
             H_ineq = H_ineq_original[nonred_inds_ineq, :]
         else:
             if mpi_wrapper.is_first_process():
@@ -226,7 +273,8 @@ def calc_H(rays=None, linearities_deflated=None, external_metabolites=None, inpu
             H_eq = np.append(H_eq, linearities, axis=0)
 
     if verbose:
-        print('Removed %d rows from H in total' % (count_before_eq + count_before_ineq - count_after_eq - count_after_ineq))
+        print('Removed %d rows from H in total' % (
+                count_before_eq + count_before_ineq - count_after_eq - count_after_ineq))
 
     return H_eq, H_ineq, linearity_rays
 

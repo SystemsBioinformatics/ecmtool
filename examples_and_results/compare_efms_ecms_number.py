@@ -3,7 +3,8 @@ import pandas as pd
 import seaborn as sns
 import numpy as np
 import os
-from ecmtool import extract_sbml_stoichiometry, get_conversion_cone
+from ecmtool import extract_sbml_stoichiometry, get_conversion_cone, normalize_columns_fraction, unique, \
+    unsplit_metabolites
 
 from examples_and_results.helpers_ECM_calc import get_efms
 
@@ -19,7 +20,7 @@ models = models + ['active_subnetwork', 'active_subnetwork_FVA', 'e_coli_core']
 number_info_df = pd.DataFrame(columns=['model', 'ECMs', 'EFMs', 'n_reacs'])
 
 for model_str in models:
-    model_path = os.path.join('models', model_str+'.xml')
+    model_path = os.path.join('models', model_str + '.xml')
 
     """Check if efms match ecms in E. coli core"""
     # Load model in ecmtool and create network object
@@ -41,7 +42,7 @@ for model_str in models:
         if metabolite.is_external:
             reaction = identity[:, index] if metabolite.direction != 'output' else -identity[index]
             ex_N = np.append(ex_N, np.transpose([reaction]), axis=1)
-            reac_ids.append('R_ex_'+metabolite.id)
+            reac_ids.append('R_ex_' + metabolite.id)
             reversibilities.append(True if metabolite.direction == 'both' else False)
             n_exchanges += 1
 
@@ -54,10 +55,13 @@ for model_str in models:
     network.compress(verbose=True)
 
     """Stap 3: Ecms enumereren"""
-    cone = network.uncompress(
-        get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
-                            network.input_metabolite_indices(), network.output_metabolite_indices(), only_rays=False,
-                            verbose=True))
+    cone = get_conversion_cone(network.N, network.external_metabolite_indices(), network.reversible_reaction_indices(),
+                               network.input_metabolite_indices(), network.output_metabolite_indices(),
+                               verbose=True)
+    # Unsplit metabolites that were inputs and outputs, and were therefore split before the computation.
+    cone_transpose, ids = unsplit_metabolites(np.transpose(cone), network)
+    cone = unique(np.transpose(normalize_columns_fraction(cone_transpose)))
+    # cone = network.uncompress(cone)
 
     cone = cone.transpose()
 
@@ -66,7 +70,7 @@ for model_str in models:
     number_info_df = number_info_df.append(
         {'model': model_str, 'ECMs': n_ecms, 'EFMs': n_efms, 'n_reacs': ex_N.shape[1]}, ignore_index=True)
 
-number_info_df_td = pd.melt(number_info_df, id_vars=['model','n_reacs'], var_name='type', value_name='number')
+number_info_df_td = pd.melt(number_info_df, id_vars=['model', 'n_reacs'], var_name='type', value_name='number')
 number_info_df_td.n_reacs = number_info_df_td.n_reacs.astype(float)
 number_info_df_td.number = number_info_df_td.number.astype(float)
 
