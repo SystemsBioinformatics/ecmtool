@@ -6,7 +6,7 @@ python-libsbml==5.19.7
 cbmpy==0.8.4
 pyparsing==3.0.9
 psutil==5.9.4
-scikit-learn==1.2.2
+scikit-learn==1.5.0
 cython==0.29.33
 pytest==7.2.2
 gmpy2==2.1.5
